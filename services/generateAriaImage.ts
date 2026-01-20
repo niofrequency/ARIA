@@ -7,14 +7,13 @@ import { CharacterProfile } from "../types";
  */
 const LORA_MAP: Record<string, string> = {
   "brittany": "brittanyspears-v1",
-  "amrvida": "asmrvida",
-  "asmr": "asmrvida",
+  "asmrvida": "asmrvida",
   "stephanie": "stephanie-lvl2",
   "stephanie og": "stephanie-og-000009",
   "stephanie v1": "stephanie-v1-000009",
   "stephanie proxy" : "stephanie-proxy",
   "poison ivy": "poison-ivy",
-  "ivy": "ivyharper-v1",
+  "ivy harper": "ivyharper-v1",
   "debby ryan": "debby-ryan",
   "debby-ryan": "debby-ryan",
   "witchofoz": "witchofoz",
