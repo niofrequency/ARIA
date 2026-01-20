@@ -8,7 +8,7 @@ interface SidebarProps {
   onSelectBot: (botId: string) => void;
   onNewBot: () => void;
   conversations: Conversation[]; 
-  onSelectConversation: (conversationId: string) => void;
+  onSelectConversation: (conversationId: string) => void; 
   onDeleteConversation: (botId: string, conversationId: string) => void;
   onDeleteBot: (botId: string) => void; 
   onSignOut: () => void;
