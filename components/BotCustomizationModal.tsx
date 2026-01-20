@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { CharacterProfile } from '../types';
 import { X, Save, Sparkles, Cpu, Fingerprint, Activity, Loader2, Plus, AlertCircle } from 'lucide-react';
-
+ 
 interface BotCustomizationModalProps {
   character: CharacterProfile;
   onSave: (updatedCharacter: CharacterProfile) => void;
