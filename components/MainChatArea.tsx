@@ -12,7 +12,7 @@ interface MainChatAreaProps {
   messages: Message[];
   userData: UserData;
   onImageGenerated: () => void;
-  onSendMessage: (message: Message) => void;
+  onSendMessage: (message: Message) => void; 
   onUpdateMessage: (messageId: string, updates: Partial<Message>) => void;
   onToggleMobileSidebar: () => void;
   onToggleDesktopSidebar: () => void;
