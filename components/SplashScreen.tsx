@@ -4,7 +4,7 @@ import { Button } from './ui/button';
 
 interface SplashScreenProps {
     onFinish: () => void;
-}
+} 
 
 const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
     const [mounted, setMounted] = useState(false);
