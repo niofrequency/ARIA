@@ -12,6 +12,7 @@ const LORA_MAP: Record<string, string> = {
   "stephanie": "stephanie-lvl2",
   "stephanie og": "stephanie-og-000009",
   "stephanie v1": "stephanie-v1-000009",
+  "stephanie proxy" : "stephanie-proxy",
   "poison ivy": "poison-ivy",
   "ivy": "ivyharper-v1",
   "debby ryan": "debby-ryan",
