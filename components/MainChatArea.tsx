@@ -6,7 +6,7 @@ import { generateAriaImage } from '../services/generateAriaImage';
 import { initiateNeuralMotion, pollNeuralMotionStatus } from '../services/neuralMotionService';
 import { uploadImageToStorage, deleteMediaFromStorage } from '../services/firebaseService';
 import { Loader2, X, Download, Menu, Settings, Cpu, ArrowUp } from 'lucide-react';
-
+ 
 interface MainChatAreaProps {
   character: CharacterProfile;
   messages: Message[];
