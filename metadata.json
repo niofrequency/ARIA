@@ -1,0 +1,5 @@
+{
+  "name": "ARIA",
+  "description": "ARIA is a dynamic AI Character Engine powered by Grok-3 and RunPod. Create unique personalities that evolve through real-time chat and high-fidelity image generation. Every trait—age, vibe, and look—is synced via Firebase for a truly personalized, multi-sensory companion experience.",
+  "requestFramePermissions": []
+}
