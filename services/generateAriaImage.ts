@@ -26,6 +26,8 @@ const LORA_MAP: Record<string, string> = {
   "aubrey": "aubreyplaza-v1",
   "jenna": "jennaortega-v1",
   "theresa": "theresa",
+  "bule barbie" : "bule-barbie",
+  "eva the elf" : "eva-the-elf",
   "cum on your mouth": "cum-on-your-face"
 };
 
