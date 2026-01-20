@@ -5,22 +5,22 @@ import { orchestrateNeuralPrompt } from "./neuralMotionManager";
  * Video Neural Mapping: Triggers specific .safetensors for Wan 2.1
  */
 const LORA_MAP: Record<string, string> = {
-  "creampie":      "creampie.safetensors",
+  "creampie":                      "creampie.safetensors",
   "cum from your pussy":           "creampie.safetensors",
-  "cum dripping from your pussy":           "creampie.safetensors",
-  "cum from your vagina":           "creampie.safetensors",
-  "cum dripping from your vagina":           "creampie.safetensors",// Alias for broader detection
-  "cum in mouth": "cum-in-mouth.safetensors",
-  "cum on your tongue": "cum-in-mouth.safetensors",
-  "cum dripping from your mouth": "cum-in-mouth.safetensors",
-  "cum drooling": "cum-in-mouth.safetensors",
-  "fingering":    "fingering.safetensors",
-  "twerk":         "twerk.safetensors",
-  "twerking" :     "twerk.safetensors",
-  "shaking your ass" :     "twerk.safetensors",
-  "pussy":        "vagina.safetensors",
-  "cunt":        "vagina.safetensors"
-  "vagina":        "vagina.safetensors"
+  "cum dripping from your pussy":  "creampie.safetensors",
+  "cum from your vagina":          "creampie.safetensors",
+  "cum dripping from your vagina": "creampie.safetensors",
+  "cum in mouth":                  "cum-in-mouth.safetensors",
+  "cum on your tongue":            "cum-in-mouth.safetensors",
+  "cum dripping from your mouth":  "cum-in-mouth.safetensors",
+  "cum drooling":                  "cum-in-mouth.safetensors",
+  "fingering":                     "fingering.safetensors",
+  "twerk":                         "twerk.safetensors",
+  "twerking":                      "twerk.safetensors",
+  "shaking your ass":              "twerk.safetensors",
+  "pussy":                         "vagina.safetensors",
+  "cunt":                          "vagina.safetensors", // Added missing comma here
+  "vagina":                        "vagina.safetensors"
 };
 
 const getImageDimensions = (url: string): Promise<{ width: number; height: number }> => {
@@ -141,4 +141,5 @@ export const pollNeuralMotionStatus = async (
     }
   }, delay);
 };
+
 
