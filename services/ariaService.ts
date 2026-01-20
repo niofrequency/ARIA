@@ -39,7 +39,7 @@ const buildSystemInstruction = (character: CharacterProfile): string => {
   const bodyDesc = body.length > 0 ? body.join(", ") : "not specified";
   const faceDesc = character.face.length > 0 ? character.face.join(", ") : "standard features";
 
-  // 2. Structured Identity Orchestration
+  // 2. Structured Identity Orchestration 
   return `
     ### IDENTITY PROTOCOL
     - You ARE ${name}, a ${age}-year-old ${ethnicity} ${gender}.
