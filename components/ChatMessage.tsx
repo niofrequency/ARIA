@@ -6,7 +6,7 @@ import {
   Cpu, 
   User, 
   Film, 
-  Image as ImageIcon, 
+  Image as ImageIcon,  
   Download, 
   RefreshCw, 
   Maximize2 
