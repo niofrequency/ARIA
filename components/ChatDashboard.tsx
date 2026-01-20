@@ -6,7 +6,7 @@ import BotCustomizationModal from './BotCustomizationModal';
 import { 
   saveBotToFirestore, 
   loadBotsFromFirestore, 
-  saveConversationToFirestore, 
+  saveConversationToFirestore,  
   loadConversationsFromFirestore,
   deleteBotFromFirestore,
   uploadImageToStorage 
