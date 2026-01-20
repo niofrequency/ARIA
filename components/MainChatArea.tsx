@@ -4,7 +4,7 @@ import { Message, CharacterProfile, UserData } from '../types';
 import { generateAriaResponse, checkForImageRequest, extractContextPrompt } from '../services/ariaService';
 import { generateAriaImage } from '../services/generateAriaImage'; 
 import { initiateNeuralMotion, pollNeuralMotionStatus } from '../services/neuralMotionService';
-import { uploadImageToStorage, deleteMediaFromStorage, getProxiedUrl } from '../services/firebaseService'; // Added getProxiedUrl
+import { uploadImageToStorage, deleteMediaFromStorage } from '../services/firebaseService';
 import { Loader2, X, Download, Menu, Settings, Cpu, ArrowUp } from 'lucide-react';
 
 interface MainChatAreaProps {
@@ -127,99 +127,103 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
     }
   };
 
-  /**
-   * NEURAL MOTION HANDLER
-   * FIXED: Includes "Un-Proxy" logic to prevent "Scheme missing" errors in the Python worker.
-   */
-  const handleAnimateRequest = async (message: Message) => {
-    if (!message.imageUrl || !character) {
-      console.error("❌ Animation Aborted: Missing Image or Character Profile");
-      return;
+/**
+ * NEURAL MOTION HANDLER
+ * logic:
+ * 1. Synchronizes User Intent + AI Context for high-fidelity physics.
+ * 2. Persists temporary blobs to Storage before worker ingestion.
+ * 3. Forces UI refresh via cache-busting while maintaining backend compatibility.
+ */
+const handleAnimateRequest = async (message: Message) => {
+  if (!message.imageUrl || !character) {
+    console.error("❌ Animation Aborted: Missing Image or Character Profile");
+    return;
+  }
+
+  // 1. UI Reset: Clear old state and trigger the Synthesis Overlay
+  onUpdateMessage(message.id, { 
+    videoUrl: undefined,
+    isVideoLoading: true, 
+    motionStatus: 'synthesizing' 
+  });
+
+  try {
+    // 2. CONTEXT HARVESTING
+    // Find the User Message immediately preceding this bot response to detect liquid/motion intent
+    const messageIndex = messages.findIndex(m => m.id === message.id);
+    const userPrompt = (messageIndex > 0 && messages[messageIndex - 1].role === 'user') 
+      ? messages[messageIndex - 1].text 
+      : "";
+
+    let sourceImageUrl = message.imageUrl;
+
+    // 3. PERSISTENCE CHECK
+    // Ensure temporary blobs are archived to Storage before the Worker attempts to download them
+    if (sourceImageUrl.startsWith('blob:') || sourceImageUrl.startsWith('data:')) {
+      if (userData?.uid) {
+        sourceImageUrl = await uploadImageToStorage(userData.uid, botId, message.imageUrl);
+        onUpdateMessage(message.id, { imageUrl: sourceImageUrl });
+      } else {
+        throw new Error("User ID missing for persistence");
+      }
     }
 
-    // 1. UI Reset: Clear old state and trigger the Synthesis Overlay
-    onUpdateMessage(message.id, { 
-      videoUrl: undefined,
-      isVideoLoading: true, 
-      motionStatus: 'synthesizing' 
-    });
+    const aiDialogue = message.text || "";
+    const negPrompt = character.negativePrompt || "blurry, distorted, static, flickering";
 
-    try {
-      // 2. CONTEXT HARVESTING
-      const messageIndex = messages.findIndex(m => m.id === message.id);
-      const userPrompt = (messageIndex > 0 && messages[messageIndex - 1].role === 'user') 
-        ? messages[messageIndex - 1].text 
-        : "";
+    // 4. NEURAL DISPATCH (Wan 2.1 Optimized)
+    // Passing all 5 arguments to ensure correct Orchestration and LoRA mapping
+    const jobId = await initiateNeuralMotion(
+      sourceImageUrl, 
+      aiDialogue, 
+      userPrompt, 
+      character, 
+      negPrompt
+    );
 
-      let sourceImageUrl = message.imageUrl;
+    if (!jobId) throw new Error("No Job ID received from Neural Engine");
 
-      // --- WORKER CRASH FIX: UN-PROXY URL ---
-      // The worker needs a real "https://" URL, not a relative "/storage-proxy/..." path.
-      if (sourceImageUrl.startsWith('/storage-proxy/')) {
-        sourceImageUrl = sourceImageUrl.replace('/storage-proxy/', 'https://firebasestorage.googleapis.com/');
-      }
+    // 5. STATUS POLLING & UI SYNC
+    pollNeuralMotionStatus(
+      jobId,
+      async (videoOutput) => {
+        let displayUrl = videoOutput;
 
-      // 3. PERSISTENCE CHECK
-      if (sourceImageUrl.startsWith('blob:') || sourceImageUrl.startsWith('data:')) {
-        if (userData?.uid) {
-          sourceImageUrl = await uploadImageToStorage(userData.uid, botId, message.imageUrl);
-          onUpdateMessage(message.id, { imageUrl: sourceImageUrl });
-        } else {
-          throw new Error("User ID missing for persistence");
+        // Convert base64 responses to local blobs for immediate playback performance
+        if (videoOutput.startsWith('data:video')) {
+          const blob = dataURLtoBlob(videoOutput);
+          displayUrl = URL.createObjectURL(blob);
         }
+
+        // --- CACHE BUSTER LOGIC ---
+        // Forces the browser to ignore the video cache and play the fresh generation.
+        // App.tsx handleVideoSynthesized will strip this 't=' before archiving.
+        const timestampedUrl = `${displayUrl}${displayUrl.includes('?') ? '&' : '?'}t=${Date.now()}`;
+
+        onUpdateMessage(message.id, {
+          videoUrl: timestampedUrl, 
+          isVideoLoading: false,
+          motionStatus: 'completed'
+        });
+
+        // Delay sync to allow UI to settle before permanent Firebase archiving triggers
+        setTimeout(() => {
+          onImageGenerated();
+        }, 800);
+      },
+      (error) => {
+        console.error("❌ Neural Motion Failed:", error);
+        onUpdateMessage(message.id, { isVideoLoading: false, motionStatus: 'failed' });
       }
+    );
 
-      const aiDialogue = message.text || "";
-      const negPrompt = character.negativePrompt || "blurry, distorted, static, flickering";
+  } catch (err: any) {
+    console.error("❌ Neural Motion Init Failed:", err.message);
+    onUpdateMessage(message.id, { isVideoLoading: false, motionStatus: 'failed' });
+  }
+};
 
-      // 4. NEURAL DISPATCH (Wan 2.1 Optimized)
-      const jobId = await initiateNeuralMotion(
-        sourceImageUrl, 
-        aiDialogue, 
-        userPrompt, 
-        character, 
-        negPrompt
-      );
-
-      if (!jobId) throw new Error("No Job ID received from Neural Engine");
-
-      // 5. STATUS POLLING & UI SYNC
-      pollNeuralMotionStatus(
-        jobId,
-        async (videoOutput) => {
-          let displayUrl = videoOutput;
-
-          // Convert base64 responses to local blobs for immediate playback performance
-          if (videoOutput.startsWith('data:video')) {
-            const blob = dataURLtoBlob(videoOutput);
-            displayUrl = URL.createObjectURL(blob);
-          }
-
-          // Cache Buster logic
-          const timestampedUrl = `${displayUrl}${displayUrl.includes('?') ? '&' : '?'}t=${Date.now()}`;
-
-          onUpdateMessage(message.id, {
-            videoUrl: timestampedUrl, 
-            isVideoLoading: false,
-            motionStatus: 'completed'
-          });
-
-          setTimeout(() => {
-            onImageGenerated();
-          }, 800);
-        },
-        (error) => {
-          console.error("❌ Neural Motion Failed:", error);
-          onUpdateMessage(message.id, { isVideoLoading: false, motionStatus: 'failed' });
-        }
-      );
-
-    } catch (err: any) {
-      console.error("❌ Neural Motion Init Failed:", err.message);
-      onUpdateMessage(message.id, { isVideoLoading: false, motionStatus: 'failed' });
-    }
-  };
-
+  
   /**
    * CORE INTERACTION: HANDLE SEND
    */
@@ -244,6 +248,7 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
         content: m.text || '' 
       }));
 
+      // Call Brain Proxy
       const rawResponse = await generateAriaResponse(userText, history, character);
       const { cleanText, contextPrompt } = extractContextPrompt(rawResponse);
       const isGeneratingImage = isImageRequested || !!contextPrompt;
@@ -256,6 +261,7 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
         timestamp: Date.now()
       });
 
+      // Call Body Generator (Tag-Aware)
       if (isGeneratingImage) {
         try {
           const tempImageUrl = await generateAriaImage(contextPrompt, userText, character);
@@ -297,20 +303,12 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
     }
   };
 
-  /**
-   * DOWNLOAD MEDIA
-   * Uses proxy for remote URLs to ensure downloads work in restricted regions.
-   */
   const downloadMedia = async (url: string, type: 'image' | 'video') => {
     if (isDownloading) return;
     setIsDownloading(true);
     
     try {
-      // Determine correct URL strategy: Local blobs stay local, Remote URLs use Proxy
-      const isLocal = url.startsWith('blob:') || url.startsWith('data:');
-      const finalUrl = isLocal ? url : getProxiedUrl(url);
-
-      const response = await fetch(finalUrl);
+      const response = await fetch(url);
       const blob = await response.blob();
       const blobUrl = window.URL.createObjectURL(blob);
       
@@ -324,8 +322,7 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
       window.URL.revokeObjectURL(blobUrl);
     } catch (err) {
       console.error("Download failed:", err);
-      // Fallback
-      window.open(getProxiedUrl(url), '_blank');
+      window.open(url, '_blank');
     } finally {
       setIsDownloading(false);
     }
@@ -428,15 +425,14 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
         </div>
       </footer>
 
-      {/* MEDIA MODAL: PROXY & BLOB FIX */}
+      {/* MEDIA MODAL */}
       {selectedMedia && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/95 backdrop-blur-md p-4" onClick={() => setSelectedMedia(null)}>
           <div className="relative max-w-5xl w-full flex flex-col items-center" onClick={(e) => e.stopPropagation()}>
             
             {selectedMedia.type === 'video' ? (
               <video 
-                /* Logic Check: Only proxy if NOT a local blob */
-                src={selectedMedia.url.startsWith('blob:') || selectedMedia.url.startsWith('data:') ? selectedMedia.url : getProxiedUrl(selectedMedia.url)} 
+                src={selectedMedia.url} 
                 controls 
                 autoPlay 
                 loop
@@ -444,8 +440,7 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
               />
             ) : (
               <img 
-                /* Logic Check: Only proxy if NOT a local blob */
-                src={selectedMedia.url.startsWith('blob:') || selectedMedia.url.startsWith('data:') ? selectedMedia.url : getProxiedUrl(selectedMedia.url)} 
+                src={selectedMedia.url} 
                 alt="Neural Output" 
                 className="max-h-[80vh] object-contain rounded-2xl border border-white/10 shadow-2xl" 
               />
