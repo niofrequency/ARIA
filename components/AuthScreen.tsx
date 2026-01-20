@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { auth } from '../lib/firebase';
 import { LogIn, UserPlus } from 'lucide-react';
 import { Button } from './ui/button'; 
-
+ 
 const AuthScreen: React.FC = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
