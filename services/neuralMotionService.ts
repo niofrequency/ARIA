@@ -13,6 +13,7 @@ const LORA_MAP: Record<string, string> = {
   "cum in mouth":                  "cum-in-mouth.safetensors",
   "cum on your tongue":            "cum-in-mouth.safetensors",
   "cum dripping from your mouth":  "cum-in-mouth.safetensors",
+  "drooling cum from your mouth":  "cum-in-mouth.safetensors",
   "cum drooling":                  "cum-in-mouth.safetensors",
   "fingering":                     "fingering.safetensors",
   "twerk":                         "twerk.safetensors",
@@ -141,5 +142,6 @@ export const pollNeuralMotionStatus = async (
     }
   }, delay);
 };
+
 
 
