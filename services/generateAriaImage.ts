@@ -150,14 +150,15 @@ export const generateAriaImage = async (
     if ((s.includes("frontview") || s.includes("backview") || s.includes("sideview") || s.includes("profile") || s.includes("from above") || s.includes("from below") || s.includes("high angle") || s.includes("low angle") || s.includes("overhead") || s.includes("birdseye") || s.includes("wormseye")) && 
         (t.includes("front") || t.includes("back") || t.includes("side") || t.includes("rear") || t.includes("profile") || t.includes("bottom view") || t.includes("top view"))) return true;
 
-    // DEFAULT: Wide shot includes everything
-if (!isFaceFocus && !isUpperBody && !isPartFocus && !isLowerBody) {
-       const situationalRegex = /ass|butt|rear|backside|armpit|feet|toes|pussy|vagina|anus|clit|sperm|cum/i;
+// DEFAULT: Wide shot includes everything
+    if (!isFaceFocus && !isUpperBody && !isPartFocus && !isLowerBody) {
+       // Added: bosom, chest, nipples, groin to catch everything
+       const situationalRegex = /ass|butt|rear|backside|tits|boobies|breasts|bosom|chest|nipples|armpit|feet|toes|pussy|vagina|anus|labia|clit|groin|sperm|cum/i;
        
-       // If the tag is "hairy armpit" or "big butt", return FALSE (exclude it)
+       // If the tag is "hairy armpit" or "large bosom", return FALSE (exclude it from generic pics)
        if (situationalRegex.test(t)) return false;
        
-       return true; // Allow "Large Bosom", "Curvy", "Tall"
+       return true; // Allow "Curvy", "Tall", "Tan", "Athletic"
     }
   });
 
