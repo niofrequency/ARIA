@@ -225,17 +225,26 @@ export const generateAriaImage = async (
     ];
   }
 
-  // --- 4. FINAL PROMPT ASSEMBLY ---
-  const physicalIdentity = situationalTags.filter(Boolean).join(", ");
-  
-  let promptText = [
+// --- 4. SAFETY & NEGATIVE PROMPT LAYER (NEW) ---
+  // Detect if the user/AI explicitly requested nudity
+  const explicitTriggers = ["nude", "naked", "topless", "nipples", "areola", "pussy", "vagina", "sex", "cum", "penis", "dick", "cock", "threesome", "orgasm", "clit", "strip", "undress", "no clothes", "bottomless", "exposed"];
+  const isExplicitRequest = explicitTriggers.some(t => sceneLower.includes(t));
+
+  // If NO nudity requested, force clothing in negative prompt
+  let safetyNegatives = "";
+  if (!isExplicitRequest) {
+    safetyNegatives = "nude, naked, nipples, topless, exposed breast, genitals, vaginal, penis, pussy";
+  }
+
+  const promptText = [
     "(masterpiece, high quality, realistic:1.2)",
-    physicalIdentity,
+    situationalTags.filter(Boolean).join(", "),
     baseDescription, 
     "unfiltered raw candid cinematic photo, extremely detailed skin texture, photorealistic, natural subsurface scattering, film grain, dslr look, 8k uhd"
   ].filter(Boolean).join(", ").replace(/\s+/g, " ").trim();
 
   const negativeText = [
+    safetyNegatives, // <--- Forces clothes if nudity wasn't asked for
     character.negativePrompt || "",
     "(multiple girls, 2girls, 3girls, trio, duo, group, crowd:1.6)", 
     "(multiple people:1.5), (male, man, boy:1.3)",
@@ -251,6 +260,7 @@ export const generateAriaImage = async (
   // --- DEBUG LOGGING ---
   console.log(`🚀 Dispatching Neural Sync: ${character.name}`);
   console.log(`📝 Final Prompt: ${promptText}`);
+  console.log(`🛡️ Safety Mode: ${isExplicitRequest ? "OFF (Nudity Allowed)" : "ON (Forcing Clothes)"}`);
   if (activeLoraFile) console.log(`🧬 Active LoRA: ${activeLoraFile}.safetensors (Weight: ${activeWeight})`);
 
   // --- 5. COMFYUI WORKFLOW INJECTION ---
