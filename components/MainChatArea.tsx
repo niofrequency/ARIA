@@ -6,6 +6,7 @@ import { generateAriaImage } from '../services/generateAriaImage';
 import { initiateNeuralMotion, pollNeuralMotionStatus } from '../services/neuralMotionService';
 import { uploadImageToStorage, deleteMediaFromStorage } from '../services/firebaseService';
 import { Loader2, X, Download, Menu, Settings, Cpu, ArrowUp, PanelLeft } from 'lucide-react';
+import { storeMemory } from '../services/memoryService';
  
 interface MainChatAreaProps {
   character: CharacterProfile;
@@ -248,15 +249,24 @@ const handleAnimateRequest = async (message: Message) => {
         content: m.text || '' 
       }));
 
-      // Call Brain Proxy
-      const rawResponse = await generateAriaResponse(userText, history, character);
-      const { cleanText, contextPrompt } = extractContextPrompt(rawResponse);
+      // Call Brain Proxy (Now with Memory IDs for recall)
+      const rawResponse = await generateAriaResponse(userText, history, character, userData?.uid, botId);
+      
+      // DESTRUCTURE: Now extracting memoryText along with visual prompts
+      const { cleanText, contextPrompt, memoryText } = extractContextPrompt(rawResponse);
+      
+      // AUTO-SAVE MEMORY: If the brain marked a fact, save it to the database
+      if (memoryText && userData?.uid) {
+        console.log("💾 Auto-Saving Memory:", memoryText);
+        storeMemory(memoryText, userData.uid, botId);
+      }
+
       const isGeneratingImage = isImageRequested || !!contextPrompt;
       
       onSendMessage({
         id: responseMessageId,
         role: 'model',
-        text: cleanText,
+        text: cleanText, // This text is clean (no [[VISUAL]] or [[MEMORY]] tags)
         isImageLoading: isGeneratingImage,
         timestamp: Date.now()
       });
@@ -264,7 +274,10 @@ const handleAnimateRequest = async (message: Message) => {
       // Call Body Generator (Tag-Aware)
       if (isGeneratingImage) {
         try {
-          const tempImageUrl = await generateAriaImage(contextPrompt, userText, character);
+          // If the AI didn't provide a specific visual tag but user asked for one, fallback to userText
+          const promptToUse = contextPrompt || userText;
+          
+          const tempImageUrl = await generateAriaImage(promptToUse, userText, character);
           
           if (tempImageUrl) {
             onUpdateMessage(responseMessageId, { 
