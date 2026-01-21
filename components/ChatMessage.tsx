@@ -87,7 +87,7 @@ const isUser = message.role === 'user';
         }
         return fullText.slice(0, nextIndex);
       });
-    }, 44); // Adjust typing speed here (ms)
+    }, 50); // Adjust typing speed here (ms)
 
     return () => clearInterval(typingInterval);
   }, [message.text, shouldAnimate]);
