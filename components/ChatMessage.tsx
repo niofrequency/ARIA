@@ -31,25 +31,34 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
   const [viewMode, setViewMode] = useState<'video' | 'image'>('video');
   const [isDownloading, setIsDownloading] = useState(false);
 
-  // --- NEW: Typing Effect State ---
-  const [displayedText, setDisplayedText] = useState(isUser ? message.text : '');
-  const [isTypingComplete, setIsTypingComplete] = useState(isUser);
+  // --- TYPEWRITER STATE ---
+  // 1. Check if message is older than 5 seconds (History)
+  const isHistory = (Date.now() - (message.timestamp || 0)) > 5000;
+  
+  // 2. Only animate if it is a BOT and NOT history
+  const shouldAnimate = !isUser && !isHistory;
+
+  // 3. Initialize State
+  // If should animate -> Start Empty ('')
+  // If user OR history -> Start Full (message.text)
+  const [displayedText, setDisplayedText] = useState(shouldAnimate ? '' : message.text);
+  const [isTypingComplete, setIsTypingComplete] = useState(!shouldAnimate);
 
   /**
    * TYPING EFFECT LOGIC
-   * Reveals the AI response character by character.
    */
   useEffect(() => {
-    // If it's a user message, show immediately.
-    if (isUser) {
-      setDisplayedText(message.text);
+    // If we shouldn't animate (user or history), ensure full text is shown immediately.
+    if (!shouldAnimate || !message.text) {
+      if (displayedText !== message.text) {
+        setDisplayedText(message.text || '');
+      }
       setIsTypingComplete(true);
       return;
     }
 
-    // If message text is empty or already fully displayed, mark complete.
-    if (!message.text || displayedText === message.text) {
-      if (!displayedText && message.text) setDisplayedText(message.text); // Catch-up if empty start
+    // If text is already fully displayed, stop.
+    if (displayedText === message.text) {
       setIsTypingComplete(true);
       return;
     }
@@ -61,20 +70,20 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
     let currentIndex = 0;
     const fullText = message.text;
     
-    // Speed: 15ms per character (adjust number lower for faster typing)
     const typingInterval = setInterval(() => {
-      if (currentIndex < fullText.length) {
-        setDisplayedText((prev) => fullText.slice(0, prev.length + 1));
-        currentIndex++;
-      } else {
+      setDisplayedText(fullText.slice(0, currentIndex + 1));
+      currentIndex++;
+
+      if (currentIndex >= fullText.length) {
         clearInterval(typingInterval);
         setIsTypingComplete(true);
       }
-    }, 15);
+    }, 15); // Adjust typing speed here (ms)
 
     return () => clearInterval(typingInterval);
-  }, [message.text, isUser]);
-
+  }, [message.text, shouldAnimate]); // IMPORTANT: Added shouldAnimate dependency
+  
+  
   /**
    * MEDIA SYNC
    * Ensures the UI automatically switches to 'video' view when a 
