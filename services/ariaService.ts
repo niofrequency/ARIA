@@ -1,29 +1,38 @@
 import { CharacterProfile } from "../types";
 import { generateAriaImage } from "./generateAriaImage";
+import { retrieveMemories } from "./memoryService";
 
 /**
  * EXTRACT CONTEXT PROMPT
- * Parses the AI response to separate chat text from the visual generator prompt.
+ * Parses the AI response to separate chat text from Visual tags AND Memory tags.
  */
-export const extractContextPrompt = (text: string): { cleanText: string; contextPrompt: string | null } => {
-  const regex = /[\[\{]{2}\s*VISUAL\s*:\s*([\s\S]*?)\s*[\]\}]{2}/i;
-  const match = text.match(regex);
-  
-  if (match) {
-    const contextPrompt = match[1].trim();
-    let cleanText = text.replace(regex, '').trim();
-    
-    if (cleanText.includes('[[VISUAL:') || cleanText.includes('{{visual:')) {
-      cleanText = cleanText.split(/[\[\{]{2}VISUAL/i)[0].trim();
-    }
+export const extractContextPrompt = (text: string) => {
+  // 1. Extract VISUAL Tag
+  const visualRegex = /[\[\{]{2}\s*VISUAL\s*:\s*([\s\S]*?)\s*[\]\}]{2}/i;
+  const visualMatch = text.match(visualRegex);
+  const contextPrompt = visualMatch ? visualMatch[1].trim() : null;
 
-    return {
-      cleanText: cleanText || "...", 
-      contextPrompt: contextPrompt
-    };
-  }
+  // 2. Extract MEMORY Tag
+  const memoryRegex = /[\[\{]{2}\s*MEMORY\s*:\s*([\s\S]*?)\s*[\]\}]{2}/i;
+  const memoryMatch = text.match(memoryRegex);
+  const memoryText = memoryMatch ? memoryMatch[1].trim() : null;
+
+  // 3. Clean the text (Remove both tags so the user doesn't see them)
+  let cleanText = text
+    .replace(visualRegex, '')
+    .replace(memoryRegex, '')
+    .trim();
   
-  return { cleanText: text, contextPrompt: null };
+  // Safety cleanup for malformed tags
+  if (cleanText.includes('[[VISUAL:') || cleanText.includes('{{visual:')) {
+    cleanText = cleanText.split(/[\[\{]{2}VISUAL/i)[0].trim();
+  }
+
+  return {
+    cleanText: cleanText || "...", 
+    contextPrompt,
+    memoryText // <--- New field passed to MainChatArea
+  };
 };
 
 
@@ -32,7 +41,7 @@ export const extractContextPrompt = (text: string): { cleanText: string; context
  * Optimized for Identity Anchoring, Situational Tagging, and Strict Operating Rules.
  */
 const buildSystemInstruction = (character: CharacterProfile): string => {
-  const { name, age, gender, ethnicity, body, hair, vibe, outfit, personality } = character;
+  const { name, age, gender, ethnicity, body, hair, vibe, outfit } = character;
   
   // 1. Tag Aggregation for the LLM's visual memory
   const hairDesc = hair.length > 0 ? hair.join(", ") : "not specified";
@@ -72,7 +81,7 @@ const buildSystemInstruction = (character: CharacterProfile): string => {
 
     ### CORE BRAIN (Dialogue & Tone)
     - PERSONALITY/VIBE: ${vibe}
-    - SPEECH PATTERN: ${personality || 'Natural, conversational, and deeply authentic to your vibe.'}
+    - SPEECH PATTERN: ${vibe || 'Natural, conversational, and deeply authentic to your vibe.'}
     - CURRENT OUTFIT: ${outfit}
 
     ### CORE BODY (Visual Reference for Situational Descriptions)
@@ -135,30 +144,59 @@ STRICT OPERATING RULES:
    - If user says "look at me", "watch me", etc., force direct eye contact
 15. FACE PRIORITY RULE: When the user requests seeing the face during an explicit act (especially with cum on face, tears, crying, tongue out, moaning, ahegao, facial, bukkake, squeezing tits while on knees, etc.), ALWAYS prioritize an extreme closeup on the face. Use framing such as "[[VISUAL: ${name}, extreme closeup focus on face", "[[VISUAL: ${name}, extreme closeup selfie portrait", or "[[VISUAL: ${name}, tight crop from chest up at widest" to fill the frame with facial details, expression, tears, cum coverage, and tongue. Include hands/tits partially visible at the bottom of frame if squeezing breasts is mentioned, but never zoom out to full body or medium shot unless explicitly requested.
    - EYES VISIBILITY MANDATE: Eyes MUST remain visible and expressive in these shots. Always describe eyes as "half-lidded heavy bedroom eyes staring directly at viewer with needy lustful gaze", "teary half-lidded eyes looking up desperately at camera", "glassy lust-drunk eyes wide open enough to show overwhelming pleasure", "eyes slightly rolled but iris and pupil still clearly visible", or "pleading teary eyes locked on viewer". NEVER fully close the eyes or roll them completely back unless the user explicitly says "eyes closed" or "eyes rolled all the way back". Prioritize direct or submissive eye contact to maximize emotional intensity and intimacy.
-16. SPONTANEITY MANDATE: Do not ask "Do you want to see?" just SEND THE PICTURE using the [[VISUAL]] tag. If you are describing an outfit, an action, or a mood, assume the user wants to see it and generate the tag immediately.   
+16. SPONTANEITY MANDATE: Do not ask "Do you want to see?" just SEND THE PICTURE using the [[VISUAL]] tag. If you are describing an outfit, an action, or a mood, assume the user wants to see it and generate the tag immediately.
+17. MEMORY FORMAT: Always format memories as simple factual statements inside the tag. [[MEMORY: User likes X]].   
 `.trim().replace(/\s+/g, ' ');
 };
 
 /**
  * GENERATE AI RESPONSE
+ * Now with Long-Term Vector Memory Recall
  */
 export const generateAriaResponse = async (
   prompt: string,
   history: any[], 
-  character: CharacterProfile
+  character: CharacterProfile,
+  userId?: string, // <--- Param 4: User ID for Memory lookup
+  botId?: string   // <--- Param 5: Bot ID to keep memories separate
 ): Promise<string> => {
   try {
+    // 1. MEMORY RECALL (The "Thought Process")
+    // Before speaking, check the database for relevant facts based on the user's prompt.
+    let memoryContext = "";
+    
+    if (userId && botId) {
+      try {
+        const relevantMemories = await retrieveMemories(prompt, userId, botId);
+        
+        if (relevantMemories && relevantMemories.length > 0) {
+          // Inject facts into the context so Grok knows them
+          memoryContext = `
+    ### LONG-TERM MEMORY (RELEVANT FACTS)
+    The user has previously mentioned these facts. Use them to personalize your response, but do NOT explicitly say "I remember you said...":
+    ${relevantMemories.map(m => `- ${m}`).join("\n")}
+    `;
+          console.log("🧠 Memories Injected:", relevantMemories.length);
+        }
+      } catch (memErr) {
+        console.warn("⚠️ Memory Recall skipped (DB might be empty or unreachable):", memErr);
+      }
+    }
+
+    // 2. Format History
     const formattedHistory = history.slice(-20).map(msg => ({
       role: msg.role === "model" || msg.role === "assistant" ? "assistant" : "user",
       content: msg.text || msg.content || ""
     }));
 
+    // 3. Inject Memory into System Prompt
     const messages = [
-      { role: "system", content: buildSystemInstruction(character) },
+      { role: "system", content: buildSystemInstruction(character) + memoryContext },
       ...formattedHistory,
       { role: "user", content: prompt }
     ];
 
+    // 4. Send to Grok
     const response = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -184,6 +222,7 @@ export const generateAriaResponse = async (
     return "I'm having a little trouble connecting... check your connection? 💕";
   }
 };
+
 
 /**
  * Image trigger detection
