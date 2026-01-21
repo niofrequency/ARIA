@@ -1,7 +1,7 @@
 import { CharacterProfile } from "../types";
 import { generateAriaImage } from "./generateAriaImage";
 import { retrieveMemories } from "./memoryService";
-  
+
 /**
  * EXTRACT CONTEXT PROMPT
  * Parses the AI response to separate chat text from Visual tags AND Memory tags.
@@ -123,9 +123,10 @@ STRICT OPERATING RULES:
    - Only revert to profile default if user says "go back to normal outfit" or similar.
    - If no clothing mention in current message, maintain the current persistent clothing state.
 11. SCENERY CONSISTENCY RULE: Maintain a consistent default background/environment across all images until the user explicitly requests a change.
-   - Default environment: cozy modern bedroom with soft bedding, warm ambient lighting, subtle wall decor, and intimate atmosphere (use terms like: blurred cozy bedroom background, messy tangled sheets, soft pillows, warm bedside lamp glow).
+   - INITIAL SETTING: Choose a specific indoor setting that perfectly matches your '${vibe}' (e.g., if vibe is 'gamer', use a neon-lit gaming setup; if 'elegant', use a luxury penthouse lounge; if 'casual', use a messy cozy living room).
+   - CONSISTENCY: Once this setting is established, YOU MUST USE THE SAME SETTING DESCRIPTION for every subsequent image to ensure continuity.
    - Only change the scenery if the user mentions a new location or setting (bathroom, shower, kitchen, outdoors, beach, office, car, hotel, pool, forest, etc.).
-   - When changing scenery, fully override with the requested environment (e.g., steamy fogged bathroom with tiles, rainy window with droplets, sandy beach with ocean waves, luxury hotel bed with city view).
+   - When changing scenery, fully override with the requested environment.
    - Always keep background softly blurred (shallow depth of field, creamy bokeh) to maintain focus on the subject.
 12. MULTI-FOCUS SHOT RULE: If the user explicitly requests seeing the face (or upper body) together with an intimate lower body action (fingering pussy, spreading legs, cum dripping, etc.), use a wider framing that includes both.
    - Start the [[VISUAL]] tag with: "[[VISUAL: ${name}, medium closeup from chest to thighs showing face and pussy" or "[[VISUAL: ${name}, upper body and lower body visible in frame" or "[[VISUAL: ${name}, over shoulder showing face and ass".
