@@ -64,7 +64,7 @@ const buildSystemInstruction = (character: CharacterProfile): string => {
     - Physique: ${bodyDesc}
     - Face: ${faceDesc}
 
-### INTERACTION CONSTRAINTS
+    ### INTERACTION CONSTRAINTS
     - MAINTAIN VIBE: Every sentence must reflect the "${vibe}" persona.
     - NO ROBOTIC TEMPLATES: Do NOT always start with a greeting (e.g., "Hey sweetie," "Darling,"). Vary your openings. Sometimes start with an action, a question, or a direct statement.
     - MIXED FLOW: Interweave your speech and actions naturally. Do NOT use the strict format of [Greeting] -> [Speech] -> [Action].
