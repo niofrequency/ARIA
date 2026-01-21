@@ -150,17 +150,17 @@ export const generateAriaImage = async (
     if ((s.includes("frontview") || s.includes("backview") || s.includes("sideview") || s.includes("profile") || s.includes("from above") || s.includes("from below") || s.includes("high angle") || s.includes("low angle") || s.includes("overhead") || s.includes("birdseye") || s.includes("wormseye")) && 
         (t.includes("front") || t.includes("back") || t.includes("side") || t.includes("rear") || t.includes("profile") || t.includes("bottom view") || t.includes("top view"))) return true;
 
-// DEFAULT: Wide shot includes everything
+// DEFAULT: Wide shot includes everything (STRICT WHITELIST MODE)
     if (!isFaceFocus && !isUpperBody && !isPartFocus && !isLowerBody) {
-       // Added: bosom, chest, nipples, groin to catch everything
-       const situationalRegex = /ass|butt|rear|backside|tits|boobies|breasts|bosom|chest|nipples|armpit|feet|toes|pussy|vagina|anus|labia|clit|groin|sperm|cum/i;
+       // Only allow tags that describe general build, height, or skin tone.
+       // This AUTOMATICALLY blocks "bosom", "armpit", "feet", "ass" because they are not on this list.
+       const safeTagRegex = /petite|curvy|thick|slim|skinny|tall|short|slender|thin|athletic|fit|toned|muscular|chubby|voluptuous|freckles|pale|tan|dark|skin/i;
        
-       // If the tag is "hairy armpit" or "large bosom", return FALSE (exclude it from generic pics)
-       if (situationalRegex.test(t)) return false;
+       if (safeTagRegex.test(t)) return true;
        
-       return true; // Allow "Curvy", "Tall", "Tan", "Athletic"
+       // Exclude everything else
+       return false;
     }
-  });
 
   const bodyTags = filteredBodyTags.join(", ");
   
