@@ -160,8 +160,8 @@ export const generateAriaImage = async (
        
        // Exclude everything else
        return false;
-    }
-
+     }
+  });
   const bodyTags = filteredBodyTags.join(", ");
   
 // PRIMARY IDENTITY ANCHOR: Added solo/1girl for subject isolation
