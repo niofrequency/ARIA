@@ -162,10 +162,13 @@ export const generateAriaImage = async (
        return false;
      }
   });
+
   const bodyTags = filteredBodyTags.join(", ");
   
-// PRIMARY IDENTITY ANCHOR: Added solo/1girl for subject isolation
-  const botIdentity = `solo, 1girl, ${character.name}, a ${character.age}-year-old ${character.gender}`;
+// PRIMARY IDENTITY ANCHOR: BOOSTED CONSISTENCY
+  // Automatically swaps "1girl" for "1boy" if the character is male
+  const baseTag = character.gender.toLowerCase() === 'male' ? '1boy' : '1girl';
+  const botIdentity = `(solo, ${baseTag}:1.2), (${character.name}:1.1), ${outfit}, a ${character.age}-year-old ${character.gender}`;
 
   // --- UPDATED SITUATIONAL TAGS (Fully Synced with ariaService Rule 12) ---
   let situationalTags: string[] = [];
@@ -231,10 +234,29 @@ export const generateAriaImage = async (
     ];
   }
 
-// --- 4. SAFETY & NEGATIVE PROMPT LAYER (NEW) ---
+  // --- 4. SAFETY & NEGATIVE PROMPT LAYER (NEW) ---
   // Detect if the user/AI explicitly requested nudity
   const explicitTriggers = ["nude", "naked", "topless", "nipples", "areola", "pussy", "vagina", "sex", "cum", "penis", "dick", "cock", "threesome", "orgasm", "clit", "strip", "undress", "no clothes", "bottomless", "exposed"];
   const isExplicitRequest = explicitTriggers.some(t => sceneLower.includes(t));
+
+ // --- 4b. GENDER EXCLUSION LAYER (Dynamic Isolation) ---
+  const maleTriggers = ["man", "boy", "guy", "male", "husband", "boyfriend", "him", "he ", "his ", "father", "brother"];
+  const femaleTriggers = ["woman", "girl", "lady", "female", "wife", "girlfriend", "her ", "she ", "mother", "sister"];
+
+  const isMaleRequested = maleTriggers.some(t => sceneLower.includes(t));
+  const isFemaleRequested = femaleTriggers.some(t => sceneLower.includes(t));
+  const charGender = character.gender.toLowerCase();
+
+  let genderExclusion = "";
+
+  // CASE 1: Character is Female -> Block Men (unless user asks for one)
+  if (charGender === 'female' && !isMaleRequested) {
+    genderExclusion = "(male, man, boy, guy, penis, beard, stubble, testicular:1.5), (back of head, multiple views:1.3), ";
+  }
+  // CASE 2: Character is Male -> Block Women (unless user asks for one)
+  else if (charGender === 'male' && !isFemaleRequested) {
+    genderExclusion = "(female, woman, girl, lady, vagina, breasts, bra, panties, lipstick, makeup:1.5), (back of head, multiple views:1.3), ";
+  }
 
   // If NO nudity requested, force clothing in negative prompt
   let safetyNegatives = "";
@@ -249,11 +271,12 @@ export const generateAriaImage = async (
     "unfiltered raw candid cinematic photo, extremely detailed skin texture, photorealistic, natural subsurface scattering, film grain, dslr look, 8k uhd"
   ].filter(Boolean).join(", ").replace(/\s+/g, " ").trim();
 
-  const negativeText = [
-    safetyNegatives, // <--- Forces clothes if nudity wasn't asked for
+const negativeText = [
+    safetyNegatives,
+    genderExclusion, // <--- This now handles blocking the opposite gender
     character.negativePrompt || "",
     "(multiple girls, 2girls, 3girls, trio, duo, group, crowd:1.6)", 
-    "(multiple people:1.5), (male, man, boy:1.3)",
+    "(multiple people:1.5)", // <--- REMOVED "(male, man, boy:1.3)" from here
     "(deformed iris, deformed pupils:1.2)",
     "airbrushed skin, plastic skin, porcelain skin, doll-like skin, flawless smooth skin",
     "beauty filter, over-smoothed, heavy retouch, instagram filter",
