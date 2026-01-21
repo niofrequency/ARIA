@@ -1,9 +1,9 @@
 import { CharacterProfile } from "../types";
 
 /**
- * NEURAL MOTION MANAGER (V5 - Ultimate Orchestration)
+ * NEURAL MOTION MANAGER (V6 - Atmosphere & Expression Upgrade)
  * Logic: Context-aware packet injection for Wan 2.1.
- * Handles Physics, Anatomy, Camera, and Motion Styles with automatic de-duplication.
+ * Handles Physics, Anatomy, Camera, Motion Styles, Atmosphere, and Micro-Expressions.
  */
 
 const PACKETS = {
@@ -58,7 +58,7 @@ const PACKETS = {
     ]
   },
 
-  // --- SOCIAL CONTEXT (RESTORED - FIXES THE CRASH) ---
+  // --- SOCIAL CONTEXT ---
   MULTI_PERSON: {
     pos: ["two distinct people", "separate silhouettes", "interaction detail"],
     neg: ["merged bodies", "fused limbs", "double heads", "deformed people"]
@@ -83,6 +83,40 @@ const PACKETS = {
   MACRO_FOCUS: {
     pos: ["extreme closeup", "macro focus", "tight crop", "filling frame", "faceless", "head out of frame", "anatomical detail focus"],
     neg: ["deformed iris", "multiple rows of teeth", "unnatural tongue", "extra limbs", "bad face", "background details"]
+  },
+
+  // --- NEW PACKET 1: ATMOSPHERE & LIGHTING ---
+  NEON_NOIR: {
+    pos: ["cyberpunk neon lighting", "volumetric fog", "purple and blue rim lights", "rainy street reflections", "high contrast", "moody atmosphere"],
+    neg: ["daylight", "bright sun", "flat lighting", "washed out", "warm tones"]
+  },
+  GOLDEN_HOUR: {
+    pos: ["warm sunlight", "lens flare", "sun rays", "dust motes", "soft cinematic lighting", "backlit hair", "romantic atmosphere"],
+    neg: ["cold colors", "fluorescent light", "studio lighting", "night time", "dark"]
+  },
+  STUDIO_GLAM: {
+    pos: ["studio softbox lighting", "perfect skin tone", "professional photography", "rim lighting", "sharp focus", "clean background"],
+    neg: ["shadows", "grain", "darkness", "messy lighting", "amateur"]
+  },
+
+  // --- NEW PACKET 2: MICRO-EXPRESSIONS ---
+  FLIRTY_EYES: {
+    pos: ["subtle biting lip", "looking up through lashes", "playful smirk", "eyes shifting", "subtle eyebrow raise", "alluring gaze"],
+    neg: ["dead eyes", "blank stare", "frozen face", "scary expression", "angry"]
+  },
+  EMOTIONAL_VULNERABILITY: {
+    pos: ["glassy eyes", "subtle trembling lip", "looking down shyly", "soft breathing", "emotional gaze"],
+    neg: ["confident", "laughing", "smiling", "hard expression"]
+  },
+
+  // --- NEW PACKET 3: TEMPORAL DYNAMICS ---
+  SLOW_MOTION: {
+    pos: ["slow motion", "high frame rate", "slowed down", "graceful movement", "suspended in time", "120fps"],
+    neg: ["fast motion", "jittery", "sped up", "timelapse"]
+  },
+  TIMELAPSE: { 
+    pos: ["timelapse", "fast moving clouds", "shadows moving", "time passing", "hyperlapse"],
+    neg: ["slow motion", "still image", "frozen"]
   }
 };
 
@@ -161,7 +195,7 @@ export const orchestrateNeuralPrompt = (
     negativeTokens.push(...PACKETS.VISCOUS_LIQUID.neg);
   }
 
-  // --- 5. SOCIAL CONTEXT (FIXED - ACCESSIBLE PACKETS) ---
+  // --- 5. SOCIAL CONTEXT ---
   const isMultiple = /two people|double|couple|with another|group|bukkake|gangbang|multiperson/i.test(combinedContext);
   if (isMultiple) {
     positiveTokens.push(...PACKETS.MULTI_PERSON.pos);
@@ -190,7 +224,7 @@ export const orchestrateNeuralPrompt = (
     );
   }
 
-  // --- 7. BODY FRAME / BUILD (RESTORED CATEGORY 7) ---
+  // --- 7. BODY FRAME / BUILD ---
   const hasBuildTags = /body|figure|shape|frame|petite|curvy|thick|slim|skinny|tall|short|silhouette|build/i.test(combinedContext);
   if (hasBuildTags) {
     const buildTraits = (character?.body || []).filter(t => 
@@ -199,7 +233,47 @@ export const orchestrateNeuralPrompt = (
     situationalTags.push(...buildTraits);
   }
 
-  // --- 8. FINAL CLEAN & DE-DUPLICATE ---
+  // --- NEW SECTION 9: ATMOSPHERE & LIGHTING ---
+  const isNeon = /neon|cyberpunk|night|city lights|purple|blue|nocturnal|club|party/i.test(combinedContext);
+  const isGolden = /sunset|sunrise|golden hour|morning|sunlight|warm|glow/i.test(combinedContext);
+  const isStudio = /studio|photoshoot|professional|clean|white background|fashion/i.test(combinedContext);
+
+  if (isNeon) {
+    positiveTokens.push(...PACKETS.NEON_NOIR.pos);
+    negativeTokens.push(...PACKETS.NEON_NOIR.neg);
+  } else if (isGolden) {
+    positiveTokens.push(...PACKETS.GOLDEN_HOUR.pos);
+    negativeTokens.push(...PACKETS.GOLDEN_HOUR.neg);
+  } else if (isStudio) {
+    positiveTokens.push(...PACKETS.STUDIO_GLAM.pos);
+    negativeTokens.push(...PACKETS.STUDIO_GLAM.neg);
+  }
+
+  // --- NEW SECTION 10: MICRO-EXPRESSIONS ---
+  const isFlirty = /flirty|tease|teasing|smirk|looking at me|bedroom eyes|seductive|winking/i.test(combinedContext);
+  const isVulnerable = /sad|crying|shy|blushing|nervous|timid|emotional|tears/i.test(combinedContext);
+
+  if (isFlirty) {
+    positiveTokens.push(...PACKETS.FLIRTY_EYES.pos);
+    negativeTokens.push(...PACKETS.FLIRTY_EYES.neg);
+  } else if (isVulnerable) {
+    positiveTokens.push(...PACKETS.EMOTIONAL_VULNERABILITY.pos);
+    negativeTokens.push(...PACKETS.EMOTIONAL_VULNERABILITY.neg);
+  }
+
+  // --- NEW SECTION 11: TEMPORAL DYNAMICS ---
+  const isSlowMo = /slow motion|slowmo|slowed|graceful|cinematic|dreamy/i.test(combinedContext);
+  const isTimelapse = /timelapse|fast forward|time passing|hyperlapse|clouds moving|shadows moving/i.test(combinedContext);
+
+  if (isSlowMo) {
+    positiveTokens.push(...PACKETS.SLOW_MOTION.pos);
+    negativeTokens.push(...PACKETS.SLOW_MOTION.neg);
+  } else if (isTimelapse) {
+    positiveTokens.push(...PACKETS.TIMELAPSE.pos);
+    negativeTokens.push(...PACKETS.TIMELAPSE.neg);
+  }
+
+  // --- 12. FINAL CLEAN & DE-DUPLICATE ---
   const cleanPos = Array.from(new Set([...positiveTokens, ...situationalTags, actionPrompt]))
     .filter(Boolean).join(", ").replace(/\s+/g, " ").trim();
 
