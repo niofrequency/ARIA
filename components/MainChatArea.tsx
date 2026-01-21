@@ -7,7 +7,7 @@ import { initiateNeuralMotion, pollNeuralMotionStatus } from '../services/neural
 import { uploadImageToStorage, deleteMediaFromStorage } from '../services/firebaseService';
 import { Loader2, X, Download, Menu, Settings, Cpu, ArrowUp, PanelLeft } from 'lucide-react';
 import { storeMemory } from '../services/memoryService';
- 
+  
 interface MainChatAreaProps {
   character: CharacterProfile;
   messages: Message[];
