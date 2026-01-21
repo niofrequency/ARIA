@@ -1,7 +1,7 @@
 import { CharacterProfile } from "../types";
 import { generateAriaImage } from "./generateAriaImage";
 import { retrieveMemories } from "./memoryService";
-
+  
 /**
  * EXTRACT CONTEXT PROMPT
  * Parses the AI response to separate chat text from Visual tags AND Memory tags.
