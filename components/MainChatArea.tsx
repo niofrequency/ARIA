@@ -5,7 +5,7 @@ import { generateAriaResponse, checkForImageRequest, extractContextPrompt } from
 import { generateAriaImage } from '../services/generateAriaImage'; 
 import { initiateNeuralMotion, pollNeuralMotionStatus } from '../services/neuralMotionService';
 import { uploadImageToStorage, deleteMediaFromStorage } from '../services/firebaseService';
-import { Loader2, X, Download, Menu, Settings, Cpu, ArrowUp } from 'lucide-react';
+import { Loader2, X, Download, Menu, Settings, Cpu, ArrowUp, PanelLeft } from 'lucide-react';
  
 interface MainChatAreaProps {
   character: CharacterProfile;
@@ -343,9 +343,17 @@ const handleAnimateRequest = async (message: Message) => {
         `}
       >
         <div className="flex items-center gap-4">
+          {/* Mobile Toggle */}
           <button onClick={onToggleMobileSidebar} className="lg:hidden p-2 text-zinc-400 hover:text-white bg-white/5 rounded-xl transition-all">
             <Menu className="w-5 h-5" />
           </button>
+          
+          {/* Desktop Toggle (Only visible when sidebar is closed) */}
+          {!isDesktopSidebarOpen && (
+            <button onClick={onToggleDesktopSidebar} className="hidden lg:block p-2 text-zinc-400 hover:text-white bg-white/5 rounded-xl transition-all">
+              <PanelLeft className="w-5 h-5" />
+            </button>
+          )}
           
           <div>
             <h1 className="text-sm font-black text-white tracking-wide uppercase">{character.name}</h1>
