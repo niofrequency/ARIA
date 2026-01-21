@@ -27,20 +27,18 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
   onAnimateRequest,
   onRegenerateImage
 }) => {
-  const isUser = message.role === 'user';
+const isUser = message.role === 'user';
   const [viewMode, setViewMode] = useState<'video' | 'image'>('video');
   const [isDownloading, setIsDownloading] = useState(false);
 
   // --- TYPEWRITER STATE ---
-  // 1. Check if message is older than 5 seconds (History)
-  const isHistory = (Date.now() - (message.timestamp || 0)) > 5000;
-  
-  // 2. Only animate if it is a BOT and NOT history
-  const shouldAnimate = !isUser && !isHistory;
+  // FIX: Calculate this ONCE inside useState so it doesn't change mid-typing
+  const [shouldAnimate] = useState(() => {
+    const isHistory = (Date.now() - (message.timestamp || 0)) > 5000;
+    return !isUser && !isHistory;
+  });
 
-  // 3. Initialize State
-  // If should animate -> Start Empty ('')
-  // If user OR history -> Start Full (message.text)
+  // Initialize state based on the frozen 'shouldAnimate' value
   const [displayedText, setDisplayedText] = useState(shouldAnimate ? '' : message.text);
   const [isTypingComplete, setIsTypingComplete] = useState(!shouldAnimate);
 
@@ -49,7 +47,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
    */
   useEffect(() => {
     // If we shouldn't animate (user or history), ensure full text is shown immediately.
-    if (!shouldAnimate || !message.text) {
+    if (!shouldAnimate) {
       if (displayedText !== message.text) {
         setDisplayedText(message.text || '');
       }
@@ -65,24 +63,34 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
 
     // Start typing
     setIsTypingComplete(false);
-    setDisplayedText('');
+    
+    // Don't reset displayedText here if re-rendering, just pick up where we are
+    // But if starting fresh:
+    if (displayedText === '' && message.text) {
+        // Safe to start empty
+    }
     
     let currentIndex = 0;
-    const fullText = message.text;
+    const fullText = message.text || '';
     
     const typingInterval = setInterval(() => {
-      setDisplayedText(fullText.slice(0, currentIndex + 1));
-      currentIndex++;
-
-      if (currentIndex >= fullText.length) {
-        clearInterval(typingInterval);
-        setIsTypingComplete(true);
-      }
-    }, 15); // Adjust typing speed here (ms)
+      // Use the callback to ensure we always have the latest state
+      setDisplayedText((prev) => {
+        // If we somehow finished, stop
+        if (!prev && prev !== '') return fullText.slice(0, 1);
+        
+        const nextIndex = prev ? prev.length + 1 : 1;
+        if (nextIndex > fullText.length) {
+            clearInterval(typingInterval);
+            setIsTypingComplete(true);
+            return fullText;
+        }
+        return fullText.slice(0, nextIndex);
+      });
+    }, 30); // Adjust typing speed here (ms)
 
     return () => clearInterval(typingInterval);
-  }, [message.text, shouldAnimate]); // IMPORTANT: Added shouldAnimate dependency
-  
+  }, [message.text, shouldAnimate]);
   
   /**
    * MEDIA SYNC
