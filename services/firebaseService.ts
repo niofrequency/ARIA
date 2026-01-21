@@ -1,6 +1,6 @@
 import { db, storage } from '../lib/firebase';
 import { UserData, CharacterProfile, Bot, Conversation, Message } from '../types';
-
+  
 const USERS_COLLECTION = 'users';
 
 /**
