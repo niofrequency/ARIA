@@ -17,7 +17,7 @@ interface SidebarProps {
   isMobileSidebarOpen: boolean;
   onCloseMobileSidebar: () => void;
   isDesktopSidebarOpen: boolean;
-  onToggleDesktopSidebar: () => void; // New prop required
+  onToggleDesktopSidebar: () => void;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -32,16 +32,25 @@ const Sidebar: React.FC<SidebarProps> = ({
   isDesktopSidebarOpen,
   onToggleDesktopSidebar,
 }) => {
+  
+  // Helper to auto-close sidebar on mobile interactions
+  const handleMobileAction = (action: () => void) => {
+    action();
+    if (window.innerWidth < 1024) { // Check if on mobile/tablet
+      onCloseMobileSidebar();
+    }
+  };
+
   return (
     <>
       {/* Overlay for mobile sidebar */}
-      {isMobileSidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-40 lg:hidden"
-          onClick={onCloseMobileSidebar}
-          aria-hidden="true"
-        ></div>
-      )}
+      <div
+        className={`fixed inset-0 bg-black/80 backdrop-blur-sm z-40 lg:hidden transition-opacity duration-300 ${
+          isMobileSidebarOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+        }`}
+        onClick={onCloseMobileSidebar}
+        aria-hidden="true"
+      />
 
       {/* Sidebar */}
       <aside
@@ -71,15 +80,21 @@ const Sidebar: React.FC<SidebarProps> = ({
           <div className="flex items-center gap-1">
             {/* Desktop Fold Button */}
             <button 
-              onClick={onToggleDesktopSidebar} 
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleDesktopSidebar();
+              }} 
               className="hidden lg:flex p-2 text-zinc-500 hover:text-white hover:bg-white/5 rounded-lg transition-all"
-              title="Fold Sidebar"
+              title={isDesktopSidebarOpen ? "Collapse Sidebar" : "Expand Sidebar"}
             >
-              <PanelLeftClose className="w-5 h-5" />
+              <PanelLeftClose className={`w-5 h-5 transition-transform duration-300 ${!isDesktopSidebarOpen ? 'rotate-180' : ''}`} />
             </button>
 
             {/* Mobile Close Button */}
-            <button onClick={onCloseMobileSidebar} className="lg:hidden p-2 text-zinc-500 hover:text-white">
+            <button 
+              onClick={onCloseMobileSidebar} 
+              className="lg:hidden p-2 text-zinc-500 hover:text-white"
+            >
               <X className="w-5 h-5" />
             </button>
           </div>
@@ -88,7 +103,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         {/* New Interface Button */}
         <div className="relative z-10 p-4">
           <button
-            onClick={onNewBot}
+            onClick={() => handleMobileAction(onNewBot)}
             className="group w-full flex items-center justify-center gap-2 bg-white/[0.03] border border-white/10 text-white font-bold py-3.5 px-5 rounded-2xl
               hover:bg-white/10 hover:border-purple-500/50 transition-all duration-300 active:scale-95 shadow-xl"
           >
@@ -114,7 +129,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               bots.map((bot, index) => (
                 <div key={`${bot.id}-${index}`} className="group relative">
                   <button
-                    onClick={() => { onSelectBot(bot.id); onCloseMobileSidebar(); }}
+                    onClick={() => handleMobileAction(() => onSelectBot(bot.id))}
                     className={`flex items-center w-full gap-3 p-3 rounded-2xl text-left transition-all duration-300
                       ${selectedBotId === bot.id 
                         ? 'bg-purple-600/10 border border-purple-500/30 shadow-[0_0_15px_rgba(147,51,234,0.1)]' 
@@ -140,6 +155,8 @@ const Sidebar: React.FC<SidebarProps> = ({
                       onClick={(e) => {
                           e.stopPropagation();
                           if (window.confirm(`Terminate connection with ${bot.name}?`)) {
+                            // Close sidebar BEFORE triggering the delete to prevent UI hang feeling
+                            if (window.innerWidth < 1024) onCloseMobileSidebar();
                             onDeleteBot(bot.id);
                           }
                       }}
@@ -157,7 +174,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         <div className="relative z-10 p-4 mt-auto space-y-2 border-t border-white/5 bg-zinc-950/80 backdrop-blur-xl">
           {/* Logout Button */}
           <button
-            onClick={onSignOut}
+            onClick={() => handleMobileAction(onSignOut)}
             className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-red-500/5 text-zinc-500 hover:text-red-400 transition-all group"
           >
             <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-transparent group-hover:bg-red-500/10 transition-all">
