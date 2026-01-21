@@ -304,7 +304,7 @@ const ChatDashboard: React.FC<ChatDashboardProps> = ({
         onNewBot={handleNewBot}
         conversations={currentBotConversations}
         onSelectConversation={setCurrentConversationId}
-        onDeleteConversation={() => {}} // Implementation for conv delete can be added
+        onDeleteConversation={() => {}} 
         onDeleteBot={handleDeleteBot}
         onSignOut={onSignOut}
         theme={theme}
@@ -312,6 +312,7 @@ const ChatDashboard: React.FC<ChatDashboardProps> = ({
         isMobileSidebarOpen={isMobileSidebarOpen}
         onCloseMobileSidebar={() => setIsMobileSidebarOpen(false)}
         isDesktopSidebarOpen={isDesktopSidebarOpen}
+        onToggleDesktopSidebar={() => setIsDesktopSidebarOpen(prev => !prev)}
       />
       
       {selectedBot && (
