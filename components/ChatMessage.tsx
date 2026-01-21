@@ -31,6 +31,50 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
   const [viewMode, setViewMode] = useState<'video' | 'image'>('video');
   const [isDownloading, setIsDownloading] = useState(false);
 
+  // --- NEW: Typing Effect State ---
+  const [displayedText, setDisplayedText] = useState(isUser ? message.text : '');
+  const [isTypingComplete, setIsTypingComplete] = useState(isUser);
+
+  /**
+   * TYPING EFFECT LOGIC
+   * Reveals the AI response character by character.
+   */
+  useEffect(() => {
+    // If it's a user message, show immediately.
+    if (isUser) {
+      setDisplayedText(message.text);
+      setIsTypingComplete(true);
+      return;
+    }
+
+    // If message text is empty or already fully displayed, mark complete.
+    if (!message.text || displayedText === message.text) {
+      if (!displayedText && message.text) setDisplayedText(message.text); // Catch-up if empty start
+      setIsTypingComplete(true);
+      return;
+    }
+
+    // Start typing
+    setIsTypingComplete(false);
+    setDisplayedText('');
+    
+    let currentIndex = 0;
+    const fullText = message.text;
+    
+    // Speed: 15ms per character (adjust number lower for faster typing)
+    const typingInterval = setInterval(() => {
+      if (currentIndex < fullText.length) {
+        setDisplayedText((prev) => fullText.slice(0, prev.length + 1));
+        currentIndex++;
+      } else {
+        clearInterval(typingInterval);
+        setIsTypingComplete(true);
+      }
+    }, 15);
+
+    return () => clearInterval(typingInterval);
+  }, [message.text, isUser]);
+
   /**
    * MEDIA SYNC
    * Ensures the UI automatically switches to 'video' view when a 
@@ -107,7 +151,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
             {isUser && <User className="w-3 h-3 text-zinc-500" />}
         </div>
 
-        {/* TEXT CONTENT: Neural Chat Bubble */}
+        {/* TEXT CONTENT: Neural Chat Bubble (UPDATED FOR TYPING) */}
         {message.text && (
           <div
             className={`relative px-5 py-4 rounded-2xl text-sm md:text-[15px] leading-relaxed backdrop-blur-md transition-all
@@ -120,7 +164,15 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
             {!isUser && (
                 <div className="absolute -inset-0.5 bg-purple-500/10 rounded-2xl blur-md -z-10"></div>
             )}
-            <p className="relative z-10 font-light tracking-wide whitespace-pre-wrap">{message.text}</p>
+            
+            {/* CHANGED: Uses displayedText instead of message.text */}
+            <p className="relative z-10 font-light tracking-wide whitespace-pre-wrap">
+              {displayedText}
+              {/* Added: Blinking Cursor */}
+              {!isTypingComplete && !isUser && (
+                <span className="inline-block w-1.5 h-3.5 ml-1 bg-purple-400 align-middle animate-pulse" />
+              )}
+            </p>
           </div>
         )}
 
@@ -196,8 +248,8 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
               {message.isVideoLoading && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 backdrop-blur-md pointer-events-none">
                   <div className="relative mb-3">
-                     <div className="absolute -inset-6 bg-purple-600/40 rounded-full blur-3xl animate-pulse"></div>
-                     <Loader2 className="w-10 h-10 text-purple-400 animate-spin relative" />
+                      <div className="absolute -inset-6 bg-purple-600/40 rounded-full blur-3xl animate-pulse"></div>
+                      <Loader2 className="w-10 h-10 text-purple-400 animate-spin relative" />
                   </div>
                   <div className="flex flex-col items-center gap-1 relative z-10">
                     <span className="text-[11px] text-white font-black uppercase tracking-[0.4em] animate-pulse">Synthesizing</span>
