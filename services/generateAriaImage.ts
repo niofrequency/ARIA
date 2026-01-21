@@ -68,7 +68,7 @@ export const generateAriaImage = async (
 
   // --- 2. LORA DETECTION & SYNC ---
   let activeLoraFile = "";
-  let activeWeight = 0.85;
+  let activeWeight = 0.77;
 
   // Step 2.1: Dynamic Profile Sync (UI Tags)
   const profileKeywords = [
