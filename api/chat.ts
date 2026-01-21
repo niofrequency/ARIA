@@ -43,7 +43,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     console.log(`🧠 Proxying request to xAI: ${model || "grok-3"}`);
 
-    // 3. EXECUTE NEURAL REQUEST
+// 3. EXECUTE NEURAL REQUEST
     const response = await fetch("https://api.x.ai/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -55,7 +55,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         model: model || "grok-3", // Defaults to Grok-3 for high-fidelity reasoning
         temperature: temperature || 0.85, // Optimized for creative but consistent dialogue
         max_tokens: 800, // Increased slightly to ensure full [[VISUAL]] tags aren't cut off
-        stream: false 
+        stream: false,
+        frequency_penalty: 1.2, // High penalty prevents repeating exact words (e.g., "darling")
+        presence_penalty: 0.6   // Moderate penalty encourages moving to new topics
       })
     });
 
