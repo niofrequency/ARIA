@@ -151,9 +151,14 @@ export const generateAriaImage = async (
         (t.includes("front") || t.includes("back") || t.includes("side") || t.includes("rear") || t.includes("profile") || t.includes("bottom view") || t.includes("top view"))) return true;
 
     // DEFAULT: Wide shot includes everything
-    if (!isFaceFocus && !isUpperBody && !isPartFocus && !isLowerBody) return true;
-
-    return false;
+if (!isFaceFocus && !isUpperBody && !isPartFocus && !isLowerBody) {
+       const situationalRegex = /ass|butt|rear|backside|armpit|feet|toes|pussy|vagina|anus|clit|sperm|cum/i;
+       
+       // If the tag is "hairy armpit" or "big butt", return FALSE (exclude it)
+       if (situationalRegex.test(t)) return false;
+       
+       return true; // Allow "Large Bosom", "Curvy", "Tall"
+    }
   });
 
   const bodyTags = filteredBodyTags.join(", ");
