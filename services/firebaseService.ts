@@ -6,7 +6,6 @@ const USERS_COLLECTION = 'users';
 /**
  * --- MEDIA PERSISTENCE (IMAGES & VIDEOS) ---
  * Handles uploading media and maintaining a 10-item rotation per bot.
- * This ensures storage costs remain low while providing a persistent gallery.
  */
 export const uploadMediaToStorage = async (
   userId: string, 
@@ -23,7 +22,6 @@ export const uploadMediaToStorage = async (
 
     let blob: Blob;
 
-    // Logic: Standardize all inputs (Base64 or Blobs) into a Firebase-ready Blob
     const response = await fetch(mediaUrlOrBase64);
     blob = await response.blob();
     
@@ -32,7 +30,7 @@ export const uploadMediaToStorage = async (
 
     console.log(`✅ ${type} saved to ${botId} gallery:`, permanentUrl);
 
-    // Manage 10-item limit PER BOT to optimize storage footprint
+    // Manage 10-item limit PER BOT
     try {
         const botFolderRef = storage.ref().child(folderPath);
         const listResult = await botFolderRef.listAll();
@@ -98,6 +96,26 @@ const deleteStorageFolder = async (path: string) => {
 };
 
 /**
+ * --- HELPER: DELETE FIRESTORE COLLECTION ---
+ * Firestore doesn't delete sub-collections automatically. We must do it manually.
+ */
+const deleteCollection = async (collectionPath: string) => {
+  const collectionRef = db.collection(collectionPath);
+  const snapshot = await collectionRef.get();
+
+  if (snapshot.size === 0) return;
+
+  // Delete documents in a batch
+  const batch = db.batch();
+  snapshot.docs.forEach((doc) => {
+    batch.delete(doc.ref);
+  });
+  
+  await batch.commit();
+  console.log(`🧹 Collection wiped: ${collectionPath}`);
+};
+
+/**
  * --- USER DATA HYDRATION ---
  */
 export const getUserData = async (userId: string): Promise<UserData | null> => {
@@ -109,7 +127,7 @@ export const getUserData = async (userId: string): Promise<UserData | null> => {
 
     const data = docSnap.data() as UserData;
 
-    // Normalization: Ensure profile tags are arrays if user exists but has legacy data
+    // Normalization
     if (data.character) {
       data.character.hair = Array.isArray(data.character.hair) ? data.character.hair : [];
       data.character.face = Array.isArray(data.character.face) ? data.character.face : [];
@@ -135,18 +153,17 @@ export const createUserData = async (userId: string): Promise<UserData> => {
 };
 
 /**
- * --- BOT PERSISTENCE (TAGGING SYSTEM READY) ---
+ * --- BOT PERSISTENCE ---
  */
 export const saveBotToFirestore = async (userId: string, bot: Bot): Promise<void> => {
   try {
-    // Force deep copy to ensure no non-serializable Proxy objects are sent to Firestore
     const botToSave = JSON.parse(JSON.stringify(bot));
     await db.collection(USERS_COLLECTION)
       .doc(userId)
       .collection('bots')
       .doc(bot.id)
       .set(botToSave, { merge: true });
-    console.log(`✅ Neural profile ${bot.id} synced with Tagging System`);
+    console.log(`✅ Neural profile ${bot.id} synced`);
   } catch (error) {
     console.error("Error saving bot profile:", error);
   }
@@ -161,7 +178,6 @@ export const loadBotsFromFirestore = async (userId: string): Promise<Bot[]> => {
     
     return snapshot.docs.map(doc => {
       const data = doc.data() as Bot;
-      // Normalization: Ensure all loaded bots handle array-based tags
       if (data.characterProfile) {
         data.characterProfile.hair = Array.isArray(data.characterProfile.hair) ? data.characterProfile.hair : [];
         data.characterProfile.face = Array.isArray(data.characterProfile.face) ? data.characterProfile.face : [];
@@ -175,19 +191,31 @@ export const loadBotsFromFirestore = async (userId: string): Promise<Bot[]> => {
   }
 };
 
+/**
+ * --- DELETE BOT (TOTAL WIPEOUT) ---
+ * Deletes Bot Profile + Media + Memories + Chat History
+ */
 export const deleteBotFromFirestore = async (userId: string, botId: string): Promise<void> => {
   try {
     console.log(`🗑️ Terminating Bot: ${botId}...`);
+    
+    // 1. Delete Media (Images/Videos in Storage)
     const mediaPath = `chat_media/${userId}/${botId}`;
     await deleteStorageFolder(mediaPath);
 
+    // 2. Delete Sub-Collections (Memories & Conversations)
+    const botPath = `${USERS_COLLECTION}/${userId}/bots/${botId}`;
+    await deleteCollection(`${botPath}/memories`);
+    await deleteCollection(`${botPath}/conversations`);
+
+    // 3. Delete the Bot Profile itself
     await db.collection(USERS_COLLECTION)
       .doc(userId)
       .collection('bots')
       .doc(botId)
       .delete();
       
-    console.log("✅ Bot and associated media wiped.");
+    console.log("✅ Bot, Memories, History, and Media successfully wiped.");
   } catch (error) {
     console.error("❌ Error deleting bot:", error);
     throw error;
@@ -204,7 +232,6 @@ export const saveConversationToFirestore = async (userId: string, botId: string,
   }
 
   try {
-    // Explicit sanitization of the message array to ensure Firebase-compatible types
     const sanitizedMessages = conversation.messages.map((msg: Message) => ({
       id: msg.id,
       role: msg.role,
@@ -256,7 +283,6 @@ export const loadConversationsFromFirestore = async (userId: string, botId: stri
  * --- ANALYTICS & UTILS ---
  */
 export const saveCharacterProfile = async (userId: string, character: CharacterProfile): Promise<void> => {
-    // Sanitize CharacterProfile before saving
     const profileToSave = JSON.parse(JSON.stringify(character));
     await db.collection(USERS_COLLECTION).doc(userId).update({ character: profileToSave });
 };
@@ -264,4 +290,46 @@ export const saveCharacterProfile = async (userId: string, character: CharacterP
 export const incrementFreeImageCount = async (userId: string, currentCount: number): Promise<void> => {
     const newCount = (currentCount || 0) + 1;
     await db.collection(USERS_COLLECTION).doc(userId).update({ freeImagesUsed: newCount });
+};
+
+/**
+ * --- LONG-TERM MEMORY (FIREBASE EDITION) ---
+ */
+
+// 1. SAVE A MEMORY
+export const saveMemoryToFirestore = async (userId: string, botId: string, text: string) => {
+  try {
+    await db.collection(USERS_COLLECTION)
+      .doc(userId)
+      .collection('bots')
+      .doc(botId)
+      .collection('memories')
+      .add({
+        text: text,
+        timestamp: Date.now(),
+        type: 'fact'
+      });
+    console.log("🔥 Firebase: Memory Saved ->", text);
+  } catch (error) {
+    console.error("Error saving memory:", error);
+  }
+};
+
+// 2. LOAD MEMORIES
+export const loadMemoriesFromFirestore = async (userId: string, botId: string): Promise<string[]> => {
+  try {
+    const snapshot = await db.collection(USERS_COLLECTION)
+      .doc(userId)
+      .collection('bots')
+      .doc(botId)
+      .collection('memories')
+      .orderBy("timestamp", "desc")
+      .limit(50)
+      .get();
+    
+    return snapshot.docs.map(doc => doc.data().text);
+  } catch (error) {
+    console.error("Error loading memories:", error);
+    return [];
+  }
 };
