@@ -1,6 +1,9 @@
 import { RunPodJobResponse, CharacterProfile } from "../types";
 import { orchestrateNeuralPrompt } from "./neuralMotionManager";
 
+// ✅ YOUR PUBLIC R2 DOMAIN (For viewing videos)
+const R2_PUBLIC_DOMAIN = "https://pub-5ad10447a420475ebb914b21e843d79d.r2.dev";
+
 /**
  * Video Neural Mapping: Triggers specific .safetensors for Wan 2.1
  */
@@ -20,7 +23,7 @@ const LORA_MAP: Record<string, string> = {
   "twerking":                      "twerk.safetensors",
   "shaking your ass":              "twerk.safetensors",
   "pussy":                         "vagina.safetensors",
-  "cunt":                          "vagina.safetensors", // Added missing comma here
+  "cunt":                          "vagina.safetensors",
   "vagina":                        "vagina.safetensors"
 };
 
@@ -68,7 +71,7 @@ export const initiateNeuralMotion = async (
 
   // 3. Prepare Dispatch Payload
   const payload = {
-    imageUrl: imageUrl,       
+    imageUrl: imageUrl,        
     prompt: finalPositive,            
     negativePrompt: `${finalNegative}, ${negPrompt}`.trim(), // Merges Manager negs with UI negs
     isLandscape: isLandscape,
@@ -129,12 +132,20 @@ export const pollNeuralMotionStatus = async (
         }
 
         if (finalContent) {
-           // --- THE FIX: BANDWIDTH SAVER ---
-           // If it's a URL, pass it through. If it's raw base64, wrap it.
-           const videoSrc = (finalContent.startsWith('http') || finalContent.startsWith('data:'))
-             ? finalContent
-             : `data:video/mp4;base64,${finalContent}`;
-             
+           let videoSrc = finalContent;
+
+           // --- 1. R2 DOMAIN SWAP (Private Upload URL -> Public View URL) ---
+           // The worker returns 'r2.cloudflarestorage.com', but the browser needs 'r2.dev'
+           if (videoSrc.includes("r2.cloudflarestorage.com")) {
+               const filename = videoSrc.split('/').pop(); // Extracts "task_123.mp4"
+               videoSrc = `${R2_PUBLIC_DOMAIN}/${filename}`;
+           } 
+           // --- 2. Base64 Fallback (Safety Net) ---
+           // If it's NOT a URL and NOT a Data URI, it must be raw Base64. Wrap it.
+           else if (!videoSrc.startsWith('http') && !videoSrc.startsWith('data:')) {
+               videoSrc = `data:video/mp4;base64,${videoSrc}`;
+           }
+
            onSuccess(videoSrc);
         } else {
           onError("No video payload found.");
