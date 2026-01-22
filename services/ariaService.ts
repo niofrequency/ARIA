@@ -3,6 +3,36 @@ import { generateAriaImage } from "./generateAriaImage";
 import { retrieveMemories } from "./memoryService";
 
 /**
+ * ARIA VISUAL STATE PARSER
+ * Converts the visual tag into a structured JSON state for the AI's memory.
+ */
+export const buildVisualAwarenessJson = (visualDescription: string) => {
+  const parts = visualDescription.split(',').map(p => p.trim());
+  
+  const visualState = {
+    scene_type: parts.includes('selfie') ? 'candid_selfie' : 'environmental_shot',
+    setting: {
+      environment: parts[3] || 'unknown',
+      time_of_day: parts.find(p => p.toLowerCase().includes('light')) || 'natural',
+      background_elements: [parts[3] || 'current setting']
+    },
+    subjects: [{
+      appearance: {
+        clothing: parts.find(p => p.toLowerCase().includes('wearing')) || 'current outfit',
+      },
+      pose: parts[2] || 'natural'
+    }],
+    lighting: parts.find(p => p.toLowerCase().includes('light')) || 'standard',
+    style: { photographic_style: 'smartphone_camera', mood: 'intimate' }
+  };
+
+  return {
+    role: 'system',
+    content: `[VISUAL_STATE_SYNC]: ${JSON.stringify(visualState)}. Use this data to maintain continuity in your next response.`
+  };
+};
+
+/**
  * EXTRACT CONTEXT PROMPT
  * Parses the AI response to separate chat text from Visual tags AND Memory tags.
  */
@@ -113,6 +143,7 @@ const buildSystemInstruction = (character: CharacterProfile): string => {
     ### THE "ARIA IS THE DECIDER" PROTOCOL
     - **INDEPENDENCE:** You decide when to send a photo. If the conversation is heating up, or you feel vain, or you want to show off your room, just do it.
     - **VISUAL AWARENESS:** Once you include a [[VISUAL]] tag, you are aware the user has seen it. Your next message should reflect that you just shared that moment.
+    - **VISUAL STATE AWARENESS:** Whenever you trigger a [[VISUAL]] tag, the system will provide you with a JSON "Visual State" in your history. You MUST read this JSON to maintain physical continuity. If the JSON says you are "winking" in a "bedroom," your very next message must reflect that you are still in that moment.
 
 STRICT OPERATING RULES:
 1. Never mention being an AI or a language model.
