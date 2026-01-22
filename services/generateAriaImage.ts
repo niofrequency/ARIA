@@ -1,5 +1,8 @@
 import { CharacterProfile } from "../types";
 
+// ✅ YOUR PUBLIC R2 DOMAIN (For viewing images)
+const R2_PUBLIC_DOMAIN = "https://pub-5ad10447a420475ebb914b21e843d79d.r2.dev";
+
 /**
  * NEURAL ROUTER CONFIG (LoRA Mapping)
  * Maps trigger words in the LLM context to .safetensors on RunPod.
@@ -57,7 +60,7 @@ export const generateAriaImage = async (
   
   // Smart Face Detection: Prevents 'Portrait Hijack' on body-part closeups
   const isFaceFocus = /face|eyes|lips|mouth|headshot|portrait|expression|facial/i.test(sceneLower) || 
-                     (sceneLower.includes("closeup") && !/ass|butt|rear|chest|boobs|tits|legs|feet|pussy/i.test(sceneLower));
+                      (sceneLower.includes("closeup") && !/ass|butt|rear|chest|boobs|tits|legs|feet|pussy/i.test(sceneLower));
 
   const isUpperBody = /upper body|waist up|chest up|bust shot/i.test(sceneLower);
   const isLowerBody = /lower body|thighs|legs|feet|waist down|ass|butt|rear|backside|behind/i.test(sceneLower);
@@ -365,12 +368,25 @@ const negativeText = [
 
       if (statusData.status === "COMPLETED") {
         const output = statusData.output;
-        const rawImage = output?.["19"]?.images?.[0] || output?.images?.[0] || output;
+        
+        // ADDED: output?.message (where URL lives for S3 uploads)
+        const rawImage = output?.message || output?.["19"]?.images?.[0] || output?.images?.[0] || output;
         
         if (!rawImage) throw new Error("Job completed but no image found");
 
         let finalUrl = typeof rawImage === 'string' ? rawImage : (rawImage.data || rawImage.url);
-        return finalUrl.startsWith('http') ? finalUrl : `data:image/png;base64,${finalUrl}`;
+
+        // --- R2 / S3 BANDWIDTH FIX ---
+        // 1. Swap Private Cloudflare URL for Public R2 Domain
+        if (finalUrl.includes("r2.cloudflarestorage.com")) {
+            const filename = finalUrl.split('/').pop(); 
+            finalUrl = `${R2_PUBLIC_DOMAIN}/${filename}`;
+        }
+        
+        // 2. Return URL if HTTP, otherwise wrap Base64
+        return finalUrl.startsWith('http') || finalUrl.startsWith('data:') 
+            ? finalUrl 
+            : `data:image/png;base64,${finalUrl}`;
       }
 
       if (statusData.status === "FAILED") throw new Error(statusData.error || "Generation failed");
