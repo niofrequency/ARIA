@@ -41,11 +41,11 @@ const Sidebar: React.FC<SidebarProps> = ({
     }
   };
 
-  return (
+return (
     <>
       {/* Overlay for mobile sidebar */}
       <div
-        className={`fixed inset-0 bg-black/80 backdrop-blur-sm z-40 lg:hidden transition-opacity duration-300 ${
+        className={`fixed inset-0 bg-black/80 backdrop-blur-sm z-[90] lg:hidden transition-opacity duration-300 ${ // UPDATED: z-[90]
           isMobileSidebarOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
         }`}
         onClick={onCloseMobileSidebar}
@@ -54,11 +54,11 @@ const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 w-[280px] bg-zinc-950 border-r border-white/5 flex flex-col z-50 overflow-hidden
+        className={`fixed inset-y-0 left-0 w-[280px] bg-zinc-950 border-r border-white/5 flex flex-col z-[100] overflow-hidden  
           transition-transform duration-300 ease-in-out
           ${isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
           ${isDesktopSidebarOpen ? 'lg:translate-x-0' : 'lg:-translate-x-full'}
-        `}
+        `} // UPDATED: z-[100] ensures it sits above the Chat Input
       >
         {/* Tech Background for Sidebar */}
         <div className="absolute inset-0 z-0 opacity-10 pointer-events-none" 
