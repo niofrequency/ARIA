@@ -320,7 +320,7 @@ const handleDeleteBot = async (botId: string) => {
   const currentBotConversations = conversations.get(selectedBotId) || [];
   const currentMessages = currentBotConversations.find(c => c.id === currentConversationId)?.messages || [];
 
-  return (
+return (
     <div className={`flex h-[100dvh] ${theme === 'dark' ? 'bg-zinc-950' : 'bg-zinc-50'} text-zinc-100 overflow-hidden`}>
       <Sidebar
         bots={bots}
@@ -340,23 +340,39 @@ const handleDeleteBot = async (botId: string) => {
         onToggleDesktopSidebar={() => setIsDesktopSidebarOpen(prev => !prev)}
       />
       
-      {selectedBot && (
-        <MainChatArea
-          character={selectedBot.characterProfile}
-          botId={selectedBot.id}
-          messages={currentMessages}
-          userData={userData}
-          onImageGenerated={onImageGenerated}
-          onSendMessage={handleSendMessage}
-          onUpdateMessage={handleUpdateMessage}
-          onToggleMobileSidebar={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
-          onToggleDesktopSidebar={() => setIsDesktopSidebarOpen(!isDesktopSidebarOpen)}
-          isDesktopSidebarOpen={isDesktopSidebarOpen}
-          isLoadingResponse={isLoadingResponse}
-          onOpenBotCustomization={setShowCustomizationModalForBotId}
-          setIsLoading={setIsLoadingResponse}
-        />
-      )}
+      {/* LAYOUT FIX: 
+         1. transition-all duration-300: Matches sidebar animation speed.
+         2. lg:ml-[280px]: Pushes content right when sidebar is open on desktop.
+         3. flex-1: Ensures it fills remaining space.
+      */}
+      <main 
+        className={`flex-1 flex flex-col h-full transition-all duration-300 ease-in-out ${
+          isDesktopSidebarOpen ? 'lg:ml-[280px]' : 'lg:ml-0'
+        }`}
+      >
+        {selectedBot ? (
+          <MainChatArea
+            character={selectedBot.characterProfile}
+            botId={selectedBot.id}
+            messages={currentMessages}
+            userData={userData}
+            onImageGenerated={onImageGenerated}
+            onSendMessage={handleSendMessage}
+            onUpdateMessage={handleUpdateMessage}
+            onToggleMobileSidebar={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
+            onToggleDesktopSidebar={() => setIsDesktopSidebarOpen(!isDesktopSidebarOpen)}
+            isDesktopSidebarOpen={isDesktopSidebarOpen}
+            isLoadingResponse={isLoadingResponse}
+            onOpenBotCustomization={setShowCustomizationModalForBotId}
+            setIsLoading={setIsLoadingResponse}
+          />
+        ) : (
+          /* Handle Empty State (Optional) */
+          <div className="flex-1 flex items-center justify-center text-zinc-500 text-sm uppercase tracking-widest">
+            Select a companion
+          </div>
+        )}
+      </main>
 
       {showCustomizationModalForBotId && (
         <BotCustomizationModal
