@@ -33,6 +33,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Invalid message protocol. Expected array.' });
     }
 
+    // ... inside api/chat.ts
+
+    console.log(`🧠 Proxying request to xAI: ${model || "grok-3"}`);
+    
+    // ADD THIS LINE TO SEE THE FULL CONVERSATION IN YOUR VERCEL LOGS:
+    console.log("📤 Payload sent to Grok:", JSON.stringify(messages, null, 2)); 
+
     // 3. EXECUTE NEURAL REQUEST
     const response = await fetch("https://api.x.ai/v1/chat/completions", {
       method: "POST",
