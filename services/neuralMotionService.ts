@@ -118,15 +118,24 @@ export const pollNeuralMotionStatus = async (
 
       if (data.status === 'COMPLETED' && data.output) {
         let finalContent: string = "";
+        
+        // Handle different RunPod output shapes
         if (typeof data.output === 'object' && data.output !== null) {
           const out = data.output as any;
-          finalContent = out.video || out.video_url || out.url || "";
+          // 'message' is often used by the rp_upload script we added
+          finalContent = out.message || out.video || out.video_url || out.url || "";
         } else {
           finalContent = data.output as string;
         }
 
         if (finalContent) {
-          onSuccess(finalContent.startsWith('http') || finalContent.startsWith('data:') ? finalContent : `data:video/mp4;base64,${finalContent}`);
+           // --- THE FIX: BANDWIDTH SAVER ---
+           // If it's a URL, pass it through. If it's raw base64, wrap it.
+           const videoSrc = (finalContent.startsWith('http') || finalContent.startsWith('data:'))
+             ? finalContent
+             : `data:video/mp4;base64,${finalContent}`;
+             
+           onSuccess(videoSrc);
         } else {
           onError("No video payload found.");
         }
@@ -142,6 +151,3 @@ export const pollNeuralMotionStatus = async (
     }
   }, delay);
 };
-
-
-
