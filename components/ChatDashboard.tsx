@@ -257,23 +257,48 @@ const ChatDashboard: React.FC<ChatDashboardProps> = ({
     setCurrentConversationId(newConvId);
   };
 
-  const handleDeleteBot = async (botId: string) => {
+const handleDeleteBot = async (botId: string) => {
     if (!userData?.uid) return;
+    
     try {
+      // 1. Remove from Database
       await deleteBotFromFirestore(userData.uid, botId);
-      setBots(prev => prev.filter(b => b.id !== botId));
+      
+      // 2. Filter local state
+      const updatedBots = bots.filter(b => b.id !== botId);
+      setBots(updatedBots);
+      
       setConversations(prev => {
         const next = new Map(prev);
         next.delete(botId);
         return next;
       });
+
+      // 3. HANDLE REDIRECTION (Prevent Black Screen)
       if (selectedBotId === botId) {
-        setSelectedBotId('');
-        setCurrentConversationId(null);
-        localStorage.removeItem('aria_last_active_bot');
+        if (updatedBots.length > 0) {
+          // Select the first available bot in the list
+          const nextBot = updatedBots[0];
+          setSelectedBotId(nextBot.id);
+          localStorage.setItem('aria_last_active_bot', nextBot.id);
+          
+          // Sync conversation for the new bot
+          const botConvs = conversations.get(nextBot.id) || [];
+          if (botConvs.length > 0) {
+            setCurrentConversationId(botConvs[0].id);
+          } else {
+            handleNewConversation(nextBot.id, true);
+          }
+        } else {
+          // No bots left? Clear everything and trigger the "New Bot" flow
+          setSelectedBotId('');
+          setCurrentConversationId(null);
+          localStorage.removeItem('aria_last_active_bot');
+          handleNewBot(); 
+        }
       }
     } catch (err) {
-      console.error("Delete failed:", err);
+      console.error("❌ Delete failed:", err);
     }
   };
 
