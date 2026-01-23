@@ -244,10 +244,22 @@ const handleAnimateRequest = async (message: Message) => {
     });
 
     try {
-      const history = (messages || []).map(m => ({ 
-        role: m.role === 'model' || m.role === 'assistant' ? 'assistant' : 'user', 
-        content: m.text || '' 
-      }));
+// ✅ FIX: REINJECT TAGS INTO HISTORY
+      // If a message has an image, we append a generic tag to the history 
+      // so Grok remembers that it's supposed to use the [[VISUAL]] format.
+      const history = (messages || []).map(m => {
+        let content = m.text || '';
+        
+        // If this message has an image attached, fake the tag in the history
+        if (m.role === 'model' && (m.imageUrl || m.videoUrl)) {
+          content += ` [[VISUAL: ${character.name}, photo sent]]`;
+        }
+
+        return {
+          role: m.role === 'model' || m.role === 'assistant' ? 'assistant' : 'user',
+          content: content
+        };
+      });
 
       // Call Brain Proxy (Now with Memory IDs for recall)
       const rawResponse = await generateAriaResponse(userText, history, character, userData?.uid, botId);
