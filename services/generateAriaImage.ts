@@ -56,7 +56,7 @@ export const generateAriaImage = async (
     return null;
   }
 
-  // --- 1. SITUATIONAL ANALYSIS (REFINED PERSPECTIVE) ---
+// --- 1. SITUATIONAL ANALYSIS (REFINED PERSPECTIVE) ---
   const sceneLower = baseDescription.toLowerCase();
   
   // Smart Face Detection: Prevents 'Portrait Hijack' on body-part closeups
@@ -71,60 +71,78 @@ export const generateAriaImage = async (
   const imgWidth = isHorizontal ? 1500 : 1024;
   const imgHeight = isHorizontal ? 1024 : 1500;
 
-// --- 2. LORA DETECTION & SYNC ---
+  // --- 2. LORA DETECTION & SYNC ---
   let activeLoraFile = "";
-  let activeWeight = 0.88;
+  let activeWeight = 0.90; // Slightly bumped for better likeness
+  let loraTriggerWord = ""; // <--- CAPTURES THE TRIGGER FOR FACE ANCHORING
 
-  // 🛡️ FIX: Prioritize Name Match First (Prevents Body Tag Leak)
+  // 🛡️ FIX 1: Prioritize Name Match First (Prevents Body Tag Leak)
   const nameKey = character.name.toLowerCase();
   if (LORA_MAP[nameKey]) {
       activeLoraFile = LORA_MAP[nameKey];
+      loraTriggerWord = nameKey;
   } 
   else {
-      // Only check other tags if the NAME didn't trigger a LoRA
-      const profileKeywords = [
-        ...(character.face || []),
-        ...(character.hair || []),
-        ...(character.body || [])
-      ].map(tag => tag.toLowerCase());
+      // Step 2.2: Chat Trigger Override (Manual Weights)
+      const weightRegex = /\(([^:]+):([0-9.]+)\)/i;
+      const weightMatch = baseDescription.match(weightRegex);
 
-      for (const tag of profileKeywords) {
-        if (LORA_MAP[tag]) {
-          activeLoraFile = LORA_MAP[tag];
-          break; 
+      if (weightMatch) {
+        const trigger = weightMatch[1].toLowerCase();
+        if (LORA_MAP[trigger]) {
+          activeLoraFile = LORA_MAP[trigger];
+          activeWeight = parseFloat(weightMatch[2]);
+          loraTriggerWord = trigger;
+        }
+      } 
+      else {
+        // Fallback: Check for triggers using Word Boundaries
+        const sortedTriggers = Object.keys(LORA_MAP).sort((a, b) => b.length - a.length);
+        for (const trigger of sortedTriggers) {
+          // 🛡️ FIX 2: Word Boundary Regex (Stops "modest" triggering "des")
+          const triggerRegex = new RegExp(`\\b${trigger}\\b`, 'i');
+          
+          if (triggerRegex.test(sceneLower)) {
+            activeLoraFile = LORA_MAP[trigger];
+            loraTriggerWord = trigger;
+            break;
+          }
+        }
+        
+        // Final Fallback: If no trigger found yet, check generic body tags (Low Priority)
+        if (!activeLoraFile) {
+           const profileKeywords = [
+             ...(character.face || []),
+             ...(character.hair || []),
+             ...(character.body || [])
+           ].map(tag => tag.toLowerCase());
+
+           for (const tag of profileKeywords) {
+             if (LORA_MAP[tag]) {
+               activeLoraFile = LORA_MAP[tag];
+               loraTriggerWord = tag; // Capture generic tag if used
+               break; 
+             }
+           }
         }
       }
   }
 
-  // Step 2.2: Chat Trigger Override
-  const weightRegex = /\(([^:]+):([0-9.]+)\)/i;
-  const weightMatch = baseDescription.match(weightRegex);
-
-  if (weightMatch) {
-    const trigger = weightMatch[1].toLowerCase();
-    if (LORA_MAP[trigger]) {
-      activeLoraFile = LORA_MAP[trigger];
-      activeWeight = parseFloat(weightMatch[2]);
-    }
-} else if (!activeLoraFile) {
-    const sortedTriggers = Object.keys(LORA_MAP).sort((a, b) => b.length - a.length);
-    for (const trigger of sortedTriggers) {
-      // 🛡️ FIX: Use Regex Word Boundaries (\b) to prevent "modest" triggering "des"
-      // This ensures we only match if "des" is a standalone word.
-      const triggerRegex = new RegExp(`\\b${trigger}\\b`, 'i');
-      
-      if (triggerRegex.test(sceneLower)) {
-        activeLoraFile = LORA_MAP[trigger];
-        break;
-      }
-    }
-  }
-
-  // --- 3. DYNAMIC TAG ORCHESTRATION (9-CATEGORY SMART FILTER) ---
-  const hairTags = character.hair.length > 0 ? `${character.hair.join(", ")} hair` : "";
-  const faceTags = character.face.join(", ");
-  const outfit = character.outfit || "";
+  // --- 3. DYNAMIC TAG ORCHESTRATION & CONSISTENCY LOCKS ---
   
+  // 🔐 CONSISTENCY LOCK 1: HARD FACE ANCHOR
+  // Forces the LoRA trigger + face tags to prevent morphing
+  const faceTags = character.face.join(", ");
+  const hairTags = character.hair.length > 0 ? `${character.hair.join(", ")} hair` : "";
+  const faceAnchor = `(${loraTriggerWord}, ${faceTags}, ${hairTags}, ${character.ethnicity}:1.2)`;
+
+  // 🔐 CONSISTENCY LOCK 2: SMART OUTFIT INJECTION
+  // If Grok describes clothes, trust Grok. If NOT, force the default outfit.
+  const clothingKeywords = ["wearing", "dressed in", "outfit", "bikini", "lingerie", "shirt", "dress", "pants", "naked", "nude", "topless", "bra", "panties"];
+  const hasClothingMention = clothingKeywords.some(kw => sceneLower.includes(kw));
+  const outfitLock = hasClothingMention ? "" : `(${character.outfit}:1.3)`;
+
+  // Filter Body Tags (9-Category Filter)
   const filteredBodyTags = (character.body || []).filter(tag => {
     const t = tag.toLowerCase();
     const s = sceneLower;
@@ -165,87 +183,64 @@ export const generateAriaImage = async (
     if ((s.includes("frontview") || s.includes("backview") || s.includes("sideview") || s.includes("profile") || s.includes("from above") || s.includes("from below") || s.includes("high angle") || s.includes("low angle") || s.includes("overhead") || s.includes("birdseye") || s.includes("wormseye")) && 
         (t.includes("front") || t.includes("back") || t.includes("side") || t.includes("rear") || t.includes("profile") || t.includes("bottom view") || t.includes("top view"))) return true;
 
-// DEFAULT: Wide shot includes everything (STRICT WHITELIST MODE)
+    // DEFAULT: Wide shot includes everything (STRICT WHITELIST MODE)
     if (!isFaceFocus && !isUpperBody && !isPartFocus && !isLowerBody) {
-       // Only allow tags that describe general build, height, or skin tone.
-       // This AUTOMATICALLY blocks "bosom", "armpit", "feet", "ass" because they are not on this list.
        const safeTagRegex = /petite|curvy|thick|slim|skinny|tall|short|slender|thin|athletic|fit|toned|muscular|chubby|voluptuous|freckles|pale|tan|dark|skin/i;
-       
        if (safeTagRegex.test(t)) return true;
-       
-       // Exclude everything else
        return false;
      }
   });
 
   const bodyTags = filteredBodyTags.join(", ");
   
-// PRIMARY IDENTITY ANCHOR: BOOSTED CONSISTENCY
-  // Automatically swaps "1girl" for "1boy" if the character is male
+  // 🔐 CONSISTENCY LOCK 3: IDENTITY BLOCK
+  // Face Anchor comes FIRST for priority. Outfit Lock is injected if needed.
   const baseTag = character.gender.toLowerCase() === 'male' ? '1boy' : '1girl';
-  const botIdentity = `(solo, ${baseTag}:1.2), (${character.name}:1.1), ${outfit}, a ${character.age}-year-old ${character.gender}`;
+  const botIdentity = `(solo, ${baseTag}:1.2), ${faceAnchor}, ${outfitLock}, a ${character.age}-year-old ${character.gender}`;
 
-  // --- UPDATED SITUATIONAL TAGS (Fully Synced with ariaService Rule 12) ---
+  // --- UPDATED SITUATIONAL TAGS ---
   let situationalTags: string[] = [];
 
-  // 1. MULTI-FOCUS: If user asks for Face + Lower Body (Rule 12 support)
+  // 1. MULTI-FOCUS: Face + Lower Body
   if (isFaceFocus && isLowerBody) {
     situationalTags = [
       `wide medium shot of ${botIdentity} showing both face and lower body`,
-      character.ethnicity,
-      faceTags,
-      hairTags,
-      bodyTags, 
-      outfit
+      bodyTags
     ];
   } 
-  // 2. FACE FOCUS: Only if NOT asking for lower body
+  // 2. FACE FOCUS
   else if (isFaceFocus && !isLowerBody) {
     situationalTags = [
       `extreme closeup portrait of ${botIdentity}`,
-      character.ethnicity,
-      faceTags,
-      hairTags,
       bodyTags
     ];
   } 
-  // 3. LOWER BODY: Now correctly uses the rear perspective for ass shots
+  // 3. LOWER BODY
   else if (isLowerBody) {
     situationalTags = [
       `detailed focused shot of ${botIdentity} from the lower body and rear perspective`,
-      character.ethnicity,
-      bodyTags,
-      outfit
+      bodyTags
     ];
   } 
-  // 4. PART FOCUS: For hands, feet, or skin texture
+  // 4. PART FOCUS
   else if (isPartFocus) {
     situationalTags = [
       `macro detailed focus on ${character.name}'s body part`,
-      character.ethnicity,
       bodyTags
     ];
   } 
-  // 5. UPPER BODY: Waist-up shots
+  // 5. UPPER BODY
   else if (isUpperBody) {
     situationalTags = [
       `waist-up shot of ${botIdentity}`,
-      character.ethnicity,
-      faceTags,
-      hairTags,
-      outfit,
       bodyTags
     ];
   } 
-  // 6. DEFAULT: Full body candid
+  // 6. DEFAULT
   else {
     situationalTags = [
       `raw candid photo of ${botIdentity}`,
-      character.ethnicity,
-      bodyTags,
-      hairTags,
-      faceTags,
-      outfit
+      bodyTags
     ];
   }
 
