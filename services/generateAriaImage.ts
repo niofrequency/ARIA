@@ -110,65 +110,85 @@ export const generateAriaImage = async (
     }
   }
 
-  // --- 3. DYNAMIC TAG ORCHESTRATION (9-CATEGORY SMART FILTER) ---
-  const hairTags = character.hair.length > 0 ? `${character.hair.join(", ")} hair` : "";
+// --- 3. DYNAMIC TAG ORCHESTRATION & CONSISTENCY LOCKS ---
   const faceTags = character.face.join(", ");
+  const hairTags = character.hair.length > 0 ? `${character.hair.join(", ")} hair` : "";
   const outfit = character.outfit || "";
+
+  // 🔐 CONSISTENCY LOCK 1: PHYSIQUE AMPLIFIER (The FIX)
+  // This extracts shape tags so the situational filter below CANNOT delete them.
+  const shapeKeywords = /curvy|thick|petite|voluptuous|chubby|slim|skinny|large|big|huge|massive|small|flat|heavy|muscular|toned|fit|athletic|busty|thicc|plump|waist|bosom/i;
+  let physiqueTags = (character.body || []).filter(t => shapeKeywords.test(t)).join(", ");
   
+  // Force extra amplification to fight the model's "skinny" bias
+  if (physiqueTags.toLowerCase().includes("curvy") || physiqueTags.toLowerCase().includes("thick")) {
+      physiqueTags += ", (voluptuous figure, wide hips, thick thighs, round curves:1.2)";
+  }
+
+  // 🔐 CONSISTENCY LOCK 2: SMART OUTFIT INJECTION
+  const clothingKeywords = ["wearing", "dressed in", "outfit", "bikini", "lingerie", "shirt", "dress", "pants", "naked", "nude", "topless", "bra", "panties"];
+  const hasClothingMention = clothingKeywords.some(kw => sceneLower.includes(kw));
+  const outfitLock = hasClothingMention ? "" : `(${character.outfit}:1.3)`;
+
+  // --- 3.2 SITUATIONAL FILTER (FULL 9-CATEGORY SMART FILTER) ---
   const filteredBodyTags = (character.body || []).filter(tag => {
     const t = tag.toLowerCase();
     const s = sceneLower;
 
+    // 🛡️ Skip shape tags here (they are already locked in 'physiqueTags')
+    if (shapeKeywords.test(t)) return false; 
+
     // 1. CHEST / BUST / BOOBS
-    if ((s.includes("bosom") || s.includes("breast") || s.includes("tits") || s.includes("chest") || s.includes("cleavage") || s.includes("boobs") || s.includes("jugs") || s.includes("bra") || s.includes("motorboat") || s.includes("rack") || s.includes("nipples")) && 
+    if ((s.includes("bosom") || s.includes("breast") || s.includes("tits") || s.includes("chest") || s.includes("cleavage") || s.includes("boobs") || s.includes("nipples")) && 
         (t.includes("tits") || t.includes("breast") || t.includes("bust") || t.includes("boobs"))) return true;
     
     // 2. REAR / ASS / HIPS
-    if ((s.includes("ass") || s.includes("butt") || s.includes("bottom") || s.includes("behind") || s.includes("rear") || s.includes("hips") || s.includes("backside") || s.includes("cheeks") || s.includes("twerk") || s.includes("spank") || s.includes("bent over")) && 
-        (t.includes("ass") || t.includes("butt") || t.includes("hips") || t.includes("thicc"))) return true;
+    if ((s.includes("ass") || s.includes("butt") || s.includes("bottom") || s.includes("behind") || s.includes("rear") || s.includes("hips") || s.includes("backside") || s.includes("bent over")) && 
+        (t.includes("ass") || t.includes("butt") || t.includes("hips"))) return true;
     
     // 3. GENITALS / PUBIC AREA
-    if ((s.includes("pussy") || s.includes("crotch") || s.includes("vagina") || s.includes("down there") || s.includes("spread") || s.includes("vulva") || s.includes("lips") || s.includes("between legs") || s.includes("clit") || s.includes("panties") || s.includes("undressing")) && 
+    if ((s.includes("pussy") || s.includes("crotch") || s.includes("vagina") || s.includes("spread") || s.includes("vulva") || s.includes("lips") || s.includes("clit") || s.includes("panties")) && 
         (t.includes("pussy") || t.includes("hairy") || t.includes("shaved") || t.includes("pubic") || t.includes("bush"))) return true;
 
     // 4. LEGS & FEET
-    if ((s.includes("legs") || s.includes("thighs") || s.includes("feet") || s.includes("toes") || s.includes("soles") || s.includes("stockings") || s.includes("calves") || s.includes("ankles") || s.includes("stepping") || s.includes("socks") || s.includes("kneeling")) && 
+    if ((s.includes("legs") || s.includes("thighs") || s.includes("feet") || s.includes("toes") || s.includes("soles") || s.includes("stockings")) && 
         (t.includes("legs") || t.includes("thighs") || t.includes("feet") || t.includes("toes"))) return true;
 
     // 5. ARMS & HANDS
-    if ((s.includes("hands") || s.includes("fingers") || s.includes("arms") || s.includes("squeezing") || s.includes("touching") || s.includes("holding") || s.includes("grabbing") || s.includes("nails") || s.includes("shoulders") || s.includes("wrist") || s.includes("reaching")) && 
+    if ((s.includes("hands") || s.includes("fingers") || s.includes("arms") || s.includes("touching") || s.includes("holding") || s.includes("grabbing") || s.includes("nails")) && 
         (t.includes("hands") || t.includes("fingers") || t.includes("nails") || t.includes("arms"))) return true;
 
     // 6. SKIN / TEXTURE / MIDRIFF
-    if ((s.includes("skin") || s.includes("texture") || s.includes("detailed") || s.includes("tan") || s.includes("sweat") || s.includes("abs") || s.includes("stomach") || s.includes("belly") || s.includes("waist") || s.includes("navel") || s.includes("freckles") || s.includes("goosebumps") || s.includes("oiled")) && 
+    if ((s.includes("skin") || s.includes("texture") || s.includes("detailed") || s.includes("tan") || s.includes("sweat") || s.includes("abs") || s.includes("stomach") || s.includes("navel")) && 
         (t.includes("skin") || t.includes("tan") || t.includes("freckles") || t.includes("abs") || t.includes("waist") || t.includes("smooth"))) return true;
 
-    // 7. BODY FRAME / BUILD
-    if ((s.includes("body") || s.includes("figure") || s.includes("shape") || s.includes("frame") || s.includes("petite") || s.includes("curvy") || s.includes("thick") || s.includes("slim") || s.includes("skinny") || s.includes("tall") || s.includes("short") || s.includes("silhouette") || s.includes("build")) && 
-        (t.includes("petite") || t.includes("curvy") || t.includes("thick") || t.includes("slim") || t.includes("skinny") || t.includes("tall") || t.includes("short") || t.includes("slender") || t.includes("thin"))) return true;
+    // 7. BODY FRAME / BUILD (Situational check for frame focus)
+    if ((s.includes("body") || s.includes("figure") || s.includes("shape") || s.includes("frame") || s.includes("silhouette") || s.includes("build")) && 
+        (t.includes("slender") || t.includes("thin") || t.includes("athletic") || t.includes("fit"))) return true;
 
     // 8. ACTIONS / POSES / POSITIONS
-    if ((s.includes("posing") || s.includes("sitting") || s.includes("standing") || s.includes("lying") || s.includes("laying") || s.includes("kneeling") || s.includes("on her knees") || s.includes("legs spread") || s.includes("squatting") || s.includes("bending") || s.includes("stretching") || s.includes("dancing") || s.includes("arching") || s.includes("on top") || s.includes("she is below") || s.includes("laying on side") || s.includes("doggy") || s.includes("missionary") || s.includes("cowgirl") || s.includes("riding")) && 
-        (t.includes("athletic") || t.includes("flexible") || t.includes("fit") || t.includes("toned") || t.includes("submissive") || t.includes("dominant") || t.includes("kneeling") || t.includes("side profile"))) return true;
+    if ((s.includes("posing") || s.includes("sitting") || s.includes("standing") || s.includes("lying") || s.includes("kneeling") || s.includes("on her knees") || s.includes("on top") || s.includes("doggy") || s.includes("missionary") || s.includes("cowgirl")) && 
+        (t.includes("athletic") || t.includes("flexible") || t.includes("toned") || t.includes("submissive") || t.includes("dominant") || t.includes("side profile"))) return true;
 
     // 9. PERSPECTIVE / VIEWPOINT
-    if ((s.includes("frontview") || s.includes("backview") || s.includes("sideview") || s.includes("profile") || s.includes("from above") || s.includes("from below") || s.includes("high angle") || s.includes("low angle") || s.includes("overhead") || s.includes("birdseye") || s.includes("wormseye")) && 
+    if ((s.includes("frontview") || s.includes("backview") || s.includes("sideview") || s.includes("profile") || s.includes("from above") || s.includes("from below") || s.includes("high angle") || s.includes("low angle")) && 
         (t.includes("front") || t.includes("back") || t.includes("side") || t.includes("rear") || t.includes("profile") || t.includes("bottom view") || t.includes("top view"))) return true;
 
-// DEFAULT: Wide shot includes everything (STRICT WHITELIST MODE)
+    // DEFAULT: Wide shot includes everything (STRICT WHITELIST MODE)
     if (!isFaceFocus && !isUpperBody && !isPartFocus && !isLowerBody) {
-       // Only allow tags that describe general build, height, or skin tone.
-       // This AUTOMATICALLY blocks "bosom", "armpit", "feet", "ass" because they are not on this list.
        const safeTagRegex = /petite|curvy|thick|slim|skinny|tall|short|slender|thin|athletic|fit|toned|muscular|chubby|voluptuous|freckles|pale|tan|dark|skin/i;
-       
        if (safeTagRegex.test(t)) return true;
-       
-       // Exclude everything else
-       return false;
-     }
+    }
+
+    return false;
   });
 
   const bodyTags = filteredBodyTags.join(", ");
+  
+  // 🔐 CONSISTENCY LOCK 3: IDENTITY BLOCK
+  // We use (physiqueTags:1.5) to FORCE the curves even if the model wants to draw her skinny.
+  const baseTag = character.gender.toLowerCase() === 'male' ? '1boy' : '1girl';
+  const botIdentity = `(solo, ${baseTag}:1.2), (${loraTriggerWord}, ${character.name}:1.2), (${faceTags}, ${hairTags}, ${character.ethnicity}:1.1), (${physiqueTags}:1.5), ${outfitLock}, a ${character.age}-year-old ${character.gender}`;
   
 // PRIMARY IDENTITY ANCHOR: BOOSTED CONSISTENCY
   // Automatically swaps "1girl" for "1boy" if the character is male
