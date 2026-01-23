@@ -10,7 +10,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 // 1. ENVIRONMENT CONFIGURATION
 const API_KEY = process.env.RUNPOD_API_KEY;
-const ENDPOINT_ID = process.env.RUNPOD_VIDEO_ENDPOINT_ID || "zsg1nevqapjfo2";
+const ENDPOINT_ID = process.env.RUNPOD_VIDEO_ENDPOINT_ID || "f4bj7ybcvqyiha";
 const BASE_URL = process.env.RUNPOD_VIDEO_BASEURL || 'https://api.runpod.ai/v2';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -100,4 +100,5 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
 }
+
 
