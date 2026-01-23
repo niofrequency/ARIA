@@ -294,7 +294,7 @@ export const generateAriaResponse = async (
     return "I'm having a little trouble connecting... check your connection? 💕";
   }
 };
-
+ 
 /**
  * Image trigger detection
  */
