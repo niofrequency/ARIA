@@ -110,11 +110,13 @@ export const generateAriaImage = async (
     }
   }
 
-  // --- 3. DYNAMIC TAG ORCHESTRATION (9-CATEGORY SMART FILTER) ---
+// --- 3. DYNAMIC TAG ORCHESTRATION (9-CATEGORY SMART FILTER) ---
   const hairTags = character.hair.length > 0 ? `${character.hair.join(", ")} hair` : "";
   const faceTags = character.face.join(", ");
   const outfit = character.outfit || "";
   
+  // NOTE: We do NOT define 'bodyTags' here to avoid the crash. We define it at the end.
+
   const filteredBodyTags = (character.body || []).filter(tag => {
     const t = tag.toLowerCase();
     const s = sceneLower;
@@ -155,19 +157,22 @@ export const generateAriaImage = async (
     if ((s.includes("frontview") || s.includes("backview") || s.includes("sideview") || s.includes("profile") || s.includes("from above") || s.includes("from below") || s.includes("high angle") || s.includes("low angle") || s.includes("overhead") || s.includes("birdseye") || s.includes("wormseye")) && 
         (t.includes("front") || t.includes("back") || t.includes("side") || t.includes("rear") || t.includes("profile") || t.includes("bottom view") || t.includes("top view"))) return true;
 
-// DEFAULT: Wide shot includes everything (STRICT WHITELIST MODE)
+    // 10. DEFAULT WHITELIST (THE FIX)
+    // If we are NOT in a closeup mode, we allow these tags to pass so the body shape exists under clothes.
     if (!isFaceFocus && !isUpperBody && !isPartFocus && !isLowerBody) {
-       // Only allow tags that describe general build, height, or skin tone.
-       // This AUTOMATICALLY blocks "bosom", "armpit", "feet", "ass" because they are not on this list.
-       const safeTagRegex = /petite|curvy|thick|slim|skinny|tall|short|slender|thin|athletic|fit|toned|muscular|chubby|voluptuous|freckles|pale|tan|dark|skin/i;
+       
+       // ✅ UPDATED REGEX: Added 'bosom', 'bust', 'breast', 'hips', 'ass', 'butt'
+       // This is the line that saves your physique tags in safe mode.
+       const safeTagRegex = /petite|curvy|thick|slim|skinny|tall|short|slender|thin|athletic|fit|toned|muscular|chubby|voluptuous|freckles|pale|tan|dark|skin|bosom|bust|breast|hips|ass|butt/i;
        
        if (safeTagRegex.test(t)) return true;
        
-       // Exclude everything else
+       // Exclude everything else (prevent random noise)
        return false;
      }
   });
 
+  // ✅ DEFINE VARIABLE ONCE HERE
   const bodyTags = filteredBodyTags.join(", ");
   
 // PRIMARY IDENTITY ANCHOR: BOOSTED CONSISTENCY
