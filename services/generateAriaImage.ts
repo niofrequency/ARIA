@@ -115,8 +115,8 @@ export const generateAriaImage = async (
   const hairTags = character.hair.length > 0 ? `${character.hair.join(", ")} hair` : "";
   const outfit = character.outfit || "";
 
-  // 🔐 CONSISTENCY LOCK 1: PHYSIQUE AMPLIFIER (The FIX)
-  // This extracts shape tags so the situational filter below CANNOT delete them.
+  // 🔐 CONSISTENCY LOCK 1: PHYSIQUE AMPLIFIER
+  // Extract shape tags so they are NEVER filtered out by situational logic.
   const shapeKeywords = /curvy|thick|petite|voluptuous|chubby|slim|skinny|large|big|huge|massive|small|flat|heavy|muscular|toned|fit|athletic|busty|thicc|plump|waist|bosom/i;
   let physiqueTags = (character.body || []).filter(t => shapeKeywords.test(t)).join(", ");
   
@@ -130,13 +130,12 @@ export const generateAriaImage = async (
   const hasClothingMention = clothingKeywords.some(kw => sceneLower.includes(kw));
   const outfitLock = hasClothingMention ? "" : `(${character.outfit}:1.3)`;
 
-  // --- 3.2 SITUATIONAL FILTER (FULL 9-CATEGORY SMART FILTER) ---
+  // --- 3.2 SITUATIONAL FILTER (FULL 9-CATEGORY) ---
   const filteredBodyTags = (character.body || []).filter(tag => {
     const t = tag.toLowerCase();
     const s = sceneLower;
 
-    // 🛡️ Skip shape tags here (they are already locked in 'physiqueTags')
-    if (shapeKeywords.test(t)) return false; 
+    if (shapeKeywords.test(t)) return false; // Already locked in physiqueTags
 
     // 1. CHEST / BUST / BOOBS
     if ((s.includes("bosom") || s.includes("breast") || s.includes("tits") || s.includes("chest") || s.includes("cleavage") || s.includes("boobs") || s.includes("nipples")) && 
@@ -162,7 +161,7 @@ export const generateAriaImage = async (
     if ((s.includes("skin") || s.includes("texture") || s.includes("detailed") || s.includes("tan") || s.includes("sweat") || s.includes("abs") || s.includes("stomach") || s.includes("navel")) && 
         (t.includes("skin") || t.includes("tan") || t.includes("freckles") || t.includes("abs") || t.includes("waist") || t.includes("smooth"))) return true;
 
-    // 7. BODY FRAME / BUILD (Situational check for frame focus)
+    // 7. BODY FRAME / BUILD 
     if ((s.includes("body") || s.includes("figure") || s.includes("shape") || s.includes("frame") || s.includes("silhouette") || s.includes("build")) && 
         (t.includes("slender") || t.includes("thin") || t.includes("athletic") || t.includes("fit"))) return true;
 
@@ -185,80 +184,27 @@ export const generateAriaImage = async (
 
   const bodyTags = filteredBodyTags.join(", ");
   
-  // 🔐 CONSISTENCY LOCK 3: IDENTITY BLOCK
+  // 🔐 CONSISTENCY LOCK 3: IDENTITY BLOCK (FORCE CURVES)
   // We use (physiqueTags:1.5) to FORCE the curves even if the model wants to draw her skinny.
   const baseTag = character.gender.toLowerCase() === 'male' ? '1boy' : '1girl';
   const botIdentity = `(solo, ${baseTag}:1.2), (${loraTriggerWord}, ${character.name}:1.2), (${faceTags}, ${hairTags}, ${character.ethnicity}:1.1), (${physiqueTags}:1.5), ${outfitLock}, a ${character.age}-year-old ${character.gender}`;
-  
-// PRIMARY IDENTITY ANCHOR: BOOSTED CONSISTENCY
-  // Automatically swaps "1girl" for "1boy" if the character is male
-  const baseTag = character.gender.toLowerCase() === 'male' ? '1boy' : '1girl';
-  const botIdentity = `(solo, ${baseTag}:1.2), (${character.name}:1.1), ${outfit}, a ${character.age}-year-old ${character.gender}`;
 
-  // --- UPDATED SITUATIONAL TAGS (Fully Synced with ariaService Rule 12) ---
+  // --- UPDATED SITUATIONAL TAGS ---
   let situationalTags: string[] = [];
 
-  // 1. MULTI-FOCUS: If user asks for Face + Lower Body (Rule 12 support)
   if (isFaceFocus && isLowerBody) {
-    situationalTags = [
-      `wide medium shot of ${botIdentity} showing both face and lower body`,
-      character.ethnicity,
-      faceTags,
-      hairTags,
-      bodyTags, 
-      outfit
-    ];
-  } 
-  // 2. FACE FOCUS: Only if NOT asking for lower body
-  else if (isFaceFocus && !isLowerBody) {
-    situationalTags = [
-      `extreme closeup portrait of ${botIdentity}`,
-      character.ethnicity,
-      faceTags,
-      hairTags,
-      bodyTags
-    ];
-  } 
-  // 3. LOWER BODY: Now correctly uses the rear perspective for ass shots
-  else if (isLowerBody) {
-    situationalTags = [
-      `detailed focused shot of ${botIdentity} from the lower body and rear perspective`,
-      character.ethnicity,
-      bodyTags,
-      outfit
-    ];
-  } 
-  // 4. PART FOCUS: For hands, feet, or skin texture
-  else if (isPartFocus) {
-    situationalTags = [
-      `macro detailed focus on ${character.name}'s body part`,
-      character.ethnicity,
-      bodyTags
-    ];
-  } 
-  // 5. UPPER BODY: Waist-up shots
-  else if (isUpperBody) {
-    situationalTags = [
-      `waist-up shot of ${botIdentity}`,
-      character.ethnicity,
-      faceTags,
-      hairTags,
-      outfit,
-      bodyTags
-    ];
-  } 
-  // 6. DEFAULT: Full body candid
-  else {
-    situationalTags = [
-      `raw candid photo of ${botIdentity}`,
-      character.ethnicity,
-      bodyTags,
-      hairTags,
-      faceTags,
-      outfit
-    ];
+    situationalTags = [`wide medium shot of ${botIdentity} showing both face and lower body`, character.ethnicity, faceTags, hairTags, bodyTags, outfit];
+  } else if (isFaceFocus && !isLowerBody) {
+    situationalTags = [`extreme closeup portrait of ${botIdentity}`, character.ethnicity, faceTags, hairTags, bodyTags];
+  } else if (isLowerBody) {
+    situationalTags = [`detailed focused shot of ${botIdentity} from the lower body and rear perspective`, character.ethnicity, bodyTags, outfit];
+  } else if (isPartFocus) {
+    situationalTags = [`macro detailed focus on ${character.name}'s body part`, character.ethnicity, bodyTags];
+  } else if (isUpperBody) {
+    situationalTags = [`waist-up shot of ${botIdentity}`, character.ethnicity, faceTags, hairTags, outfit, bodyTags];
+  } else {
+    situationalTags = [`raw candid photo of ${botIdentity}`, character.ethnicity, bodyTags, hairTags, faceTags, outfit];
   }
-
 
 
 // --- 4. NEURAL CONTEXT SYNC (SMART BYPASS) ---
