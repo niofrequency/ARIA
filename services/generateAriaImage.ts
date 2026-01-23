@@ -301,7 +301,7 @@ const seed = Math.floor(Math.random() * 1_000_000_000);
   // --- DEBUG LOGGING ---
   console.log(`🚀 Dispatching Neural Sync: ${character.name}`);
   console.log(`📝 Final Prompt: ${promptText}`);
-  console.log(`🛡️ Safety Mode: ${isExplicitRequest ? "OFF (Nudity Allowed)" : "ON (Forcing Clothes)"}`);
+  console.log(`🛡️ Safety Mode: ${bypassSafety ? "OFF (Bypass Active)" : "ON (Forcing Clothes)"}`);
   if (activeLoraFile) console.log(`🧬 Active LoRA: ${activeLoraFile}.safetensors (Weight: ${activeWeight})`);
 
   // --- 5. COMFYUI WORKFLOW INJECTION ---
