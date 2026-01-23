@@ -239,85 +239,69 @@ export const generateAriaImage = async (
     ];
   }
 
-// --- 4. SAFETY & PROMPT CONSTRUCTION LAYER ---
-  
-  // 4a. Detect if the user/AI explicitly requested nudity
-  const explicitTriggers = ["nude", "naked", "topless", "nipples", "areola", "pussy", "vagina", "sex", "cum", "penis", "dick", "cock", "threesome", "orgasm", "clit", "strip", "undress", "no clothes", "bottomless", "exposed"];
-  const isExplicitRequest = explicitTriggers.some(t => sceneLower.includes(t));
+The error is caused by duplicate variable declarations. You have the entire // --- 4. SAFETY & PROMPT CONSTRUCTION LAYER --- block written twice in a row.
 
-  // 4b. GENDER EXCLUSION LAYER (Dynamic Isolation)
-  const maleTriggers = ["man", "boy", "guy", "male", "husband", "boyfriend", "him", "he ", "his ", "father", "brother"];
-  const femaleTriggers = ["woman", "girl", "lady", "female", "wife", "girlfriend", "her ", "she ", "mother", "sister"];
+In JavaScript/TypeScript, you cannot declare the same const (like explicitTriggers, isMaleRequested, etc.) more than once in the same scope. This will throw a SyntaxError: Identifier 'explicitTriggers' has already been declared.
 
-  const isMaleRequested = maleTriggers.some(t => sceneLower.includes(t));
-  const isFemaleRequested = femaleTriggers.some(t => sceneLower.includes(t));
-  const charGender = character.gender.toLowerCase();
+🛠️ The Fix
+Delete the first version of Section 4 and use this consolidated version. I have cleaned up the duplicates and ensured the Bypass Safety logic is correctly integrated.
 
-  let genderExclusion = "";
-
-  // CASE 1: Character is Female -> Block Men (unless user asks for one)
-  if (charGender === 'female' && !isMaleRequested) {
-    genderExclusion = "(male, man, boy, guy, penis, beard, stubble, testicular:1.5), (back of head, multiple views:1.3), ";
-  }
-  // CASE 2: Character is Male -> Block Women (unless user asks for one)
-  else if (charGender === 'male' && !isFemaleRequested) {
-    genderExclusion = "(female, woman, girl, lady, vagina, breasts, bra, panties, lipstick, makeup:1.5), (back of head, multiple views:1.3), ";
-  }
+TypeScript
 
 // --- 4. SAFETY & PROMPT CONSTRUCTION LAYER ---
 
-  // 4a. Consolidated Safety Detection
-  const explicitTriggers = ["nude", "naked", "topless", "nipples", "areola", "pussy", "vagina", "sex", "cum", "penis", "dick", "cock", "threesome", "orgasm", "clit", "strip", "undress", "no clothes", "bottomless", "exposed"];
-  const isExplicitRequest = explicitTriggers.some(t => sceneLower.includes(t));
+// 4a. Consolidated Safety & Bypass Detection
+const explicitTriggers = ["nude", "naked", "topless", "nipples", "areola", "pussy", "vagina", "sex", "cum", "penis", "dick", "cock", "threesome", "orgasm", "clit", "strip", "undress", "no clothes", "bottomless", "exposed"];
+const isExplicitRequest = explicitTriggers.some(t => sceneLower.includes(t));
 
-  // 🛡️ SYNC FIX: Trust Grok's long descriptions or explicit keywords
-  const isLLMManaged = baseDescription.length > 150; 
-  const bypassSafety = isExplicitRequest || isLLMManaged;
+// 🛡️ SYNC FIX: Trust Grok's long descriptions or explicit keywords to bypass safety negatives
+const isLLMManaged = baseDescription.length > 150; 
+const bypassSafety = isExplicitRequest || isLLMManaged;
 
-  // 4b. GENDER EXCLUSION LAYER (Dynamic Isolation)
-  const maleTriggers = ["man", "boy", "guy", "male", "husband", "boyfriend", "him", "he ", "his ", "father", "brother"];
-  const femaleTriggers = ["woman", "girl", "lady", "female", "wife", "girlfriend", "her ", "she ", "mother", "sister"];
+// 4b. GENDER EXCLUSION LAYER (Dynamic Isolation)
+const maleTriggers = ["man", "boy", "guy", "male", "husband", "boyfriend", "him", "he ", "his ", "father", "brother"];
+const femaleTriggers = ["woman", "girl", "lady", "female", "wife", "girlfriend", "her ", "she ", "mother", "sister"];
 
-  const isMaleRequested = maleTriggers.some(t => sceneLower.includes(t));
-  const isFemaleRequested = femaleTriggers.some(t => sceneLower.includes(t));
-  const charGender = character.gender.toLowerCase();
+const isMaleRequested = maleTriggers.some(t => sceneLower.includes(t));
+const isFemaleRequested = femaleTriggers.some(t => sceneLower.includes(t));
+const charGender = character.gender.toLowerCase();
 
-  let genderExclusion = "";
-  if (charGender === 'female' && !isMaleRequested) {
-    genderExclusion = "(male, man, boy, guy, penis, beard, stubble, testicular:1.5), (back of head, multiple views:1.3), ";
-  } else if (charGender === 'male' && !isFemaleRequested) {
-    genderExclusion = "(female, woman, girl, lady, vagina, breasts, bra, panties, lipstick, makeup:1.5), (back of head, multiple views:1.3), ";
-  }
+let genderExclusion = "";
+if (charGender === 'female' && !isMaleRequested) {
+  genderExclusion = "(male, man, boy, guy, penis, beard, stubble, testicular:1.5), (back of head, multiple views:1.3), ";
+} else if (charGender === 'male' && !isFemaleRequested) {
+  genderExclusion = "(female, woman, girl, lady, vagina, breasts, bra, panties, lipstick, makeup:1.5), (back of head, multiple views:1.3), ";
+}
 
-  // 4c. SAFETY NEGATIVES (Bypass logic applied)
-  let safetyNegatives = "";
-  if (!bypassSafety) {
-    safetyNegatives = "nude, naked, nipples, topless, exposed breast, genitals, vaginal, penis, pussy";
-  }
+// 4c. SAFETY NEGATIVES (Bypass logic applied)
+let safetyNegatives = "";
+if (!bypassSafety) {
+  safetyNegatives = "nude, naked, nipples, topless, exposed breast, genitals, vaginal, penis, pussy";
+}
 
-  // 🚀 PROMPT FUSION: Narrative focus first
-  const fusedDescription = `(${baseDescription}:1.2)`;
+// 🚀 PROMPT FUSION: Narrative focus first
+const fusedDescription = `(${baseDescription}:1.2)`;
 
-  const promptText = [
-    fusedDescription,
-    situationalTags.filter(Boolean).join(", "),
-    "(masterpiece, high quality, realistic:1.1)",
-    "unfiltered raw candid cinematic photo, extremely detailed skin texture, photorealistic, natural subsurface scattering, film grain, dslr look, 8k uhd"
-  ].filter(Boolean).join(", ").replace(/\s+/g, " ").trim();
+const promptText = [
+  fusedDescription,
+  situationalTags.filter(Boolean).join(", "),
+  "(masterpiece, high quality, realistic:1.1)",
+  "unfiltered raw candid cinematic photo, extremely detailed skin texture, photorealistic, natural subsurface scattering, film grain, dslr look, 8k uhd"
+].filter(Boolean).join(", ").replace(/\s+/g, " ").trim();
 
-  const negativeText = [
-    safetyNegatives,
-    genderExclusion,
-    character.negativePrompt || "",
-    "(multiple girls, 2girls, 3girls, trio, duo, group, crowd:1.6), (multiple people:1.5)",
-    "(deformed iris, deformed pupils:1.2)",
-    "airbrushed skin, plastic skin, porcelain skin, doll-like skin, flawless smooth skin",
-    "beauty filter, over-smoothed, heavy retouch, instagram filter",
-    "cartoon, anime, 3d render, illustration, painting",
-    "low quality, blurry, bad anatomy, deformed, extra limbs, mutated hands"
-  ].filter(Boolean).join(", ");
+const negativeText = [
+  safetyNegatives,
+  genderExclusion,
+  character.negativePrompt || "",
+  "(multiple girls, 2girls, 3girls, trio, duo, group, crowd:1.6), (multiple people:1.5)",
+  "(deformed iris, deformed pupils:1.2)",
+  "airbrushed skin, plastic skin, porcelain skin, doll-like skin, flawless smooth skin",
+  "beauty filter, over-smoothed, heavy retouch, instagram filter",
+  "cartoon, anime, 3d render, illustration, painting",
+  "low quality, blurry, bad anatomy, deformed, extra limbs, mutated hands"
+].filter(Boolean).join(", ");
 
-  const seed = Math.floor(Math.random() * 1_000_000_000);
+const seed = Math.floor(Math.random() * 1_000_000_000);
   
   // --- DEBUG LOGGING ---
   console.log(`🚀 Dispatching Neural Sync: ${character.name}`);
