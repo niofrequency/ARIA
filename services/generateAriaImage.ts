@@ -106,10 +106,14 @@ export const generateAriaImage = async (
       activeLoraFile = LORA_MAP[trigger];
       activeWeight = parseFloat(weightMatch[2]);
     }
-  } else if (!activeLoraFile) {
+} else if (!activeLoraFile) {
     const sortedTriggers = Object.keys(LORA_MAP).sort((a, b) => b.length - a.length);
     for (const trigger of sortedTriggers) {
-      if (sceneLower.includes(trigger)) {
+      // 🛡️ FIX: Use Regex Word Boundaries (\b) to prevent "modest" triggering "des"
+      // This ensures we only match if "des" is a standalone word.
+      const triggerRegex = new RegExp(`\\b${trigger}\\b`, 'i');
+      
+      if (triggerRegex.test(sceneLower)) {
         activeLoraFile = LORA_MAP[trigger];
         break;
       }
