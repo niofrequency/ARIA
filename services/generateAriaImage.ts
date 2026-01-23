@@ -264,26 +264,42 @@ export const generateAriaImage = async (
     genderExclusion = "(female, woman, girl, lady, vagina, breasts, bra, panties, lipstick, makeup:1.5), (back of head, multiple views:1.3), ";
   }
 
-  // 4c. SAFETY NEGATIVES (If NO nudity requested, force clothing)
-// Detect if Grok/AI explicitly requested "Neural Engine" bypass
-const explicitTriggers = ["nude", "naked", "topless", "nipples", "areola", "pussy", "vagina", "sex", "cum", "penis", "dick", "cock", "threesome", "orgasm", "clit", "strip", "undress", "no clothes", "bottomless", "exposed"];
-const isExplicitRequest = explicitTriggers.some(t => sceneLower.includes(t));
+// --- 4. SAFETY & PROMPT CONSTRUCTION LAYER ---
 
-// 🛡️ SYNC FIX: If Grok provides a long, detailed description, trust the LLM over the safety filter
-const isLLMManaged = baseDescription.length > 150; // Long descriptions usually come from Grok
-const bypassSafety = isExplicitRequest || isLLMManaged;
+  // 4a. Consolidated Safety Detection
+  const explicitTriggers = ["nude", "naked", "topless", "nipples", "areola", "pussy", "vagina", "sex", "cum", "penis", "dick", "cock", "threesome", "orgasm", "clit", "strip", "undress", "no clothes", "bottomless", "exposed"];
+  const isExplicitRequest = explicitTriggers.some(t => sceneLower.includes(t));
 
-let safetyNegatives = "";
-if (!bypassSafety) {
-    // Only force clothes if it's a short/generic user prompt
+  // 🛡️ SYNC FIX: Trust Grok's long descriptions or explicit keywords
+  const isLLMManaged = baseDescription.length > 150; 
+  const bypassSafety = isExplicitRequest || isLLMManaged;
+
+  // 4b. GENDER EXCLUSION LAYER (Dynamic Isolation)
+  const maleTriggers = ["man", "boy", "guy", "male", "husband", "boyfriend", "him", "he ", "his ", "father", "brother"];
+  const femaleTriggers = ["woman", "girl", "lady", "female", "wife", "girlfriend", "her ", "she ", "mother", "sister"];
+
+  const isMaleRequested = maleTriggers.some(t => sceneLower.includes(t));
+  const isFemaleRequested = femaleTriggers.some(t => sceneLower.includes(t));
+  const charGender = character.gender.toLowerCase();
+
+  let genderExclusion = "";
+  if (charGender === 'female' && !isMaleRequested) {
+    genderExclusion = "(male, man, boy, guy, penis, beard, stubble, testicular:1.5), (back of head, multiple views:1.3), ";
+  } else if (charGender === 'male' && !isFemaleRequested) {
+    genderExclusion = "(female, woman, girl, lady, vagina, breasts, bra, panties, lipstick, makeup:1.5), (back of head, multiple views:1.3), ";
+  }
+
+  // 4c. SAFETY NEGATIVES (Bypass logic applied)
+  let safetyNegatives = "";
+  if (!bypassSafety) {
     safetyNegatives = "nude, naked, nipples, topless, exposed breast, genitals, vaginal, penis, pussy";
-}
+  }
 
-  // 🚀 PROMPT FUSION: We put the scene description FIRST with a weight of 1.2
+  // 🚀 PROMPT FUSION: Narrative focus first
   const fusedDescription = `(${baseDescription}:1.2)`;
 
   const promptText = [
-    fusedDescription, // Grok's scene description now takes primary focus
+    fusedDescription,
     situationalTags.filter(Boolean).join(", "),
     "(masterpiece, high quality, realistic:1.1)",
     "unfiltered raw candid cinematic photo, extremely detailed skin texture, photorealistic, natural subsurface scattering, film grain, dslr look, 8k uhd"
