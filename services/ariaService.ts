@@ -32,41 +32,40 @@ export const buildVisualAwarenessJson = (visualDescription: string) => {
   };
 };
 
+okay and fix this line only 
+
+
 /**
- * EXTRACT CONTEXT PROMPT
- * Parses the AI response to separate chat text from Visual tags AND Memory tags.
- */
+ * EXTRACT CONTEXT PROMPT
+ * Parses the AI response to separate chat text from Visual tags AND Memory tags.
+ */
 export const extractContextPrompt = (text: string) => {
-  // 1. Extract VISUAL Tag (Your Original Regex)
-  const visualRegex = /[\[\{]{2}\s*VISUAL\s*:\s*([\s\S]*?)\s*[\]\}]{2}/i;
-  const visualMatch = text.match(visualRegex);
-  const contextPrompt = visualMatch ? visualMatch[1].trim() : null;
+  // 1. Extract VISUAL Tag
+  const visualRegex = /[\[\{]{2}\s*VISUAL\s*:\s*([\s\S]*?)\s*[\]\}]{2}/i;
+  const visualMatch = text.match(visualRegex);
+  const contextPrompt = visualMatch ? visualMatch[1].trim() : null;
 
-  // 2. Extract MEMORY Tag (Your Original Regex)
-  const memoryRegex = /[\[\{]{2}\s*MEMORY\s*:\s*([\s\S]*?)\s*[\]\}]{2}/i;
-  const memoryMatch = text.match(memoryRegex);
-  const memoryText = memoryMatch ? memoryMatch[1].trim() : null;
+  // 2. Extract MEMORY Tag
+  const memoryRegex = /[\[\{]{2}\s*MEMORY\s*:\s*([\s\S]*?)\s*[\]\}]{2}/i;
+  const memoryMatch = text.match(memoryRegex);
+  const memoryText = memoryMatch ? memoryMatch[1].trim() : null;
 
-  // 3. Clean the text
-  let cleanText = text
-    .replace(visualRegex, '')
-    .replace(memoryRegex, '')
-    // This line is the "Emoji Action" safety net—it kills the asterisks residue 
-    // but keeps the actual emoji symbols in the message.
-    .replace(/\*\s*sends\s+.*?\*/gi, '') 
-    .trim();
+  // 3. Clean the text (Remove both tags so the user doesn't see them)
+  let cleanText = text
+    .replace(visualRegex, '')
+    .replace(memoryRegex, '')
+    .trim();
+  
+  // Safety cleanup for malformed tags
+  if (cleanText.includes('[[VISUAL:') || cleanText.includes('{{visual:')) {
+    cleanText = cleanText.split(/[\[\{]{2}VISUAL/i)[0].trim();
+  }
 
-  // 4. Safety cleanup for malformed tags
-  if (cleanText.includes('[[VISUAL:') || cleanText.includes('{{visual:')) {
-    cleanText = cleanText.split(/[\[\{]{2}VISUAL/i)[0].trim();
-  }
-
-  // 5. Final Return (Cleaned up the duplicate return error)
-  return {
-    cleanText: cleanText || "...", 
-    contextPrompt, // Sent to RunPod
-    memoryText     // Saved to DB
-  };
+  return {
+    cleanText: cleanText || "...", 
+    contextPrompt,
+    memoryText // <--- New field passed to MainChatArea
+  };
 };
 
 
