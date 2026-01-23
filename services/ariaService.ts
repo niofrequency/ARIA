@@ -208,7 +208,7 @@ STRICT OPERATING RULES:
 
 /**
  * GENERATE AI RESPONSE
- * Now with Long-Term Vector Memory Recall
+ * Now with Long-Term Vector Memory Recall & Hallucination Patch
  */
 export const generateAriaResponse = async (
   prompt: string,
@@ -219,7 +219,6 @@ export const generateAriaResponse = async (
 ): Promise<string> => {
   try {
     // 1. MEMORY RECALL (The "Thought Process")
-    // Before speaking, check the database for relevant facts based on the user's prompt.
     let memoryContext = "";
     
     if (userId && botId) {
@@ -270,9 +269,21 @@ export const generateAriaResponse = async (
     }
 
     const data = await response.json();
-    const content = data.choices[0]?.message?.content;
+    let content = data.choices[0]?.message?.content || "I'm lost in thought... 💕";
+    content = content.trim();
+
+    // 🛡️ HALLUCINATION PATCH (The "Safety Net")
+    // If the bot implies an image (e.g. "look at me") but forgets the tag, we force it.
+    const impliedVisualRegex = /(look at me|take a look|see this|picture us|picture me|here is a|sending a|check this out|watch me|look here|my new|showing you)/i;
     
-    return content ? content.trim() : "I'm lost in thought... 💕";
+    // Check if intent exists BUT the [[VISUAL]] tag is missing
+    if (impliedVisualRegex.test(content) && !content.includes('[[VISUAL')) {
+        console.log("⚠️ Hallucination detected! Forcing missing visual tag.");
+        // Append a generic selfie tag to save the moment
+        content += ` [[VISUAL: ${character.name}, selfie, looking at camera, ${character.outfit}]]`;
+    }
+
+    return content;
 
   } catch (err: any) {
     console.error("❌ AI Service Error:", err);
