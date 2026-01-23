@@ -37,12 +37,12 @@ export const buildVisualAwarenessJson = (visualDescription: string) => {
  * Parses the AI response to separate chat text from Visual tags AND Memory tags.
  */
 export const extractContextPrompt = (text: string) => {
-  // 1. Extract VISUAL Tag
+  // 1. Extract VISUAL Tag (Your Original Regex)
   const visualRegex = /[\[\{]{2}\s*VISUAL\s*:\s*([\s\S]*?)\s*[\]\}]{2}/i;
   const visualMatch = text.match(visualRegex);
   const contextPrompt = visualMatch ? visualMatch[1].trim() : null;
 
-  // 2. Extract MEMORY Tag
+  // 2. Extract MEMORY Tag (Your Original Regex)
   const memoryRegex = /[\[\{]{2}\s*MEMORY\s*:\s*([\s\S]*?)\s*[\]\}]{2}/i;
   const memoryMatch = text.match(memoryRegex);
   const memoryText = memoryMatch ? memoryMatch[1].trim() : null;
@@ -51,25 +51,23 @@ export const extractContextPrompt = (text: string) => {
   let cleanText = text
     .replace(visualRegex, '')
     .replace(memoryRegex, '')
-    // This line specifically removes the "*sends emoji*" roleplay residue
+    // This line is the "Emoji Action" safety net—it kills the asterisks residue 
+    // but keeps the actual emoji symbols in the message.
     .replace(/\*\s*sends\s+.*?\*/gi, '') 
     .trim();
-  
-  // 4. Safety cleanup: Ensures no raw [[VISUAL]] logic leaks to the user
-  if (cleanText.includes('[[') || cleanText.includes('{{')) {
-    cleanText = cleanText.split(/[\[\{]{2}/)[0].trim();
+
+  // 4. Safety cleanup for malformed tags
+  if (cleanText.includes('[[VISUAL:') || cleanText.includes('{{visual:')) {
+    cleanText = cleanText.split(/[\[\{]{2}VISUAL/i)[0].trim();
   }
 
-  // 5. Emoji Sanitization for RunPod
-  // We keep the emojis in cleanText, but they are NOT in contextPrompt
-  // This ensures RunPod only gets the narrative description.
-
+  // 5. Final Return (Cleaned up the duplicate return error)
   return {
     cleanText: cleanText || "...", 
-    contextPrompt, // This goes to RunPod (Emoji-Free)
-    memoryText 
+    contextPrompt, // Sent to RunPod
+    memoryText     // Saved to DB
   };
-};;
+};
 
 
 /**
