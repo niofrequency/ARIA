@@ -1,4 +1,4 @@
-import { CharacterProfile } from "../types";
+import { CharacterProfile } from "../types"; 
 
 // ✅ YOUR PUBLIC R2 DOMAIN (For viewing images)
 const R2_PUBLIC_DOMAIN = "https://pub-5ad10447a420475ebb914b21e843d79d.r2.dev";
