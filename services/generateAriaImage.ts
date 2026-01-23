@@ -36,12 +36,16 @@ export const generateAriaImage = async (
   userPrompt: string,
   character: CharacterProfile
 ): Promise<string | null> => {
-  const baseDescription = (contextPrompt || userPrompt || "").trim();
+  let baseDescription = (contextPrompt || userPrompt || "").trim();
 
   if (!baseDescription) {
     console.warn("No prompt description available for image generation");
     return null;
   }
+
+  // 🧹 DIALOGUE CLEANER (Fixes the "Bad Quality" issue)
+  // Strips text between quotes or common chat artifacts from the visual prompt
+  baseDescription = baseDescription.replace(/["“][^"”]*["”]/g, '').replace(/\b(hehe|haha|lol|hey|hello)\b/gi, '').trim();
 
   const sceneLower = baseDescription.toLowerCase();
   
@@ -57,19 +61,19 @@ export const generateAriaImage = async (
   const imgWidth = isHorizontal ? 1500 : 1024;
   const imgHeight = isHorizontal ? 1024 : 1500;
 
-  // --- 2. LORA DETECTION (Keep New Safety Logic) ---
+  // --- 2. LORA DETECTION (New Safety Logic) ---
   let activeLoraFile = "";
   let activeWeight = 0.90; 
   let loraTriggerWord = ""; 
 
-  // Priority 1: Check Name
+  // Priority 1: Check Name Match First
   const nameKey = character.name.toLowerCase();
   if (LORA_MAP[nameKey]) {
       activeLoraFile = LORA_MAP[nameKey];
       loraTriggerWord = nameKey;
   } 
   else {
-      // Priority 2: Chat Trigger (Regex Word Boundary)
+      // Priority 2: Chat Trigger Override
       const weightRegex = /\(([^:]+):([0-9.]+)\)/i;
       const weightMatch = baseDescription.match(weightRegex);
 
@@ -82,6 +86,7 @@ export const generateAriaImage = async (
         }
       } 
       else {
+        // Priority 3: Word Boundary Regex (Prevents "modest" triggering "des")
         const sortedTriggers = Object.keys(LORA_MAP).sort((a, b) => b.length - a.length);
         for (const trigger of sortedTriggers) {
           const triggerRegex = new RegExp(`\\b${trigger}\\b`, 'i');
@@ -91,20 +96,39 @@ export const generateAriaImage = async (
             break;
           }
         }
+        
+        // Final Fallback: Generic Body Tags
+        if (!activeLoraFile) {
+           const profileKeywords = [
+             ...(character.face || []),
+             ...(character.hair || []),
+             ...(character.body || [])
+           ].map(tag => tag.toLowerCase());
+
+           for (const tag of profileKeywords) {
+             if (LORA_MAP[tag]) {
+               activeLoraFile = LORA_MAP[tag];
+               loraTriggerWord = tag; 
+               break; 
+             }
+           }
+        }
       }
   }
 
-  // --- 3. DYNAMIC TAG ORCHESTRATION ---
+  // --- 3. DYNAMIC TAG ORCHESTRATION & LOCKS ---
   
-  // 🔐 CONSISTENCY LOCKS
+  // 🔐 CONSISTENCY LOCK 1: FACE ANCHOR
   const faceTags = character.face.join(", ");
   const hairTags = character.hair.length > 0 ? `${character.hair.join(", ")} hair` : "";
-  
-  // Physique Logic: Extract shape tags so they are NEVER filtered out
+  // We don't build "faceAnchor" separately here; we put it directly into botIdentity like the old code.
+
+  // 🔐 CONSISTENCY LOCK 2: PHYSIQUE INJECTION (Fixes "Curvy" being ignored)
+  // Extracts shape tags so they are NEVER filtered out by situational logic.
   const shapeKeywords = /curvy|thick|petite|voluptuous|chubby|slim|skinny|large|big|huge|massive|small|flat|heavy|muscular|toned|fit|athletic|busty|thicc|plump|waist|bosom/i;
   const physiqueTags = (character.body || []).filter(t => shapeKeywords.test(t)).join(", ");
 
-  // Outfit Logic: Force default if not mentioned
+  // 🔐 CONSISTENCY LOCK 3: OUTFIT INJECTION
   const clothingKeywords = ["wearing", "dressed in", "outfit", "bikini", "lingerie", "shirt", "dress", "pants", "naked", "nude", "topless", "bra", "panties"];
   const hasClothingMention = clothingKeywords.some(kw => sceneLower.includes(kw));
   const outfitLock = hasClothingMention ? "" : `(${character.outfit}:1.3)`;
@@ -114,7 +138,8 @@ export const generateAriaImage = async (
     const t = tag.toLowerCase();
     const s = sceneLower;
     
-    if (shapeKeywords.test(t)) return false; // Handled by physiqueTags
+    // Skip shape tags here because we handled them in Lock 2
+    if (shapeKeywords.test(t)) return false; 
 
     if ((s.includes("chest") || s.includes("cleavage") || s.includes("boobs")) && (t.includes("tits") || t.includes("breast") || t.includes("bust"))) return true;
     if ((s.includes("ass") || s.includes("butt") || s.includes("rear")) && (t.includes("ass") || t.includes("butt") || t.includes("hips"))) return true;
@@ -126,7 +151,7 @@ export const generateAriaImage = async (
 
   const bodyTags = filteredBodyTags.join(", ");
   
-  // 📸 IDENTITY BLOCK (Restored to Old Style for Consistency)
+  // 📸 IDENTITY BLOCK (Restored to Old Code Structure)
   // Logic: Trigger + Name + Face + Shape + Outfit
   const botIdentity = `(solo, 1girl:1.2), (${loraTriggerWord}, ${character.name}:1.2), (${faceTags}, ${hairTags}, ${character.ethnicity}:1.1), (${physiqueTags}:1.3), ${outfitLock}, a ${character.age}-year-old ${character.gender}`;
 
@@ -146,17 +171,17 @@ export const generateAriaImage = async (
     situationalTags = [`raw candid photo of ${botIdentity}`, bodyTags];
   }
 
-  // --- 4. PROMPT ASSEMBLY (RESTORED OLD ORDERING) ---
-  // We put identity/situational tags BEFORE the description.
-  // This tells Stable Diffusion: "Draw THIS PERSON first, then put them in this scene."
+  // --- 4. PROMPT ASSEMBLY (RESTORED "OLD CODE" ORDERING) ---
+  // Critical Fix: Identity tags (physicalIdentity) are placed BEFORE the Description.
+  // This ensures the AI draws the correct face/body first, then applies the scene.
   
   const physicalIdentity = situationalTags.filter(Boolean).join(", ");
-  const fusedDescription = `(${baseDescription}:1.3)`;
+  const fusedDescription = `(${baseDescription}:1.2)`; // Reduced from 1.3 to 1.2 to fix quality "burn"
 
   const promptText = [
-    "(masterpiece, high quality, realistic:1.2)", // Quality first
-    physicalIdentity,                             // WHO (Identity)
-    fusedDescription,                             // WHAT (Action)
+    "(masterpiece, high quality, realistic:1.2)", // Quality First
+    physicalIdentity,                             // WHO (Identity - High Priority)
+    fusedDescription,                             // WHAT (Action/Scene)
     "unfiltered raw candid cinematic photo, extremely detailed skin texture, photorealistic, natural subsurface scattering, film grain, dslr look, 8k uhd"
   ].filter(Boolean).join(", ").replace(/\s+/g, " ").trim();
 
@@ -182,6 +207,7 @@ export const generateAriaImage = async (
     safetyNegatives = "nude, naked, nipples, topless, exposed breast, genitals, vaginal, penis, pussy";
   }
 
+  // Consistency Negatives: Prevents the AI from making your "curvy" character skinny
   const consistencyNegatives = "(changing clothes, changing hair color, changing hairstyle, asian, chinese, flat chest, skinny, anorexic, small tits:1.5)"; 
 
   const negativeText = [
@@ -271,17 +297,22 @@ export const generateAriaImage = async (
 
       if (statusData.status === "COMPLETED") {
         const output = statusData.output;
+        
+        // ADDED: output?.message (where URL lives for S3 uploads)
         const rawImage = output?.message || output?.["19"]?.images?.[0] || output?.images?.[0] || output;
         
         if (!rawImage) throw new Error("Job completed but no image found");
 
         let finalUrl = typeof rawImage === 'string' ? rawImage : (rawImage.data || rawImage.url);
 
+        // --- R2 / S3 BANDWIDTH FIX ---
+        // 1. Swap Private Cloudflare URL for Public R2 Domain
         if (finalUrl.includes("r2.cloudflarestorage.com")) {
             const filename = finalUrl.split('/').pop(); 
             finalUrl = `${R2_PUBLIC_DOMAIN}/${filename}`;
         }
         
+        // 2. Return URL if HTTP, otherwise wrap Base64
         return finalUrl.startsWith('http') || finalUrl.startsWith('data:') 
             ? finalUrl 
             : `data:image/png;base64,${finalUrl}`;
