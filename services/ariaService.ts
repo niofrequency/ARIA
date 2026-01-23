@@ -52,7 +52,7 @@ export const extractContextPrompt = (text: string) => {
   let cleanText = text
     .replace(visualRegex, '')
     .replace(memoryRegex, '')
-    .replace(/\*\s*sends\s+.*?\*/gi, '') // Removes "*sends giggle emoji*"
+    .replace(/\*\s*sends\s+.*?\*/gi, '') // Removes "*sends giggle emoji*" residue
     .trim();
 
   // 4. Emoji Sanitization for RunPod
@@ -73,7 +73,6 @@ export const extractContextPrompt = (text: string) => {
     memoryText     // For the Database
   };
 };
-
 
 /**
  * BUILD SYSTEM INSTRUCTION
