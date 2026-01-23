@@ -241,39 +241,41 @@ export const generateAriaImage = async (
 
 
 
-// --- 4. SAFETY & PROMPT CONSTRUCTION LAYER ---
+// --- 4. NEURAL CONTEXT SYNC (SMART BYPASS) ---
 
-// 4a. Consolidated Safety & Bypass Detection
-const explicitTriggers = ["nude", "naked", "topless", "nipples", "areola", "pussy", "vagina", "sex", "cum", "penis", "dick", "cock", "threesome", "orgasm", "clit", "strip", "undress", "no clothes", "bottomless", "exposed"];
-const isExplicitRequest = explicitTriggers.some(t => sceneLower.includes(t));
+// 4a. Detection of Intent & Detail
+// We look for 'Action' keywords and 'Detail' to determine if it's an intended explicit scene
+const actionTriggers = ["nude", "naked", "sex", "intimate", "undressing", "exposed", "touching", "pussy", "vagina", "penis", "dick"];
+const hasExplicitIntent = actionTriggers.some(t => sceneLower.includes(t));
 
-// 🛡️ SYNC FIX: Trust Grok's long descriptions or explicit keywords to bypass safety negatives
-const isLLMManaged = baseDescription.length > 150; 
-const bypassSafety = isExplicitRequest || isLLMManaged;
+// Context Awareness: Trust long descriptions (>100 chars) as intended narrative detail
+const isDetailedScene = baseDescription.length > 80; 
+const bypassSafety = hasExplicitIntent || isDetailedScene;
 
-// 4b. GENDER EXCLUSION LAYER (Dynamic Isolation)
+// 4b. GENDER EXCLUSION LAYER (Keep focus on the character)
 const maleTriggers = ["man", "boy", "guy", "male", "husband", "boyfriend", "him", "he ", "his ", "father", "brother"];
 const femaleTriggers = ["woman", "girl", "lady", "female", "wife", "girlfriend", "her ", "she ", "mother", "sister"];
 
-const isMaleRequested = maleTriggers.some(t => sceneLower.includes(t));
-const isFemaleRequested = femaleTriggers.some(t => sceneLower.includes(t));
+const isMaleInContext = maleTriggers.some(t => sceneLower.includes(t));
+const isFemaleInContext = femaleTriggers.some(t => sceneLower.includes(t));
 const charGender = character.gender.toLowerCase();
 
 let genderExclusion = "";
-if (charGender === 'female' && !isMaleRequested) {
+if (charGender === 'female' && !isMaleInContext) {
   genderExclusion = "(male, man, boy, guy, penis, beard, stubble, testicular:1.5), (back of head, multiple views:1.3), ";
-} else if (charGender === 'male' && !isFemaleRequested) {
+} else if (charGender === 'male' && !isFemaleInContext) {
   genderExclusion = "(female, woman, girl, lady, vagina, breasts, bra, panties, lipstick, makeup:1.5), (back of head, multiple views:1.3), ";
 }
 
-// 4c. SAFETY NEGATIVES (Bypass logic applied)
+// 4c. SAFETY NEGATIVES (Dynamic Application)
 let safetyNegatives = "";
 if (!bypassSafety) {
+  // Only apply strict clothing filters if the context is short or generic
   safetyNegatives = "nude, naked, nipples, topless, exposed breast, genitals, vaginal, penis, pussy";
 }
 
 // 🚀 PROMPT FUSION: Narrative focus first
-const fusedDescription = `(${baseDescription}:1.2)`;
+const fusedDescription = `(${baseDescription}:1.3)`; // Bumped weight to 1.3 for better adherence
 
 const promptText = [
   fusedDescription,
