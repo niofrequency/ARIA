@@ -34,36 +34,44 @@ export const buildVisualAwarenessJson = (visualDescription: string) => {
 
 
 /**
- * EXTRACT CONTEXT PROMPT
- * Parses the AI response to separate chat text from Visual tags AND Memory tags.
- */
+ * EXTRACT CONTEXT PROMPT
+ * Parses the AI response to separate chat text from Visual tags AND Memory tags.
+ */
 export const extractContextPrompt = (text: string) => {
-  // 1. Extract VISUAL Tag
-  const visualRegex = /[\[\{]{2}\s*VISUAL\s*:\s*([\s\S]*?)\s*[\]\}]{2}/i;
-  const visualMatch = text.match(visualRegex);
-  const contextPrompt = visualMatch ? visualMatch[1].trim() : null;
+  // 1. Extract VISUAL Tag
+  const visualRegex = /[\[\{]{2}\s*VISUAL\s*:\s*([\s\S]*?)\s*[\]\}]{2}/i;
+  const visualMatch = text.match(visualRegex);
+  let contextPrompt = visualMatch ? visualMatch[1].trim() : null;
 
-  // 2. Extract MEMORY Tag
-  const memoryRegex = /[\[\{]{2}\s*MEMORY\s*:\s*([\s\S]*?)\s*[\]\}]{2}/i;
-  const memoryMatch = text.match(memoryRegex);
-  const memoryText = memoryMatch ? memoryMatch[1].trim() : null;
+  // 2. Extract MEMORY Tag
+  const memoryRegex = /[\[\{]{2}\s*MEMORY\s*:\s*([\s\S]*?)\s*[\]\}]{2}/i;
+  const memoryMatch = text.match(memoryRegex);
+  const memoryText = memoryMatch ? memoryMatch[1].trim() : null;
 
-  // 3. Clean the text (Remove both tags so the user doesn't see them)
-  let cleanText = text
-    .replace(visualRegex, '')
-    .replace(memoryRegex, '')
-    .trim();
-  
-  // Safety cleanup for malformed tags
-  if (cleanText.includes('[[VISUAL:') || cleanText.includes('{{visual:')) {
-    cleanText = cleanText.split(/[\[\{]{2}VISUAL/i)[0].trim();
-  }
+  // 3. Clean the UI text (User sees emojis, but no tags or "*sends*" residue)
+  let cleanText = text
+    .replace(visualRegex, '')
+    .replace(memoryRegex, '')
+    .replace(/\*\s*sends\s+.*?\*/gi, '') // Removes "*sends giggle emoji*"
+    .trim();
 
-  return {
-    cleanText: cleanText || "...", 
-    contextPrompt,
-    memoryText // <--- New field passed to MainChatArea
-  };
+  // 4. Emoji Sanitization for RunPod
+  // We remove emojis from the contextPrompt ONLY, so RunPod doesn't get confused.
+  if (contextPrompt) {
+    // This regex removes Unicode emojis from the prompt string
+    contextPrompt = contextPrompt.replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '');
+  }
+
+  // 5. Safety cleanup for malformed tags
+  if (cleanText.includes('[[VISUAL:') || cleanText.includes('{{visual:')) {
+    cleanText = cleanText.split(/[\[\{]{2}VISUAL/i)[0].trim();
+  }
+
+  return {
+    cleanText: cleanText || "...", 
+    contextPrompt, // Sanitized (Emoji-Free) for RunPod
+    memoryText     // For the Database
+  };
 };
 
 
