@@ -239,14 +239,7 @@ export const generateAriaImage = async (
     ];
   }
 
-The error is caused by duplicate variable declarations. You have the entire // --- 4. SAFETY & PROMPT CONSTRUCTION LAYER --- block written twice in a row.
 
-In JavaScript/TypeScript, you cannot declare the same const (like explicitTriggers, isMaleRequested, etc.) more than once in the same scope. This will throw a SyntaxError: Identifier 'explicitTriggers' has already been declared.
-
-🛠️ The Fix
-Delete the first version of Section 4 and use this consolidated version. I have cleaned up the duplicates and ensured the Bypass Safety logic is correctly integrated.
-
-TypeScript
 
 // --- 4. SAFETY & PROMPT CONSTRUCTION LAYER ---
 
