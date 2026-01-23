@@ -36,20 +36,6 @@ export const generateAriaImage = async (
   userPrompt: string,
   character: CharacterProfile
 ): Promise<string | null> => {
-  const baseDescription = (contextPrompt || userPrompt || "").trim();
-
-  if (!baseDescription) {
-    console.warn("No prompt description available for image generation");
-    return null;
-  }
-
-  const sceneLower = baseDescription.toLowerCase();
-  
-export const generateAriaImage = async (
-  contextPrompt: string | null,
-  userPrompt: string,
-  character: CharacterProfile
-): Promise<string | null> => {
   let baseDescription = (contextPrompt || userPrompt || "").trim();
 
   if (!baseDescription) {
@@ -57,9 +43,8 @@ export const generateAriaImage = async (
     return null;
   }
 
-  // 🧹 DIALOGUE CLEANER (Fixes the "Bad Quality" issue)
-  // 1. Removes text inside quotes (often dialogue)
-  // 2. Removes common chat artifacts like "Hehe", "Lol", "Haha"
+  // 🧹 DIALOGUE CLEANER (Fixes the "Bad Quality/Burned" issue)
+  // Removes text inside quotes and chat artifacts that confuse the AI
   baseDescription = baseDescription
     .replace(/["“][^"”]*["”]/g, '') 
     .replace(/\b(hehe|haha|lol|hey|hello|ah|oh|wow|hmm)\b/gi, '')
@@ -309,17 +294,22 @@ export const generateAriaImage = async (
 
       if (statusData.status === "COMPLETED") {
         const output = statusData.output;
+        
+        // ADDED: output?.message (where URL lives for S3 uploads)
         const rawImage = output?.message || output?.["19"]?.images?.[0] || output?.images?.[0] || output;
         
         if (!rawImage) throw new Error("Job completed but no image found");
 
         let finalUrl = typeof rawImage === 'string' ? rawImage : (rawImage.data || rawImage.url);
 
+        // --- R2 / S3 BANDWIDTH FIX ---
+        // 1. Swap Private Cloudflare URL for Public R2 Domain
         if (finalUrl.includes("r2.cloudflarestorage.com")) {
             const filename = finalUrl.split('/').pop(); 
             finalUrl = `${R2_PUBLIC_DOMAIN}/${filename}`;
         }
         
+        // 2. Return URL if HTTP, otherwise wrap Base64
         return finalUrl.startsWith('http') || finalUrl.startsWith('data:') 
             ? finalUrl 
             : `data:image/png;base64,${finalUrl}`;
