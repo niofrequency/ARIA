@@ -71,23 +71,29 @@ export const generateAriaImage = async (
   const imgWidth = isHorizontal ? 1500 : 1024;
   const imgHeight = isHorizontal ? 1024 : 1500;
 
-  // --- 2. LORA DETECTION & SYNC ---
+// --- 2. LORA DETECTION & SYNC ---
   let activeLoraFile = "";
   let activeWeight = 0.88;
 
-  // Step 2.1: Dynamic Profile Sync (UI Tags)
-  const profileKeywords = [
-    character.name,
-    ...(character.face || []),
-    ...(character.hair || []),
-    ...(character.body || [])
-  ].map(tag => tag.toLowerCase());
+  // 🛡️ FIX: Prioritize Name Match First (Prevents Body Tag Leak)
+  const nameKey = character.name.toLowerCase();
+  if (LORA_MAP[nameKey]) {
+      activeLoraFile = LORA_MAP[nameKey];
+  } 
+  else {
+      // Only check other tags if the NAME didn't trigger a LoRA
+      const profileKeywords = [
+        ...(character.face || []),
+        ...(character.hair || []),
+        ...(character.body || [])
+      ].map(tag => tag.toLowerCase());
 
-  for (const tag of profileKeywords) {
-    if (LORA_MAP[tag]) {
-      activeLoraFile = LORA_MAP[tag];
-      break; 
-    }
+      for (const tag of profileKeywords) {
+        if (LORA_MAP[tag]) {
+          activeLoraFile = LORA_MAP[tag];
+          break; 
+        }
+      }
   }
 
   // Step 2.2: Chat Trigger Override
