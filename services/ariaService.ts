@@ -47,23 +47,29 @@ export const extractContextPrompt = (text: string) => {
   const memoryMatch = text.match(memoryRegex);
   const memoryText = memoryMatch ? memoryMatch[1].trim() : null;
 
-  // 3. Clean the text (Remove both tags so the user doesn't see them)
+  // 3. Clean the text
   let cleanText = text
     .replace(visualRegex, '')
     .replace(memoryRegex, '')
+    // This line specifically removes the "*sends emoji*" roleplay residue
+    .replace(/\*\s*sends\s+.*?\*/gi, '') 
     .trim();
   
-  // Safety cleanup for malformed tags
-  if (cleanText.includes('[[VISUAL:') || cleanText.includes('{{visual:')) {
-    cleanText = cleanText.split(/[\[\{]{2}VISUAL/i)[0].trim();
+  // 4. Safety cleanup: Ensures no raw [[VISUAL]] logic leaks to the user
+  if (cleanText.includes('[[') || cleanText.includes('{{')) {
+    cleanText = cleanText.split(/[\[\{]{2}/)[0].trim();
   }
+
+  // 5. Emoji Sanitization for RunPod
+  // We keep the emojis in cleanText, but they are NOT in contextPrompt
+  // This ensures RunPod only gets the narrative description.
 
   return {
     cleanText: cleanText || "...", 
-    contextPrompt,
-    memoryText // <--- New field passed to MainChatArea
+    contextPrompt, // This goes to RunPod (Emoji-Free)
+    memoryText 
   };
-};
+};;
 
 
 /**
@@ -89,6 +95,8 @@ const buildSystemInstruction = (character: CharacterProfile): string => {
     - You are texting on a private messenger app (like iMessage/WhatsApp).
     - Text like a real person: use casual phrasing, reaction gifs (described in asterisks), and direct thoughts.
     - DO NOT write like a formal letter or a novel. Be punchy, reactive, and raw.
+    - USE ACTUAL EMOJIS: Use actual Unicode emojis (e.g., 🤭, 😊, 🔥) directly in your sentences to express emotion. 
+    - NO EMOJI ACTIONS: Never describe the act of sending an emoji using asterisks (e.g., strictly avoid "*sends giggle emoji*" or "*sends 🤭*").
 
     ### MEMORY SAVING PROTOCOL (CRITICAL)
     - **LISTEN FOR FACTS:** If the user explicitly states a preference, a detail about their life, a name, a job, or a specific like/dislike, you MUST save it.
@@ -162,7 +170,7 @@ STRICT OPERATING RULES:
 9. FACELESS INTIMATE CLOSEUP RULE: When generating an extreme closeup of intimate or lower body parts (pussy, vagina, labia, clit, vulva, ass, anus, thighs, feet, etc.), you MUST avoid including the face, head, or hair in the frame unless the user explicitly asks for it. Use framing such as: "tight crop on lower body", "faceless", "head out of frame", "anonymous view", "no face visible", "cropped at waist or higher". Do not describe or reference facial features, hair, or expressions in these shots.
    - NEVER tell the system to ignore or skip the hair description (${hairDesc}); the generator requires these tags to maintain skin-tone and identity consistency throughout the session.
 10. PERSISTENT CLOTHING & ACCESSORIES RULE: Clothing and accessories are persistent — once changed, they remain until explicitly removed or replaced.
-   - Default: Start with the outfit from the character profile.
+   - Default: Start with the outfit from the character profile: ${outfit}.
    - If user requests specific clothing or accessories (put on, wear, change to lingerie, stockings, glasses, sunglasses, choker, collar, cat ears, heels, bikini, maid outfit, etc.), override and apply the new items. These changes persist across future images until further instruction.
    - If user requests partial state (pull aside panties, lift shirt, push down bra, hike up skirt, etc.), apply and keep that state until changed.
    - If user requests removal (take off, remove, strip, naked, topless, bottomless, no bra, panties off, etc.), remove the specified items. Full nudity persists until user dresses again.
