@@ -55,6 +55,24 @@ export const extractContextPrompt = (text: string) => {
     .replace(/\*\s*sends\s+.*?\*/gi, '') // Removes "*sends giggle emoji*"
     .trim();
 
+  // ✅ INSERT FIX HERE: HALLUCINATION PATCH
+  // If Grok implies a photo ("check this out") but forgets the tag, we force it.
+  if (!contextPrompt) {
+     const implicitTriggers = [
+       "check this out", "look at this", "can you see", "look at me", "see this", "view",
+       "here is a pic", "sending a photo","do you like that", "sending pic", "sending you a", "sent you a",
+       "taking a selfie", "snapped this", "how does this look", "like this?", "pic for you",
+       "picture for you", "photo for you", "this fit", "my outfit"
+     ];
+     
+     const lowerText = cleanText.toLowerCase();
+     if (implicitTriggers.some(t => lowerText.includes(t))) {
+         console.log("🧩 Hallucination Patch Triggered: Implicit Visual Detected");
+         // Use the chat text itself as the prompt context
+         contextPrompt = `selfie, ${cleanText}`; 
+     }
+  }
+
   // 4. Emoji Sanitization for RunPod
   // We remove emojis from the contextPrompt ONLY, so RunPod doesn't get confused.
   if (contextPrompt) {
