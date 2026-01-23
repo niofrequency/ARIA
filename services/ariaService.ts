@@ -208,17 +208,20 @@ STRICT OPERATING RULES:
 
 /**
  * GENERATE AI RESPONSE
- * Now with Long-Term Vector Memory Recall & Hallucination Patch
+ * Now with Debugging for Silent Memory Failures
  */
 export const generateAriaResponse = async (
   prompt: string,
   history: any[], 
   character: CharacterProfile,
-  userId?: string, // <--- Param 4: User ID for Memory lookup
-  botId?: string   // <--- Param 5: Bot ID to keep memories separate
+  userId?: string, 
+  botId?: string   
 ): Promise<string> => {
   try {
-    // 1. MEMORY RECALL (The "Thought Process")
+    // 🔍 DEBUG: This log runs OUTSIDE the if-statement to tell you if data is missing.
+    console.log(`🔍 MEMORY CHECK -> UserID: ${userId || "MISSING"}, BotID: ${botId || "MISSING"}`);
+
+    // 1. MEMORY RECALL
     let memoryContext = "";
     
     if (userId && botId) {
@@ -226,17 +229,21 @@ export const generateAriaResponse = async (
         const relevantMemories = await retrieveMemories(prompt, userId, botId);
         
         if (relevantMemories && relevantMemories.length > 0) {
-          // Inject facts into the context so Grok knows them
           memoryContext = `
     ### LONG-TERM MEMORY (RELEVANT FACTS)
     The user has previously mentioned these facts. Use them to personalize your response, but do NOT explicitly say "I remember you said...":
     ${relevantMemories.map(m => `- ${m}`).join("\n")}
     `;
           console.log("🧠 Memories Injected:", relevantMemories.length);
+        } else {
+          console.log("🤷‍♂️ Database searched, but no relevant memories found.");
         }
       } catch (memErr) {
-        console.warn("⚠️ Memory Recall skipped (DB might be empty or unreachable):", memErr);
+        console.warn("⚠️ Memory Recall skipped (DB Error):", memErr);
       }
+    } else {
+      // ⚠️ Warn if the logic is skipped
+      console.warn("⚠️ Memory logic skipped because userId or botId is undefined.");
     }
 
     // 2. Format History
@@ -272,14 +279,11 @@ export const generateAriaResponse = async (
     let content = data.choices[0]?.message?.content || "I'm lost in thought... 💕";
     content = content.trim();
 
-    // 🛡️ HALLUCINATION PATCH (The "Safety Net")
-    // If the bot implies an image (e.g. "look at me") but forgets the tag, we force it.
+    // 🛡️ HALLUCINATION PATCH
     const impliedVisualRegex = /(look at me|take a look|see this|picture us|picture me|here is a|sending a|check this out|watch me|look here|my new|showing you)/i;
     
-    // Check if intent exists BUT the [[VISUAL]] tag is missing
     if (impliedVisualRegex.test(content) && !content.includes('[[VISUAL')) {
         console.log("⚠️ Hallucination detected! Forcing missing visual tag.");
-        // Append a generic selfie tag to save the moment
         content += ` [[VISUAL: ${character.name}, selfie, looking at camera, ${character.outfit}]]`;
     }
 
@@ -290,7 +294,6 @@ export const generateAriaResponse = async (
     return "I'm having a little trouble connecting... check your connection? 💕";
   }
 };
-
 
 /**
  * Image trigger detection
