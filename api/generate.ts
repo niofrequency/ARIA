@@ -81,6 +81,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       console.log(`🎨 Dispatching Imaging Workflow to Endpoint: ${ENDPOINT_ID}`);
 
+      // ✅ ADD THESE LOGS HERE
+      // Node "6" is the standard Positive Prompt node in your ComfyUI workflow
+      const positivePrompt = workflow["6"]?.inputs?.text;
+      console.log("\n🔍 --- FINAL PROMPT SENT TO RUNPOD ---");
+      console.log(positivePrompt); 
+      console.log("----------------------------------------\n");
+
       const response = await fetch(`https://api.runpod.ai/v2/${ENDPOINT_ID}/run`, {
         method: "POST",
         headers: {
