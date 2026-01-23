@@ -265,10 +265,19 @@ export const generateAriaImage = async (
   }
 
   // 4c. SAFETY NEGATIVES (If NO nudity requested, force clothing)
-  let safetyNegatives = "";
-  if (!isExplicitRequest) {
+// Detect if Grok/AI explicitly requested "Neural Engine" bypass
+const explicitTriggers = ["nude", "naked", "topless", "nipples", "areola", "pussy", "vagina", "sex", "cum", "penis", "dick", "cock", "threesome", "orgasm", "clit", "strip", "undress", "no clothes", "bottomless", "exposed"];
+const isExplicitRequest = explicitTriggers.some(t => sceneLower.includes(t));
+
+// 🛡️ SYNC FIX: If Grok provides a long, detailed description, trust the LLM over the safety filter
+const isLLMManaged = baseDescription.length > 150; // Long descriptions usually come from Grok
+const bypassSafety = isExplicitRequest || isLLMManaged;
+
+let safetyNegatives = "";
+if (!bypassSafety) {
+    // Only force clothes if it's a short/generic user prompt
     safetyNegatives = "nude, naked, nipples, topless, exposed breast, genitals, vaginal, penis, pussy";
-  }
+}
 
   // 🚀 PROMPT FUSION: We put the scene description FIRST with a weight of 1.2
   const fusedDescription = `(${baseDescription}:1.2)`;
