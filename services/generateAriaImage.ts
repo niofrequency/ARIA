@@ -239,12 +239,13 @@ export const generateAriaImage = async (
     ];
   }
 
-  // --- 4. SAFETY & NEGATIVE PROMPT LAYER (NEW) ---
-  // Detect if the user/AI explicitly requested nudity
+// --- 4. SAFETY & PROMPT CONSTRUCTION LAYER ---
+  
+  // 4a. Detect if the user/AI explicitly requested nudity
   const explicitTriggers = ["nude", "naked", "topless", "nipples", "areola", "pussy", "vagina", "sex", "cum", "penis", "dick", "cock", "threesome", "orgasm", "clit", "strip", "undress", "no clothes", "bottomless", "exposed"];
   const isExplicitRequest = explicitTriggers.some(t => sceneLower.includes(t));
 
- // --- 4b. GENDER EXCLUSION LAYER (Dynamic Isolation) ---
+  // 4b. GENDER EXCLUSION LAYER (Dynamic Isolation)
   const maleTriggers = ["man", "boy", "guy", "male", "husband", "boyfriend", "him", "he ", "his ", "father", "brother"];
   const femaleTriggers = ["woman", "girl", "lady", "female", "wife", "girlfriend", "her ", "she ", "mother", "sister"];
 
@@ -263,25 +264,27 @@ export const generateAriaImage = async (
     genderExclusion = "(female, woman, girl, lady, vagina, breasts, bra, panties, lipstick, makeup:1.5), (back of head, multiple views:1.3), ";
   }
 
-  // If NO nudity requested, force clothing in negative prompt
+  // 4c. SAFETY NEGATIVES (If NO nudity requested, force clothing)
   let safetyNegatives = "";
   if (!isExplicitRequest) {
     safetyNegatives = "nude, naked, nipples, topless, exposed breast, genitals, vaginal, penis, pussy";
   }
 
+  // 🚀 PROMPT FUSION: We put the scene description FIRST with a weight of 1.2
+  const fusedDescription = `(${baseDescription}:1.2)`;
+
   const promptText = [
-    "(masterpiece, high quality, realistic:1.2)",
+    fusedDescription, // Grok's scene description now takes primary focus
     situationalTags.filter(Boolean).join(", "),
-    baseDescription, 
+    "(masterpiece, high quality, realistic:1.1)",
     "unfiltered raw candid cinematic photo, extremely detailed skin texture, photorealistic, natural subsurface scattering, film grain, dslr look, 8k uhd"
   ].filter(Boolean).join(", ").replace(/\s+/g, " ").trim();
 
-const negativeText = [
+  const negativeText = [
     safetyNegatives,
-    genderExclusion, // <--- This now handles blocking the opposite gender
+    genderExclusion,
     character.negativePrompt || "",
-    "(multiple girls, 2girls, 3girls, trio, duo, group, crowd:1.6)", 
-    "(multiple people:1.5)", // <--- REMOVED "(male, man, boy:1.3)" from here
+    "(multiple girls, 2girls, 3girls, trio, duo, group, crowd:1.6), (multiple people:1.5)",
     "(deformed iris, deformed pupils:1.2)",
     "airbrushed skin, plastic skin, porcelain skin, doll-like skin, flawless smooth skin",
     "beauty filter, over-smoothed, heavy retouch, instagram filter",
@@ -290,7 +293,7 @@ const negativeText = [
   ].filter(Boolean).join(", ");
 
   const seed = Math.floor(Math.random() * 1_000_000_000);
-
+  
   // --- DEBUG LOGGING ---
   console.log(`🚀 Dispatching Neural Sync: ${character.name}`);
   console.log(`📝 Final Prompt: ${promptText}`);
