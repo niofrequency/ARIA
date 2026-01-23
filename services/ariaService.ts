@@ -32,8 +32,6 @@ export const buildVisualAwarenessJson = (visualDescription: string) => {
   };
 };
 
-okay and fix this line only 
-
 
 /**
  * EXTRACT CONTEXT PROMPT
