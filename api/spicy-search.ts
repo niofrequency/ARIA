@@ -23,39 +23,39 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   };
 
   try {
-    console.log(`🔍 Searching for Embeds: ${searchTerm}`);
+    console.log(`🔍 Searching for Embeds (Randomized): ${searchTerm}`);
     let videoData = null;
 
-    // --- TIER 1: OFFICIAL APIs (Best Quality Embeds) ---
+    // --- TIER 1: OFFICIAL APIs ---
     
-    // 1. Pornhub
+    // 1. Pornhub (Randomized)
     if (!videoData) videoData = await searchPornhub(searchTerm as string);
     
-    // 2. RedTube
+    // 2. RedTube (Randomized)
     if (!videoData) videoData = await searchRedTube(searchTerm as string);
     
-    // 3. Eporner
+    // 3. Eporner (Randomized)
     if (!videoData) videoData = await searchEporner(searchTerm as string);
     
-    // 4. YouPorn
+    // 4. YouPorn (Randomized)
     if (!videoData) videoData = await searchYouPorn(searchTerm as string);
 
 
-    // --- TIER 2: SCRAPERS (Constructing Embeds from IDs) ---
+    // --- TIER 2: SCRAPERS ---
 
-    // 5. Spankbang
+    // 5. Spankbang (Randomized)
     if (!videoData) {
         console.log("APIs empty. Attempting scraper: Spankbang...");
         videoData = await scrapeSpankbang(searchTerm as string, headers);
     }
 
-    // 6. TNAFlix
+    // 6. TNAFlix (Randomized)
     if (!videoData) {
         console.log("Attempting scraper: TNAFlix...");
         videoData = await scrapeTnaflix(searchTerm as string, headers);
     }
 
-    // 7. XHamster
+    // 7. XHamster (Randomized)
     if (!videoData) {
         console.log("Attempting scraper: XHamster...");
         videoData = await scrapeXhamster(searchTerm as string, headers);
@@ -75,6 +75,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 }
 
 // ==========================================
+// 🎲 HELPER: RANDOM PICKER
+// ==========================================
+function pickRandom<T>(arr: T[], limit: number = 10): T | null {
+  if (!arr || arr.length === 0) return null;
+  // Pick from the top 'limit' results to ensure relevance + variety
+  const pool = arr.slice(0, limit); 
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+// ==========================================
 // 🚀 TIER 1: OFFICIAL APIs (Returning Embeds)
 // ==========================================
 
@@ -83,9 +93,12 @@ async function searchPornhub(term: string) {
     const url = `https://www.pornhub.com/webmasters/search?search=${encodeURIComponent(term)}`;
     const response = await fetch(url);
     const data = await response.json();
+    
     if (data.videos && data.videos.length > 0) {
-      const video = data.videos[0];
-      // Convert View URL to Embed: pornhub.com/view_video.php?viewkey=ph5... -> pornhub.com/embed/ph5...
+      // ✅ RANDOM SELECTION
+      const video = pickRandom(data.videos);
+      if (!video) return null;
+
       const viewKey = video.url.split('viewkey=')[1];
       if (viewKey) {
           return { url: `https://www.pornhub.com/embed/${viewKey}`, provider: 'pornhub', title: video.title };
@@ -100,9 +113,12 @@ async function searchRedTube(term: string) {
     const url = `https://api.redtube.com/?data=redtube.Videos.searchVideos&output=json&search=${encodeURIComponent(term)}&thumbsize=medium`;
     const response = await fetch(url);
     const data = await response.json();
+    
     if (data.videos && data.videos.length > 0) {
-        const video = data.videos[0].video;
-        // RedTube provides ID directly
+        // ✅ RANDOM SELECTION
+        const video = pickRandom(data.videos);
+        if (!video) return null;
+
         return { url: `https://embed.redtube.com/?id=${video.video_id}`, provider: 'redtube', title: video.title };
     }
   } catch (e) { console.error("RT API Error", e); }
@@ -114,9 +130,12 @@ async function searchEporner(term: string) {
     const url = `https://www.eporner.com/api/v2/webmasters/search?query=${encodeURIComponent(term)}&format=json`;
     const response = await fetch(url);
     const data = await response.json();
+    
     if (data.videos && data.videos.length > 0) {
-        const video = data.videos[0];
-        // Eporner provides .embed directly
+        // ✅ RANDOM SELECTION
+        const video = pickRandom(data.videos);
+        if (!video) return null;
+
         return { url: video.embed, provider: 'eporner', title: video.title };
     }
   } catch (e) { console.error("EP API Error", e); }
@@ -128,9 +147,12 @@ async function searchYouPorn(term: string) {
     const url = `https://www.youporn.com/api/webmasters/search?search=${encodeURIComponent(term)}`;
     const response = await fetch(url);
     const data = await response.json();
+    
     if (data.videos && data.videos.length > 0) {
-        const video = data.videos[0];
-        // Extract ID: https://www.youporn.com/watch/123456/title... -> 123456
+        // ✅ RANDOM SELECTION
+        const video = pickRandom(data.videos);
+        if (!video) return null;
+
         const match = video.url.match(/\/watch\/(\d+)/);
         if (match && match[1]) {
             return { url: `https://www.youporn.com/embed/${match[1]}`, provider: 'youporn', title: video.title };
@@ -153,26 +175,29 @@ async function scrapeSpankbang(term: string, headers: any) {
     const html = await response.text();
     const $ = cheerio.load(html);
     
-    let validLink = null;
-    let title = "";
+    // Accumulate all valid links first
+    const candidates: any[] = [];
 
     $('.video-list-video').each((i, el) => {
         const item = $(el);
         if (item.hasClass('paid') || item.hasClass('cam')) return; 
         
-        const relLink = item.find('.thumb').attr('href'); // /7a3b/video/title
+        const relLink = item.find('.thumb').attr('href');
         const text = item.find('.title').text();
-        
-        // Extract ID: /7a3b/video... -> 7a3b
         const idMatch = relLink?.match(/^\/([a-zA-Z0-9]+)\/video/);
 
-        if (idMatch && idMatch[1] && !validLink) {
-             validLink = `https://spankbang.com/${idMatch[1]}/embed/`;
-             title = text;
+        if (idMatch && idMatch[1]) {
+             candidates.push({
+                 url: `https://spankbang.com/${idMatch[1]}/embed/`,
+                 title: text
+             });
         }
     });
 
-    return validLink ? { url: validLink, provider: 'spankbang', title } : null;
+    // ✅ RANDOM SELECTION
+    const selected = pickRandom(candidates);
+    return selected ? { ...selected, provider: 'spankbang' } : null;
+
   } catch (e) { console.error("SB Scrape Error", e); }
   return null;
 }
@@ -186,21 +211,27 @@ async function scrapeTnaflix(term: string, headers: any) {
     const html = await response.text();
     const $ = cheerio.load(html);
     
-    let validLink = null;
+    const candidates: any[] = [];
+
     $('li.video_box').each((i, el) => {
         const item = $(el);
         if (!item.find('.info_time').text()) return;
 
-        const relLink = item.find('a').attr('href'); // /porn/Title/video123456
-        // Extract ID: video(\d+)
+        const relLink = item.find('a').attr('href'); 
         const idMatch = relLink?.match(/video(\d+)$/);
 
-        if (idMatch && idMatch[1] && !validLink) {
-            validLink = `https://www.tnaflix.com/embed/${idMatch[1]}`;
+        if (idMatch && idMatch[1]) {
+            candidates.push({
+                url: `https://www.tnaflix.com/embed/${idMatch[1]}`,
+                title: 'Video'
+            });
         }
     });
 
-    return validLink ? { url: validLink, provider: 'tnaflix', title: 'Video' } : null;
+    // ✅ RANDOM SELECTION
+    const selected = pickRandom(candidates);
+    return selected ? { ...selected, provider: 'tnaflix' } : null;
+
   } catch (e) { console.error("TNA Scrape Error", e); }
   return null;
 }
@@ -214,17 +245,25 @@ async function scrapeXhamster(term: string, headers: any) {
     const html = await response.text();
     const $ = cheerio.load(html);
     
-    const item = $('a.video-thumb__image-container').not('.promo').first();
-    
-    if (item.length) {
-      const link = item.attr('href'); // https://xhamster.com/videos/title-12345
-      // Extract ID: last numbers in URL
-      const idMatch = link?.match(/-(\d+)$/);
+    const candidates: any[] = [];
 
-      if (idMatch && idMatch[1]) {
-        return { url: `https://xhamster.com/embed/${idMatch[1]}`, provider: 'xhamster', title: 'Video' };
-      }
-    }
+    // Select multiple candidates instead of just first
+    $('a.video-thumb__image-container').not('.promo').slice(0, 10).each((i, el) => {
+        const link = $(el).attr('href');
+        const idMatch = link?.match(/-(\d+)$/);
+        
+        if (idMatch && idMatch[1] && link && !link.includes('click')) {
+            candidates.push({
+                url: `https://xhamster.com/embed/${idMatch[1]}`,
+                title: 'Video'
+            });
+        }
+    });
+
+    // ✅ RANDOM SELECTION
+    const selected = pickRandom(candidates);
+    return selected ? { ...selected, provider: 'xhamster' } : null;
+
   } catch (e) { console.error("XH Scrape Error", e); }
   return null;
 }
