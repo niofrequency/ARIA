@@ -16,7 +16,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (!searchTerm) return res.status(400).json({ error: 'Term required' });
 
-  // 2. FAKE BROWSER HEADERS (Crucial to bypass blocks)
+  // 2. FAKE BROWSER HEADERS (Crucial)
   const headers = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     'Accept': 'application/json, text/plain, */*',
@@ -25,29 +25,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   };
 
   try {
-    console.log(`🔍 Searching (Fast Mode): ${searchTerm}`);
+    console.log(`🔍 Searching: ${searchTerm}`);
     let videoData = null;
 
-    // --- TIER 1: OFFICIAL APIs ---
-    // We pass 'headers' to these now so they don't get blocked
-    if (!videoData) videoData = await searchPornhub(searchTerm as string, headers);
+    // --- TIER 1: HIGH SUCCESS APIs (Bot Friendly) ---
+    
+    // 1. RedTube (Most reliable)
     if (!videoData) videoData = await searchRedTube(searchTerm as string, headers);
+    
+    // 2. Eporner (Very reliable, rarely blocks)
     if (!videoData) videoData = await searchEporner(searchTerm as string, headers);
-    if (!videoData) videoData = await searchYouPorn(searchTerm as string, headers);
 
-    // --- TIER 2: SCRAPERS ---
+    // --- TIER 2: SCRAPERS (Often work when APIs block) ---
+    
+    // 3. Spankbang
     if (!videoData) {
-        console.log("APIs empty/blocked. Attempting scraper: Spankbang...");
+        console.log("APIs empty. Trying Spankbang...");
         videoData = await scrapeSpankbang(searchTerm as string, headers);
     }
-    if (!videoData) {
-        console.log("Attempting scraper: TNAFlix...");
-        videoData = await scrapeTnaflix(searchTerm as string, headers);
-    }
-    if (!videoData) {
-        console.log("Attempting scraper: XHamster...");
-        videoData = await scrapeXhamster(searchTerm as string, headers);
-    }
+
+    // 4. XHamster
+    if (!videoData) videoData = await scrapeXhamster(searchTerm as string, headers);
+
+    // --- TIER 3: STRICT APIs (Often block servers) ---
+    
+    // 5. YouPorn
+    if (!videoData) videoData = await searchYouPorn(searchTerm as string, headers);
+
+    // 6. Pornhub (Strictest blocking, try last)
+    if (!videoData) videoData = await searchPornhub(searchTerm as string, headers);
+
+    // 7. TNAFlix (Fallback)
+    if (!videoData) videoData = await scrapeTnaflix(searchTerm as string, headers);
 
     // RESPONSE
     if (videoData) {
@@ -72,37 +81,8 @@ function pickRandom<T>(arr: T[], limit: number = 20): T | null {
 }
 
 // ==========================================
-// 🚀 TIER 1: OFFICIAL APIs (Robust Mode)
+// 🚀 APIs
 // ==========================================
-
-async function searchPornhub(term: string, headers: any) {
-  try {
-    const url = new URL('https://www.pornhub.com/webmasters/search');
-    url.searchParams.append('search', term);
-    
-    const response = await fetch(url.toString(), { headers });
-    
-    // SAFETY CHECK: Ensure response is actually JSON
-    const contentType = response.headers.get("content-type");
-    if (!response.ok || !contentType || !contentType.includes("application/json")) {
-        console.warn("⚠️ Pornhub Blocked (Returned HTML). Skipping...");
-        return null; 
-    }
-
-    const data = await response.json();
-    
-    if (data.videos && data.videos.length > 0) {
-      const candidates = data.videos.filter((v: any) => v.url && v.url.includes('viewkey='));
-      const video = pickRandom(candidates);
-      
-      if (video) {
-          const viewKey = video.url.split('viewkey=')[1];
-          return { url: `https://www.pornhub.com/embed/${viewKey}`, provider: 'pornhub', title: video.title };
-      }
-    }
-  } catch (e) { console.error("PH Error (Skipping)", e); }
-  return null;
-}
 
 async function searchRedTube(term: string, headers: any) {
   try {
@@ -114,22 +94,17 @@ async function searchRedTube(term: string, headers: any) {
 
     const response = await fetch(url.toString(), { headers });
     
-    // SAFETY CHECK
     const contentType = response.headers.get("content-type");
-    if (!response.ok || !contentType || !contentType.includes("application/json")) {
-        console.warn("⚠️ RedTube Blocked. Skipping...");
-        return null;
-    }
+    if (!response.ok || !contentType || !contentType.includes("application/json")) return null;
 
     const data = await response.json();
-    
     if (data.videos && data.videos.length > 0) {
         const video = pickRandom(data.videos);
         if (video && video.video && video.video.video_id) {
              return { url: `https://embed.redtube.com/?id=${video.video.video_id}`, provider: 'redtube', title: video.video.title };
         }
     }
-  } catch (e) { console.error("RT Error (Skipping)", e); }
+  } catch (e) { console.error("RT Error", e); }
   return null;
 }
 
@@ -140,8 +115,12 @@ async function searchEporner(term: string, headers: any) {
     url.searchParams.append('format', 'json');
 
     const response = await fetch(url.toString(), { headers });
-    const data = await response.json(); // Eporner is usually friendlier, less blocking
     
+    // Safety check for Eporner
+    const contentType = response.headers.get("content-type");
+    if (!response.ok || !contentType || !contentType.includes("application/json")) return null;
+
+    const data = await response.json();
     if (data.videos && data.videos.length > 0) {
         const video = pickRandom(data.videos);
         if (video) {
@@ -152,21 +131,42 @@ async function searchEporner(term: string, headers: any) {
   return null;
 }
 
+async function searchPornhub(term: string, headers: any) {
+  try {
+    const url = new URL('https://www.pornhub.com/webmasters/search');
+    url.searchParams.append('search', term);
+    
+    const response = await fetch(url.toString(), { headers });
+    
+    // STRICT SAFETY: Pornhub often returns HTML 403 blocks
+    const contentType = response.headers.get("content-type");
+    if (!response.ok || !contentType || !contentType.includes("application/json")) {
+        return null; 
+    }
+
+    const data = await response.json();
+    if (data.videos && data.videos.length > 0) {
+      const candidates = data.videos.filter((v: any) => v.url && v.url.includes('viewkey='));
+      const video = pickRandom(candidates);
+      if (video) {
+          const viewKey = video.url.split('viewkey=')[1];
+          return { url: `https://www.pornhub.com/embed/${viewKey}`, provider: 'pornhub', title: video.title };
+      }
+    }
+  } catch (e) { console.error("PH Error", e); }
+  return null;
+}
+
 async function searchYouPorn(term: string, headers: any) {
   try {
     const url = new URL('https://www.youporn.com/api/webmasters/search');
     url.searchParams.append('search', term);
 
     const response = await fetch(url.toString(), { headers });
-    
-    // SAFETY CHECK
     const contentType = response.headers.get("content-type");
-    if (!response.ok || !contentType || !contentType.includes("application/json")) {
-        return null;
-    }
+    if (!response.ok || !contentType || !contentType.includes("application/json")) return null;
 
     const data = await response.json();
-    
     if (data.videos && data.videos.length > 0) {
         const video = pickRandom(data.videos);
         if (video) {
@@ -181,7 +181,7 @@ async function searchYouPorn(term: string, headers: any) {
 }
 
 // ==========================================
-// 🕷️ TIER 2: SCRAPERS (Already Robust)
+// 🕷️ SCRAPERS
 // ==========================================
 
 async function scrapeSpankbang(term: string, headers: any) {
@@ -194,7 +194,8 @@ async function scrapeSpankbang(term: string, headers: any) {
     const $ = cheerio.load(html);
     const candidates: any[] = [];
 
-    $('.video-list-video').each((i, el) => {
+    // Updated Selector: Spankbang uses .video-item sometimes
+    $('.video-list-video, .video-item').each((i, el) => {
         const item = $(el);
         if (item.hasClass('paid') || item.hasClass('cam')) return; 
         
@@ -213,6 +214,34 @@ async function scrapeSpankbang(term: string, headers: any) {
 
     return pickRandom(candidates);
   } catch (e) { console.error("SB Error", e); }
+  return null;
+}
+
+async function scrapeXhamster(term: string, headers: any) {
+  try {
+    const url = `https://xhamster.com/search?q=${encodeURIComponent(term)}`;
+    const response = await fetch(url, { headers });
+    if (!response.ok) return null;
+
+    const html = await response.text();
+    const $ = cheerio.load(html);
+    const candidates: any[] = [];
+
+    $('a.video-thumb__image-container').not('.promo').slice(0, 20).each((i, el) => {
+        const link = $(el).attr('href');
+        const idMatch = link?.match(/-(\d+)$/);
+        
+        if (idMatch && idMatch[1] && link && !link.includes('click')) {
+            candidates.push({
+                url: `https://xhamster.com/embed/${idMatch[1]}`,
+                title: 'Video',
+                provider: 'xhamster'
+            });
+        }
+    });
+
+    return pickRandom(candidates);
+  } catch (e) { console.error("XH Error", e); }
   return null;
 }
 
@@ -244,33 +273,5 @@ async function scrapeTnaflix(term: string, headers: any) {
 
     return pickRandom(candidates);
   } catch (e) { console.error("TNA Error", e); }
-  return null;
-}
-
-async function scrapeXhamster(term: string, headers: any) {
-  try {
-    const url = `https://xhamster.com/search?q=${encodeURIComponent(term)}`;
-    const response = await fetch(url, { headers });
-    if (!response.ok) return null;
-
-    const html = await response.text();
-    const $ = cheerio.load(html);
-    const candidates: any[] = [];
-
-    $('a.video-thumb__image-container').not('.promo').slice(0, 20).each((i, el) => {
-        const link = $(el).attr('href');
-        const idMatch = link?.match(/-(\d+)$/);
-        
-        if (idMatch && idMatch[1] && link && !link.includes('click')) {
-            candidates.push({
-                url: `https://xhamster.com/embed/${idMatch[1]}`,
-                title: 'Video',
-                provider: 'xhamster'
-            });
-        }
-    });
-
-    return pickRandom(candidates);
-  } catch (e) { console.error("XH Error", e); }
   return null;
 }
