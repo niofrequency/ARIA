@@ -9,7 +9,8 @@ import { Loader2, X, Download, Menu, Settings, Cpu, ArrowUp, PanelLeft } from 'l
 import { storeMemory } from '../services/memoryService';
 import { fetchGiphyUrl } from '../services/giphyService';
 import { fetchYoutubeUrl } from '../services/youtubeService';
- 
+import { fetchSpicyLink } from '../services/spicyService';
+
 interface MainChatAreaProps {
   character: CharacterProfile;
   messages: Message[];
@@ -83,7 +84,6 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
 
   /**
    * REGENERATE IMAGE HANDLER
-   * Logic: Syncs history to find original hair/look intent to prevent prompt dilution.
    */
   const handleRegenerateImage = async (message: Message) => {
     if (!character) return;
@@ -91,22 +91,17 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
     onUpdateMessage(message.id, { isImageLoading: true });
 
     try {
-      // 1. LOOKBACK: Find the original user prompt that triggered this look
       const messageIndex = messages.findIndex(m => m.id === message.id);
       const originalUserRequest = (messageIndex > 0 && messages[messageIndex - 1].role === 'user') 
         ? messages[messageIndex - 1].text 
         : "high-fidelity portrait";
 
-      // 2. IDENTITY FORCING: We pass the hair tags as the primary userPrompt 
-      // to ensure generateAriaImage puts them at the very start of the string.
       const lookAnchor = `${character.hair.join(", ")} hair, ${originalUserRequest}`;
-
       console.log("🔄 Regenerating with Identity Anchor:", lookAnchor);
 
       const oldImageUrl = message.imageUrl;
       const oldVideoUrl = message.videoUrl;
 
-      // Passing the bot's dialogue as context and the harvested intent as the anchor
       const tempImageUrl = await generateAriaImage(message.text || "", lookAnchor, character);
       
       if (tempImageUrl) {
@@ -130,89 +125,84 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
     }
   };
 
-/**
- * NEURAL MOTION HANDLER
- */
-const handleAnimateRequest = async (message: Message) => {
-  if (!message.imageUrl || !character) {
-    console.error("❌ Animation Aborted: Missing Image or Character Profile");
-    return;
-  }
-
-  // 1. UI Reset: Clear old state and trigger the Synthesis Overlay
-  onUpdateMessage(message.id, { 
-    videoUrl: undefined,
-    isVideoLoading: true, 
-    motionStatus: 'synthesizing' 
-  });
-
-  try {
-    // 2. CONTEXT HARVESTING
-    const messageIndex = messages.findIndex(m => m.id === message.id);
-    const userPrompt = (messageIndex > 0 && messages[messageIndex - 1].role === 'user') 
-      ? messages[messageIndex - 1].text 
-      : "";
-
-    let sourceImageUrl = message.imageUrl;
-
-    // 3. PERSISTENCE CHECK
-    if (sourceImageUrl.startsWith('blob:') || sourceImageUrl.startsWith('data:')) {
-      if (userData?.uid) {
-        sourceImageUrl = await uploadImageToStorage(userData.uid, botId, message.imageUrl);
-        onUpdateMessage(message.id, { imageUrl: sourceImageUrl });
-      } else {
-        throw new Error("User ID missing for persistence");
-      }
+  /**
+   * NEURAL MOTION HANDLER
+   */
+  const handleAnimateRequest = async (message: Message) => {
+    if (!message.imageUrl || !character) {
+      console.error("❌ Animation Aborted: Missing Image or Character Profile");
+      return;
     }
 
-    const aiDialogue = message.text || "";
-    const negPrompt = character.negativePrompt || "blurry, distorted, static, flickering";
+    onUpdateMessage(message.id, { 
+      videoUrl: undefined,
+      isVideoLoading: true, 
+      motionStatus: 'synthesizing' 
+    });
 
-    // 4. NEURAL DISPATCH (Wan 2.1 Optimized)
-    const jobId = await initiateNeuralMotion(
-      sourceImageUrl, 
-      aiDialogue, 
-      userPrompt, 
-      character, 
-      negPrompt
-    );
+    try {
+      const messageIndex = messages.findIndex(m => m.id === message.id);
+      const userPrompt = (messageIndex > 0 && messages[messageIndex - 1].role === 'user') 
+        ? messages[messageIndex - 1].text 
+        : "";
 
-    if (!jobId) throw new Error("No Job ID received from Neural Engine");
+      let sourceImageUrl = message.imageUrl;
 
-    // 5. STATUS POLLING & UI SYNC
-    pollNeuralMotionStatus(
-      jobId,
-      async (videoOutput) => {
-        let displayUrl = videoOutput;
-
-        if (videoOutput.startsWith('data:video')) {
-          const blob = dataURLtoBlob(videoOutput);
-          displayUrl = URL.createObjectURL(blob);
+      if (sourceImageUrl.startsWith('blob:') || sourceImageUrl.startsWith('data:')) {
+        if (userData?.uid) {
+          sourceImageUrl = await uploadImageToStorage(userData.uid, botId, message.imageUrl);
+          onUpdateMessage(message.id, { imageUrl: sourceImageUrl });
+        } else {
+          throw new Error("User ID missing for persistence");
         }
-
-        const timestampedUrl = `${displayUrl}${displayUrl.includes('?') ? '&' : '?'}t=${Date.now()}`;
-
-        onUpdateMessage(message.id, {
-          videoUrl: timestampedUrl, 
-          isVideoLoading: false,
-          motionStatus: 'completed'
-        });
-
-        setTimeout(() => {
-          onImageGenerated();
-        }, 800);
-      },
-      (error) => {
-        console.error("❌ Neural Motion Failed:", error);
-        onUpdateMessage(message.id, { isVideoLoading: false, motionStatus: 'failed' });
       }
-    );
 
-  } catch (err: any) {
-    console.error("❌ Neural Motion Init Failed:", err.message);
-    onUpdateMessage(message.id, { isVideoLoading: false, motionStatus: 'failed' });
-  }
-};
+      const aiDialogue = message.text || "";
+      const negPrompt = character.negativePrompt || "blurry, distorted, static, flickering";
+
+      const jobId = await initiateNeuralMotion(
+        sourceImageUrl, 
+        aiDialogue, 
+        userPrompt, 
+        character, 
+        negPrompt
+      );
+
+      if (!jobId) throw new Error("No Job ID received from Neural Engine");
+
+      pollNeuralMotionStatus(
+        jobId,
+        async (videoOutput) => {
+          let displayUrl = videoOutput;
+
+          if (videoOutput.startsWith('data:video')) {
+            const blob = dataURLtoBlob(videoOutput);
+            displayUrl = URL.createObjectURL(blob);
+          }
+
+          const timestampedUrl = `${displayUrl}${displayUrl.includes('?') ? '&' : '?'}t=${Date.now()}`;
+
+          onUpdateMessage(message.id, {
+            videoUrl: timestampedUrl, 
+            isVideoLoading: false,
+            motionStatus: 'completed'
+          });
+
+          setTimeout(() => {
+            onImageGenerated();
+          }, 800);
+        },
+        (error) => {
+          console.error("❌ Neural Motion Failed:", error);
+          onUpdateMessage(message.id, { isVideoLoading: false, motionStatus: 'failed' });
+        }
+      );
+
+    } catch (err: any) {
+      console.error("❌ Neural Motion Init Failed:", err.message);
+      onUpdateMessage(message.id, { isVideoLoading: false, motionStatus: 'failed' });
+    }
+  };
 
   
   /**
@@ -223,7 +213,7 @@ const handleAnimateRequest = async (message: Message) => {
 
     const userText = input.trim();
     
-    // 1. SEND USER MESSAGE (Immediately)
+    // 1. SEND USER MESSAGE
     const responseMessageId = generateId('bot'); 
     setInput('');
     
@@ -235,7 +225,7 @@ const handleAnimateRequest = async (message: Message) => {
     });
 
     try {
-      // ✅ FIX: REINJECT TAGS INTO HISTORY
+      // FIX: REINJECT TAGS INTO HISTORY
       const history = (messages || []).map(m => {
         let content = m.text || '';
         if (m.role === 'model' && (m.imageUrl || m.videoUrl)) {
@@ -247,53 +237,73 @@ const handleAnimateRequest = async (message: Message) => {
         };
       });
 
-      // Call Brain Proxy (Now with Memory IDs for recall)
+      // Call Brain Proxy
       const rawResponse = await generateAriaResponse(userText, history, character, userData?.uid, botId);
       
-      // DESTRUCTURE: Extract memoryText, visual prompts, and GIF tags
-    const { cleanText, contextPrompt, memoryText, gifSearchTerm, youtubeSearchTerm } = extractContextPrompt(rawResponse);
+      // Extract Context
+      let { cleanText, contextPrompt, memoryText, gifSearchTerm, youtubeSearchTerm } = extractContextPrompt(rawResponse);
       
-      // AUTO-SAVE MEMORY
+      // Auto-Save Memory
       if (memoryText && userData?.uid) {
         console.log("💾 Auto-Saving Memory:", memoryText);
         storeMemory(memoryText, userData.uid, botId);
       }
 
-// 2. LOGIC: DETERMINE MEDIA TYPE
-let finalImageUrl = undefined;
-let finalVideoUrl = undefined;
-const isGeneratingImage = !!contextPrompt;
+      // --- LOGIC: DETERMINE MEDIA TYPE ---
+      let finalImageUrl = undefined;
+      let finalVideoUrl = undefined;
+      const isGeneratingImage = !!contextPrompt;
 
-// CHECK 1: Real GIF (Giphy)
-if (gifSearchTerm) {
-    try {
-        const gifUrl = await fetchGiphyUrl(gifSearchTerm);
-        if (gifUrl) finalImageUrl = gifUrl; 
-    } catch(e) { console.error("Giphy failed", e); }
-}
+      // 1. CHECK: Real GIF (Giphy)
+      if (gifSearchTerm) {
+          try {
+              const gifUrl = await fetchGiphyUrl(gifSearchTerm);
+              if (gifUrl) finalImageUrl = gifUrl; 
+          } catch(e) { console.error("Giphy failed", e); }
+      }
 
-// ✅ CHECK 2: Real Video (YouTube)
-if (youtubeSearchTerm) {
-    try {
-        console.log(`📺 Searching YouTube for: ${youtubeSearchTerm}`);
-        const ytUrl = await fetchYoutubeUrl(youtubeSearchTerm);
-        if (ytUrl) finalVideoUrl = ytUrl;
-    } catch(e) { console.error("YouTube failed", e); }
-}
+      // 2. CHECK: Real Video (YouTube)
+      if (youtubeSearchTerm) {
+          try {
+              console.log(`📺 Searching YouTube for: ${youtubeSearchTerm}`);
+              const ytUrl = await fetchYoutubeUrl(youtubeSearchTerm);
+              if (ytUrl) finalVideoUrl = ytUrl;
+          } catch(e) { console.error("YouTube failed", e); }
+      }
 
-// 3. SEND BOT RESPONSE
-onSendMessage({
-    id: responseMessageId,
-    role: 'model',
-    text: cleanText,
-    imageUrl: finalImageUrl,
-    videoUrl: finalVideoUrl, // ✅ Pass the real YouTube URL here
-    isImageLoading: isGeneratingImage,
-    timestamp: Date.now()
-});
+      // 3. CHECK: SPICY CONTENT (Adult)
+      // Manual regex check ensures this works even if ariaService.ts isn't perfectly updated
+      const spicyRegex = /[\[\{]{2}\s*SPICY\s*:\s*([\s\S]*?)\s*[\]\}]{2}/i;
+      const spicyMatch = cleanText.match(spicyRegex) || rawResponse.match(spicyRegex);
+      let spicySearchTerm = null;
 
-      // 4. TRIGGER AI IMAGE GENERATION (If needed)
-      if (isGeneratingImage) {
+      if (spicyMatch) {
+          spicySearchTerm = spicyMatch[1].trim();
+          // Clean the tag out of the text so user doesn't see it
+          cleanText = cleanText.replace(spicyRegex, '').trim(); 
+      }
+
+      if (spicySearchTerm) {
+          try {
+              console.log(`🔥 Searching Adult Providers for: ${spicySearchTerm}`);
+              const spicyUrl = await fetchSpicyLink(spicySearchTerm);
+              if (spicyUrl) finalVideoUrl = spicyUrl;
+          } catch(e) { console.error("Spicy search failed", e); }
+      }
+
+      // 4. SEND BOT RESPONSE
+      onSendMessage({
+          id: responseMessageId,
+          role: 'model',
+          text: cleanText,
+          imageUrl: finalImageUrl,
+          videoUrl: finalVideoUrl, // Passes YouTube OR Spicy URL
+          isImageLoading: isGeneratingImage,
+          timestamp: Date.now()
+      });
+
+      // 5. TRIGGER AI IMAGE GENERATION (If needed)
+      if (isGeneratingImage && !finalVideoUrl && !finalImageUrl) {
         try {
           const promptToUse = contextPrompt || userText;
           const tempImageUrl = await generateAriaImage(promptToUse, userText, character);
