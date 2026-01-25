@@ -38,14 +38,16 @@ const LORA_MAP: Record<string, string> = {
 };
 
 /**
- * GENERATE ARIA IMAGE
- * logic:
- * 1. Situational Analysis: Detects camera focus and perspective.
- * 2. LoRA Detection: Syncs with UI settings and chat triggers.
- * 3. Dynamic Tag Orchestration: Smart 9-Category Context Filtering.
- * 4. Workflow Orchestration: ComfyUI JSON injection.
- */
-const rawCombined = `${userPrompt} ${contextPrompt || ""}`;
+   * GENERATE ARIA IMAGE
+   * logic:
+   * 1. Situational Analysis: Detects camera focus and perspective.
+   * 2. LoRA Detection: Syncs with UI settings and chat triggers.
+   * 3. Dynamic Tag Orchestration: Smart 9-Category Context Filtering.
+   * 4. Workflow Orchestration: ComfyUI JSON injection.
+   */
+  // ✅ FIX 1: PROMPT FUSION
+  // We combine User + AI text so the analyzer sees ALL keywords (e.g. "armpits") immediately.
+  const rawCombined = `${userPrompt} ${contextPrompt || ""}`;
   const baseDescription = rawCombined.trim();
 
   if (!baseDescription) {
@@ -53,16 +55,23 @@ const rawCombined = `${userPrompt} ${contextPrompt || ""}`;
     return null;
   }
 
-  // --- 1. SITUATIONAL ANALYSIS (Now reads BOTH inputs) ---
+  // --- 1. SITUATIONAL ANALYSIS (Refined Camera Logic) ---
   const sceneLower = baseDescription.toLowerCase();
-  
-  // Smart Face Detection: Prevents 'Portrait Hijack' on body-part closeups
+   
+  // ✅ FIX 2: SMART FACE DETECTION UPDATE
+  // Added 'armpit' and 'navel' to the exclusion list so "closeup of armpit" doesn't force a face portrait.
   const isFaceFocus = /face|eyes|lips|mouth|headshot|portrait|expression|facial/i.test(sceneLower) || 
-                      (sceneLower.includes("closeup") && !/ass|butt|rear|chest|boobs|tits|legs|feet|pussy/i.test(sceneLower));
+                      (sceneLower.includes("closeup") && !/ass|butt|rear|chest|boobs|tits|legs|feet|pussy|armpit|underarm|navel/i.test(sceneLower));
 
-  const isUpperBody = /upper body|waist up|chest up|bust shot/i.test(sceneLower);
-  const isLowerBody = /lower body|thighs|legs|feet|waist down|ass|butt|rear|backside|behind/i.test(sceneLower);
-  const isPartFocus = /hands|fingers|feet|toes|skin texture|extreme closeup/i.test(sceneLower);
+  // ✅ FIX 3: EXPANDED CATEGORIES
+  // Added specific parts to ensure the camera zooms to the right place.
+  
+  const isUpperBody = /upper body|waist up|chest up|bust shot|shoulders|arms|torso|midriff/i.test(sceneLower);
+  
+  const isLowerBody = /lower body|thighs|legs|feet|waist down|ass|butt|rear|backside|behind|hips|crotch/i.test(sceneLower);
+  
+  const isPartFocus = /hands|fingers|feet|toes|skin texture|extreme closeup|armpit|underarm|navel|nails|details/i.test(sceneLower);
+  
   const isHorizontal = /landscape|horizontal|wide shot|panoramic/i.test(sceneLower);
 
   const imgWidth = isHorizontal ? 1500 : 1024;
