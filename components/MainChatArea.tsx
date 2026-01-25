@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ChatMessage from './ChatMessage';
 import { Message, CharacterProfile, UserData } from '../types';
-import { generateAriaResponse, checkForImageRequest, extractContextPrompt } from '../services/ariaService';
+import { generateAriaResponse, extractContextPrompt } from '../services/ariaService'; // Removed checkForImageRequest
 import { generateAriaImage } from '../services/generateAriaImage'; 
 import { initiateNeuralMotion, pollNeuralMotionStatus } from '../services/neuralMotionService';
 import { uploadImageToStorage, deleteMediaFromStorage } from '../services/firebaseService';
@@ -113,8 +113,8 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
 
         onUpdateMessage(message.id, { 
           imageUrl: tempImageUrl, 
-          videoUrl: undefined,           
-          motionStatus: 'idle',     
+          videoUrl: undefined,            
+          motionStatus: 'idle',      
           isImageLoading: false 
         });
         
@@ -232,7 +232,10 @@ const handleAnimateRequest = async (message: Message) => {
     if (!input.trim() || isLoadingResponse || !character) return;
 
     const userText = input.trim();
-    const isImageRequested = checkForImageRequest(userText);
+    
+    // 🛑 REMOVED: const isImageRequested = checkForImageRequest(userText);
+    // We strictly rely on the AI's [[VISUAL]] tag response now.
+    
     const responseMessageId = generateId('bot'); 
     setInput('');
     
@@ -273,7 +276,8 @@ const handleAnimateRequest = async (message: Message) => {
         storeMemory(memoryText, userData.uid, botId);
       }
 
-      const isGeneratingImage = isImageRequested || !!contextPrompt;
+      // ✅ LOGIC UPDATE: Only generate if AI provides a contextPrompt
+      const isGeneratingImage = !!contextPrompt;
       
       onSendMessage({
         id: responseMessageId,
