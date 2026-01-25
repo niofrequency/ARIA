@@ -9,7 +9,8 @@ import {
   Image as ImageIcon,  
   Download, 
   RefreshCw, 
-  Maximize2 
+  Maximize2,
+  Wand2 // ✅ FIX 1: Added Wand2 Import
 } from 'lucide-react';
 
 interface ChatMessageProps {
@@ -27,18 +28,16 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
   onAnimateRequest,
   onRegenerateImage
 }) => {
-const isUser = message.role === 'user';
+  const isUser = message.role === 'user';
   const [viewMode, setViewMode] = useState<'video' | 'image'>('video');
   const [isDownloading, setIsDownloading] = useState(false);
 
   // --- TYPEWRITER STATE ---
-  // FIX: Calculate this ONCE inside useState so it doesn't change mid-typing
   const [shouldAnimate] = useState(() => {
     const isHistory = (Date.now() - (message.timestamp || 0)) > 5000;
     return !isUser && !isHistory;
   });
 
-  // Initialize state based on the frozen 'shouldAnimate' value
   const [displayedText, setDisplayedText] = useState(shouldAnimate ? '' : message.text);
   const [isTypingComplete, setIsTypingComplete] = useState(!shouldAnimate);
 
@@ -46,7 +45,6 @@ const isUser = message.role === 'user';
    * TYPING EFFECT LOGIC
    */
   useEffect(() => {
-    // If we shouldn't animate (user or history), ensure full text is shown immediately.
     if (!shouldAnimate) {
       if (displayedText !== message.text) {
         setDisplayedText(message.text || '');
@@ -55,28 +53,18 @@ const isUser = message.role === 'user';
       return;
     }
 
-    // If text is already fully displayed, stop.
     if (displayedText === message.text) {
       setIsTypingComplete(true);
       return;
     }
 
-    // Start typing
     setIsTypingComplete(false);
-    
-    // Don't reset displayedText here if re-rendering, just pick up where we are
-    // But if starting fresh:
-    if (displayedText === '' && message.text) {
-        // Safe to start empty
-    }
     
     let currentIndex = 0;
     const fullText = message.text || '';
     
     const typingInterval = setInterval(() => {
-      // Use the callback to ensure we always have the latest state
       setDisplayedText((prev) => {
-        // If we somehow finished, stop
         if (!prev && prev !== '') return fullText.slice(0, 1);
         
         const nextIndex = prev ? prev.length + 1 : 1;
@@ -87,15 +75,13 @@ const isUser = message.role === 'user';
         }
         return fullText.slice(0, nextIndex);
       });
-    }, 50); // Adjust typing speed here (ms)
+    }, 50);
 
     return () => clearInterval(typingInterval);
   }, [message.text, shouldAnimate]);
   
   /**
    * MEDIA SYNC
-   * Ensures the UI automatically switches to 'video' view when a 
-   * successful synthesis job returns from the Wan 2.1 worker.
    */
   useEffect(() => {
     if (message.videoUrl) {
@@ -107,7 +93,6 @@ const isUser = message.role === 'user';
 
   /**
    * UNIVERSAL DOWNLOAD HANDLER
-   * Optimized to handle both local Blob URLs and remote Firebase Storage links.
    */
   const handleDownload = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -121,7 +106,6 @@ const isUser = message.role === 'user';
 
     setIsDownloading(true);
     try {
-      // Force internal fetch to ensure the browser handles it as a file save
       const response = await fetch(urlToDownload);
       const blob = await response.blob();
       const blobUrl = window.URL.createObjectURL(blob);
@@ -136,7 +120,6 @@ const isUser = message.role === 'user';
       window.URL.revokeObjectURL(blobUrl);
     } catch (error) {
       console.error("Download failed:", error);
-      // Fallback for CORS-restricted cross-origin requests
       window.open(urlToDownload, '_blank'); 
     } finally {
       setIsDownloading(false);
@@ -145,14 +128,14 @@ const isUser = message.role === 'user';
 
   /**
    * ASPECT RATIO DETECTOR
-   * Dynamically adjusts the frame size based on prompt keywords to prevent letterboxing.
    */
   const getImageAspectRatio = () => {
     const text = message.text?.toLowerCase() || '';
     if (text.includes('landscape') || text.includes('panoramic') || text.includes('wide shot')) {
       return 'aspect-video'; 
     }
-    return 'aspect-[9/16]'; 
+    // ✅ FIX 2: Changed from 9/16 to 3/4 to match your actual image generation size
+    return 'aspect-[3/4]'; 
   };
 
   return (
@@ -168,7 +151,7 @@ const isUser = message.role === 'user';
             {isUser && <User className="w-3 h-3 text-zinc-500" />}
         </div>
 
-        {/* TEXT CONTENT: Neural Chat Bubble (UPDATED FOR TYPING) */}
+        {/* TEXT CONTENT */}
         {message.text && (
           <div
             className={`relative px-5 py-4 rounded-2xl text-sm md:text-[15px] leading-relaxed backdrop-blur-md transition-all
@@ -182,10 +165,8 @@ const isUser = message.role === 'user';
                 <div className="absolute -inset-0.5 bg-purple-500/10 rounded-2xl blur-md -z-10"></div>
             )}
             
-            {/* CHANGED: Uses displayedText instead of message.text */}
             <p className="relative z-10 font-light tracking-wide whitespace-pre-wrap">
               {displayedText}
-              {/* Added: Blinking Cursor */}
               {!isTypingComplete && !isUser && (
                 <span className="inline-block w-1.5 h-3.5 ml-1 bg-purple-400 align-middle animate-pulse" />
               )}
@@ -216,9 +197,8 @@ const isUser = message.role === 'user';
                 ${message.videoUrl ? 'border-purple-500/40 shadow-[0_0_30px_rgba(147,51,234,0.15)]' : 'hover:border-purple-500/50 hover:shadow-[0_0_30px_rgba(147,51,234,0.2)]'} 
                 ${isUser ? '' : 'rounded-tl-none'}`}
             >
-              {/* MEDIA RENDERER: Toggle between Video and Static Image */}
+              {/* MEDIA RENDERER */}
               {message.videoUrl && viewMode === 'video' ? (
-                /* VIDEO PLAYER: CRITICAL key ensures the buffer clears and new video starts */
                 <video 
                   key={message.videoUrl}
                   src={message.videoUrl}
@@ -231,7 +211,6 @@ const isUser = message.role === 'user';
                   className="w-[280px] md:w-[360px] h-auto block bg-black shadow-inner rounded-2xl cursor-pointer"
                 />
               ) : (
-                /* STATIC IMAGE: key ensures smooth transitions during base regeneration */
                 <img 
                   key={message.imageUrl}
                   src={message.imageUrl} 
@@ -242,9 +221,9 @@ const isUser = message.role === 'user';
                 />
               )}
               
-              {/* NEURAL MOTION OVERLAY: Quick Trigger for Static Images */}
+              {/* DESKTOP OVERLAY (Hover-based) */}
               {!message.videoUrl && !message.isVideoLoading && !isUser && (
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-center gap-3 backdrop-blur-[2px] pointer-events-none">
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-center gap-3 backdrop-blur-[2px] pointer-events-none hidden md:flex">
                   <button 
                     onClick={(e) => { e.stopPropagation(); onAnimateRequest(message); }}
                     className="pointer-events-auto flex items-center gap-2 px-5 py-2.5 bg-white text-black rounded-full font-black text-[10px] uppercase tracking-tighter hover:bg-purple-500 hover:text-white transition-all active:scale-95 shadow-xl"
@@ -261,7 +240,7 @@ const isUser = message.role === 'user';
                 </div>
               )}
 
-              {/* SYNTHESIS LOADING OVERLAY: Wan 2.1 Polling State */}
+              {/* SYNTHESIS LOADING OVERLAY */}
               {message.isVideoLoading && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 backdrop-blur-md pointer-events-none">
                   <div className="relative mb-3">
@@ -289,7 +268,7 @@ const isUser = message.role === 'user';
             {(message.videoUrl || message.imageUrl) && !message.isVideoLoading && (
               <div className="flex items-center justify-between w-[280px] md:w-[360px] px-1">
                 
-                {/* Mode Toggle */}
+                {/* Left Side: Mode Toggle OR Mobile Action */}
                 {message.videoUrl ? (
                   <button 
                     onClick={() => setViewMode(prev => prev === 'video' ? 'image' : 'video')}
@@ -299,12 +278,19 @@ const isUser = message.role === 'user';
                     {viewMode === 'video' ? 'Show Static' : 'Show Motion'}
                   </button>
                 ) : (
-                  <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-zinc-600">
-                    <ImageIcon className="w-3 h-3" /> Static Image
-                  </span>
+                   // ✅ FIX 3: THE MOBILE "ANIMATE" BUTTON
+                   // Replaced the static <span> with this button so phones can trigger video.
+                   <button 
+                    onClick={() => onAnimateRequest(message)}
+                    className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-purple-400 hover:text-purple-300 transition-colors animate-pulse"
+                  >
+                    <Wand2 className="w-3 h-3" />
+                    <span className="md:hidden">Animate</span>
+                    <span className="hidden md:inline">Generate Motion</span>
+                  </button>
                 )}
 
-                {/* Adaptive Actions */}
+                {/* Right Side: Actions */}
                 <div className="flex items-center gap-3">
                   <button 
                     onClick={() => {
