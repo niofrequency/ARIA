@@ -205,7 +205,7 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
   };
 
   
-  /**
+/**
    * CORE INTERACTION: HANDLE SEND
    */
   const handleSend = async () => {
@@ -213,7 +213,7 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
 
     const userText = input.trim();
     
-    // 1. SEND USER MESSAGE
+    // 1. SEND USER MESSAGE (Immediately)
     const responseMessageId = generateId('bot'); 
     setInput('');
     
@@ -225,7 +225,7 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
     });
 
     try {
-      // FIX: REINJECT TAGS INTO HISTORY
+      // REINJECT TAGS INTO HISTORY
       const history = (messages || []).map(m => {
         let content = m.text || '';
         if (m.role === 'model' && (m.imageUrl || m.videoUrl)) {
@@ -241,20 +241,17 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
       const rawResponse = await generateAriaResponse(userText, history, character, userData?.uid, botId);
       
       // Extract Context
-      let { cleanText, contextPrompt, memoryText, gifSearchTerm, youtubeSearchTerm } = extractContextPrompt(rawResponse);
+      let { cleanText, contextPrompt, memoryText, gifSearchTerm, youtubeSearchTerm, spicySearchTerm } = extractContextPrompt(rawResponse);
       
-      // Auto-Save Memory
       if (memoryText && userData?.uid) {
-        console.log("💾 Auto-Saving Memory:", memoryText);
         storeMemory(memoryText, userData.uid, botId);
       }
 
       // --- LOGIC: DETERMINE MEDIA TYPE ---
       let finalImageUrl = undefined;
       let finalVideoUrl = undefined;
-      const isGeneratingImage = !!contextPrompt;
 
-      // 1. CHECK: Real GIF (Giphy)
+      // 1. CHECK: Real GIF
       if (gifSearchTerm) {
           try {
               const gifUrl = await fetchGiphyUrl(gifSearchTerm);
@@ -265,31 +262,33 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
       // 2. CHECK: Real Video (YouTube)
       if (youtubeSearchTerm) {
           try {
-              console.log(`📺 Searching YouTube for: ${youtubeSearchTerm}`);
               const ytUrl = await fetchYoutubeUrl(youtubeSearchTerm);
               if (ytUrl) finalVideoUrl = ytUrl;
           } catch(e) { console.error("YouTube failed", e); }
       }
 
       // 3. CHECK: SPICY CONTENT (Adult)
-      // Manual regex check ensures this works even if ariaService.ts isn't perfectly updated
-      const spicyRegex = /[\[\{]{2}\s*SPICY\s*:\s*([\s\S]*?)\s*[\]\}]{2}/i;
-      const spicyMatch = cleanText.match(spicyRegex) || rawResponse.match(spicyRegex);
-      let spicySearchTerm = null;
-
-      if (spicyMatch) {
-          spicySearchTerm = spicyMatch[1].trim();
-          // Clean the tag out of the text so user doesn't see it
-          cleanText = cleanText.replace(spicyRegex, '').trim(); 
+      // Double check regex just in case ariaService didn't catch it
+      if (!spicySearchTerm) {
+        const spicyRegex = /[\[\{]{2}\s*SPICY\s*:\s*([\s\S]*?)\s*[\]\}]{2}/i;
+        const spicyMatch = cleanText.match(spicyRegex) || rawResponse.match(spicyRegex);
+        if (spicyMatch) {
+            spicySearchTerm = spicyMatch[1].trim();
+            cleanText = cleanText.replace(spicyRegex, '').trim(); 
+        }
       }
 
       if (spicySearchTerm) {
           try {
-              console.log(`🔥 Searching Adult Providers for: ${spicySearchTerm}`);
               const spicyUrl = await fetchSpicyLink(spicySearchTerm);
               if (spicyUrl) finalVideoUrl = spicyUrl;
           } catch(e) { console.error("Spicy search failed", e); }
       }
+
+      // ✅ CRITICAL FIX: "The Standoff"
+      // Only set isImageLoading to TRUE if we have a prompt AND we did NOT find a video/gif.
+      // This prevents the infinite "Imaging Protocol" loader when sending links.
+      const shouldGenerateImage = !!contextPrompt && !finalVideoUrl && !finalImageUrl;
 
       // 4. SEND BOT RESPONSE
       onSendMessage({
@@ -297,13 +296,13 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
           role: 'model',
           text: cleanText,
           imageUrl: finalImageUrl,
-          videoUrl: finalVideoUrl, // Passes YouTube OR Spicy URL
-          isImageLoading: isGeneratingImage,
+          videoUrl: finalVideoUrl,
+          isImageLoading: shouldGenerateImage, // ✅ Uses the corrected flag
           timestamp: Date.now()
       });
 
-      // 5. TRIGGER AI IMAGE GENERATION (If needed)
-      if (isGeneratingImage && !finalVideoUrl && !finalImageUrl) {
+      // 5. TRIGGER AI IMAGE GENERATION (Only if explicitly needed)
+      if (shouldGenerateImage) {
         try {
           const promptToUse = contextPrompt || userText;
           const tempImageUrl = await generateAriaImage(promptToUse, userText, character);
