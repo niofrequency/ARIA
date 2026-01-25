@@ -43,7 +43,10 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
   setIsLoading
 }) => {
   const [input, setInput] = useState('');
-  const [selectedMedia, setSelectedMedia] = useState<{ url: string; type: 'image' | 'video' } | null>(null);
+  
+  // ✅ UPDATED: Added support for 'embed' and 'youtube' types
+  const [selectedMedia, setSelectedMedia] = useState<{ url: string; type: 'image' | 'video' | 'embed' | 'youtube' } | null>(null);
+  
   const [showHeader, setShowHeader] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -111,7 +114,7 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
         onUpdateMessage(message.id, { 
           imageUrl: tempImageUrl, 
           videoUrl: undefined,            
-          motionStatus: 'idle',      
+          motionStatus: 'idle',       
           isImageLoading: false 
         });
         
@@ -344,8 +347,16 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
     }
   };
 
-  const downloadMedia = async (url: string, type: 'image' | 'video') => {
+  // ✅ UPDATED: Download Media (Safety Check for Embeds)
+  const downloadMedia = async (url: string, type: string) => {
     if (isDownloading) return;
+    
+    // Don't try to download embeds/youtube (CORS/Safety)
+    if (type === 'embed' || type === 'youtube') {
+        window.open(url, '_blank');
+        return;
+    }
+
     setIsDownloading(true);
     
     try {
@@ -427,7 +438,8 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
                 key={msg.id} 
                 message={msg} 
                 characterName={character.name} 
-                onMediaClick={(url, type) => setSelectedMedia({ url, type })}
+                // ✅ UPDATED: Pass type as 'any' to accept new types
+                onMediaClick={(url, type) => setSelectedMedia({ url, type: type as any })}
                 onAnimateRequest={() => handleAnimateRequest(msg)}
                 onRegenerateImage={() => handleRegenerateImage(msg)}
               />
@@ -469,11 +481,12 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
         </div>
       </footer>
 
-      {/* MEDIA MODAL */}
+      {/* ✅ UPDATED MEDIA MODAL (HANDLES EMBEDS & YOUTUBE) */}
       {selectedMedia && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/95 backdrop-blur-md p-4" onClick={() => setSelectedMedia(null)}>
-          <div className="relative max-w-5xl w-full flex flex-col items-center" onClick={(e) => e.stopPropagation()}>
+          <div className="relative max-w-6xl w-full flex flex-col items-center" onClick={(e) => e.stopPropagation()}>
             
+            {/* 1. NATIVE VIDEO FILE */}
             {selectedMedia.type === 'video' ? (
               <video 
                 src={selectedMedia.url} 
@@ -482,7 +495,22 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
                 loop
                 className="max-h-[80vh] w-auto max-w-full rounded-2xl border border-purple-500/30 shadow-[0_0_50px_rgba(147,51,234,0.3)]"
               />
-            ) : (
+            ) 
+            /* 2. EMBED / YOUTUBE (THEATER MODE) */
+            : (selectedMedia.type === 'embed' || selectedMedia.type === 'youtube') ? (
+               <div className="w-full aspect-video bg-black rounded-2xl overflow-hidden border border-white/10 shadow-2xl">
+                 <iframe 
+                   src={selectedMedia.url} 
+                   className="w-full h-full"
+                   title="Theater Mode"
+                   frameBorder="0"
+                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                   allowFullScreen
+                 />
+               </div>
+            )
+            /* 3. STATIC IMAGE */
+            : (
               <img 
                 src={selectedMedia.url} 
                 alt="Neural Output" 
@@ -491,17 +519,21 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
             )}
 
             <div className="mt-6 flex gap-3">
-              <button 
-                onClick={() => downloadMedia(selectedMedia.url, selectedMedia.type)} 
-                disabled={isDownloading}
-                className={`flex items-center gap-2 px-8 py-3.5 bg-white text-black font-black rounded-xl hover:bg-purple-500 hover:text-white transition-all
-                  ${isDownloading ? 'opacity-50 cursor-wait' : ''}`}
-              >
-                {isDownloading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Download className="w-5 h-5" />}
-                <span className="uppercase text-[10px] tracking-widest">
-                  {isDownloading ? 'Saving...' : `Save ${selectedMedia.type === 'video' ? 'MP4' : 'PNG'}`}
-                </span>
-              </button>
+              {/* Only show download button for Native Files (Image/Video), hide for Embeds */}
+              {(selectedMedia.type === 'image' || selectedMedia.type === 'video') && (
+                  <button 
+                    onClick={() => downloadMedia(selectedMedia.url, selectedMedia.type as 'image' | 'video')} 
+                    disabled={isDownloading}
+                    className={`flex items-center gap-2 px-8 py-3.5 bg-white text-black font-black rounded-xl hover:bg-purple-500 hover:text-white transition-all
+                      ${isDownloading ? 'opacity-50 cursor-wait' : ''}`}
+                  >
+                    {isDownloading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Download className="w-5 h-5" />}
+                    <span className="uppercase text-[10px] tracking-widest">
+                      {isDownloading ? 'Saving...' : `Save ${selectedMedia.type === 'video' ? 'MP4' : 'PNG'}`}
+                    </span>
+                  </button>
+              )}
+              
               <button 
                 onClick={() => setSelectedMedia(null)} 
                 className="p-3.5 bg-zinc-900 border border-white/10 text-white rounded-xl hover:bg-zinc-800 transition-all"
