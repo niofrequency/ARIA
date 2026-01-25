@@ -16,7 +16,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (!searchTerm) return res.status(400).json({ error: 'Term required' });
 
-  // 2. FAKE BROWSER HEADERS (Crucial to bypass blocks)
+  // 2. FAKE BROWSER HEADERS
   const headers = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     'Accept': 'application/json, text/plain, */*',
@@ -25,29 +25,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   };
 
   try {
-    console.log(`🔍 Searching (Fast Mode): ${searchTerm}`);
+    console.log(`🔍 Searching: ${searchTerm}`);
     let videoData = null;
 
-    // --- TIER 1: OFFICIAL APIs ---
-    // We pass 'headers' to these now so they don't get blocked
-    if (!videoData) videoData = await searchPornhub(searchTerm as string, headers);
+    // --- TIER 1: RELIABLE APIs (Changed Order to prevent blocking) ---
+    
+    // 1. RedTube (You said this works, so it goes first)
     if (!videoData) videoData = await searchRedTube(searchTerm as string, headers);
+    
+    // 2. Eporner (Usually very stable)
     if (!videoData) videoData = await searchEporner(searchTerm as string, headers);
+
+    // 3. Pornhub (Often blocks, so we try it third)
+    if (!videoData) videoData = await searchPornhub(searchTerm as string, headers);
+    
+    // 4. YouPorn
     if (!videoData) videoData = await searchYouPorn(searchTerm as string, headers);
 
     // --- TIER 2: SCRAPERS ---
     if (!videoData) {
-        console.log("APIs empty/blocked. Attempting scraper: Spankbang...");
+        console.log("APIs empty. Trying scrapers...");
         videoData = await scrapeSpankbang(searchTerm as string, headers);
     }
-    if (!videoData) {
-        console.log("Attempting scraper: TNAFlix...");
-        videoData = await scrapeTnaflix(searchTerm as string, headers);
-    }
-    if (!videoData) {
-        console.log("Attempting scraper: XHamster...");
-        videoData = await scrapeXhamster(searchTerm as string, headers);
-    }
+    if (!videoData) videoData = await scrapeTnaflix(searchTerm as string, headers);
+    if (!videoData) videoData = await scrapeXhamster(searchTerm as string, headers);
 
     // RESPONSE
     if (videoData) {
@@ -57,7 +58,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
   } catch (error: any) {
-    console.error("API Error:", error);
+    console.error("API Main Error:", error);
     return res.status(500).json({ error: error.message });
   }
 }
@@ -72,7 +73,7 @@ function pickRandom<T>(arr: T[], limit: number = 20): T | null {
 }
 
 // ==========================================
-// 🚀 TIER 1: OFFICIAL APIs (Robust Mode)
+// 🚀 APIs (With Crash Protection)
 // ==========================================
 
 async function searchPornhub(term: string, headers: any) {
@@ -82,25 +83,23 @@ async function searchPornhub(term: string, headers: any) {
     
     const response = await fetch(url.toString(), { headers });
     
-    // SAFETY CHECK: Ensure response is actually JSON
+    // CRASH FIX: Explicitly check content type before parsing JSON
     const contentType = response.headers.get("content-type");
     if (!response.ok || !contentType || !contentType.includes("application/json")) {
-        console.warn("⚠️ Pornhub Blocked (Returned HTML). Skipping...");
-        return null; 
+        console.warn("⚠️ Pornhub Blocked (Received HTML). Skipping.");
+        return null;
     }
 
     const data = await response.json();
-    
     if (data.videos && data.videos.length > 0) {
       const candidates = data.videos.filter((v: any) => v.url && v.url.includes('viewkey='));
       const video = pickRandom(candidates);
-      
       if (video) {
           const viewKey = video.url.split('viewkey=')[1];
           return { url: `https://www.pornhub.com/embed/${viewKey}`, provider: 'pornhub', title: video.title };
       }
     }
-  } catch (e) { console.error("PH Error (Skipping)", e); }
+  } catch (e) { console.error("PH Error", e); }
   return null;
 }
 
@@ -114,22 +113,17 @@ async function searchRedTube(term: string, headers: any) {
 
     const response = await fetch(url.toString(), { headers });
     
-    // SAFETY CHECK
     const contentType = response.headers.get("content-type");
-    if (!response.ok || !contentType || !contentType.includes("application/json")) {
-        console.warn("⚠️ RedTube Blocked. Skipping...");
-        return null;
-    }
+    if (!response.ok || !contentType || !contentType.includes("application/json")) return null;
 
     const data = await response.json();
-    
     if (data.videos && data.videos.length > 0) {
         const video = pickRandom(data.videos);
         if (video && video.video && video.video.video_id) {
              return { url: `https://embed.redtube.com/?id=${video.video.video_id}`, provider: 'redtube', title: video.video.title };
         }
     }
-  } catch (e) { console.error("RT Error (Skipping)", e); }
+  } catch (e) { console.error("RT Error", e); }
   return null;
 }
 
@@ -140,8 +134,12 @@ async function searchEporner(term: string, headers: any) {
     url.searchParams.append('format', 'json');
 
     const response = await fetch(url.toString(), { headers });
-    const data = await response.json(); // Eporner is usually friendlier, less blocking
     
+    // Eporner handles errors gracefully, but safety check anyway
+    const contentType = response.headers.get("content-type");
+    if (!response.ok || !contentType || !contentType.includes("application/json")) return null;
+
+    const data = await response.json();
     if (data.videos && data.videos.length > 0) {
         const video = pickRandom(data.videos);
         if (video) {
@@ -159,14 +157,10 @@ async function searchYouPorn(term: string, headers: any) {
 
     const response = await fetch(url.toString(), { headers });
     
-    // SAFETY CHECK
     const contentType = response.headers.get("content-type");
-    if (!response.ok || !contentType || !contentType.includes("application/json")) {
-        return null;
-    }
+    if (!response.ok || !contentType || !contentType.includes("application/json")) return null;
 
     const data = await response.json();
-    
     if (data.videos && data.videos.length > 0) {
         const video = pickRandom(data.videos);
         if (video) {
@@ -181,7 +175,7 @@ async function searchYouPorn(term: string, headers: any) {
 }
 
 // ==========================================
-// 🕷️ TIER 2: SCRAPERS (Already Robust)
+// 🕷️ SCRAPERS
 // ==========================================
 
 async function scrapeSpankbang(term: string, headers: any) {
