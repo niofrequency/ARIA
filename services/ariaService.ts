@@ -34,8 +34,9 @@ export const buildVisualAwarenessJson = (visualDescription: string) => {
 
 
 /**
- * EXTRACT CONTEXT PROMPT (FIXED)
- * Parses the AI response to separate chat text from Visual tags, Memory tags, GIFs, and Links.
+ * EXTRACT CONTEXT PROMPT
+ * Parses the AI response to separate chat text from Visual tags, Memory tags, GIFs, Links, and YouTube.
+ * Includes Hallucination Patch and Emoji Sanitization.
  */
 export const extractContextPrompt = (text: string) => {
   // 1. Define Regex Patterns
@@ -43,6 +44,7 @@ export const extractContextPrompt = (text: string) => {
   const memoryRegex = /[\[\{]{2}\s*MEMORY\s*:\s*([\s\S]*?)\s*[\]\}]{2}/i;
   const gifRegex = /[\[\{]{2}\s*GIF\s*:\s*([\s\S]*?)\s*[\]\}]{2}/i;
   const linkRegex = /[\[\{]{2}\s*LINK\s*:\s*([\s\S]*?)\s*[\]\}]{2}/i;
+  const youtubeRegex = /[\[\{]{2}\s*YOUTUBE\s*:\s*([\s\S]*?)\s*[\]\}]{2}/i;
 
   // 2. Extract Data
   const visualMatch = text.match(visualRegex);
@@ -54,22 +56,26 @@ export const extractContextPrompt = (text: string) => {
   const gifMatch = text.match(gifRegex);
   const gifSearchTerm = gifMatch ? gifMatch[1].trim() : null;
 
+  const youtubeMatch = text.match(youtubeRegex);
+  const youtubeSearchTerm = youtubeMatch ? youtubeMatch[1].trim() : null;
+
   const linkMatch = text.match(linkRegex);
   const externalLink = linkMatch ? linkMatch[1].trim() : null;
 
-  // 3. Clean the UI text (Remove ALL tags in one go)
+  // 3. Clean the UI text (Remove ALL tags in one go to prevent errors)
   let cleanText = text
     .replace(visualRegex, '')
     .replace(memoryRegex, '')
     .replace(gifRegex, '')
+    .replace(youtubeRegex, '')
     .replace(linkRegex, '')
-    .replace(/\*\s*sends\s+.*?\*/gi, '') // Removes "*sends giggle emoji*" actions
+    .replace(/\*\s*sends\s+.*?\*/gi, '') // Removes "*sends giggle emoji*"
     .trim();
 
   // ✅ HALLUCINATION PATCH (IMPROVED)
-  // If Grok implies a photo ("check this out") but forgets the tag, we force a generation.
-  // We only run this if NO other media (GIF/Link) was detected.
-  if (!contextPrompt && !gifSearchTerm && !externalLink) {
+  // If Grok implies a photo but forgets the tag, force a generation.
+  // CRITICAL: We check !youtubeSearchTerm to ensure we don't generate a selfie if she sent a video.
+  if (!contextPrompt && !gifSearchTerm && !externalLink && !youtubeSearchTerm) {
       const implicitTriggers = [
         "check this out", "look at this", "can you see", "look at me", "see this", "view",
         "here is a pic", "sending a photo", "do you like that", "sending pic", "sending you a", "sent you a",
@@ -84,7 +90,7 @@ export const extractContextPrompt = (text: string) => {
       }
   }
 
-  // 4. Emoji Sanitization for RunPod (Visual Prompts Only)
+  // 4. Emoji Sanitization for RunPod
   if (contextPrompt) {
     contextPrompt = contextPrompt.replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '');
     contextPrompt = contextPrompt.replace(/\s+/g, ' ').trim();
@@ -100,6 +106,7 @@ export const extractContextPrompt = (text: string) => {
     contextPrompt,
     memoryText,
     gifSearchTerm,
+    youtubeSearchTerm, // ✅ Includes YouTube
     externalLink
   };
 };
@@ -135,6 +142,8 @@ const buildSystemInstruction = (character: CharacterProfile): string => {
    - **REACTION GIFS:** You have access to a GIF database. If you want to react with a meme, a funny reaction, or a mood GIF, use the tag: [[GIF: search_term]].
    - **EXAMPLE:** User: "I tripped." -> You: "Oh no! [[GIF: trying not to laugh]]"
    - **REAL VIDEO LINKS:** If you want to share a song, a YouTube video, or a specific real-world clip, use the tag: [[LINK: url]].
+   - **REAL YOUTUBE VIDEOS:** Do NOT invent URLs. If you want to share a song or video, use the tag with a search query: [[YOUTUBE: song name or video title]].
+   - **EXAMPLE:** User: "Play some jazz." -> You: "Here is some smooth jazz. [[YOUTUBE: relaxing jazz music]]"
    - **RESTRICTION:** Do NOT use [[VISUAL]] and [[GIF]] in the same message. Choose one.
 
     ### MEMORY SAVING PROTOCOL (CRITICAL)
