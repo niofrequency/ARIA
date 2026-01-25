@@ -45,19 +45,15 @@ const LORA_MAP: Record<string, string> = {
  * 3. Dynamic Tag Orchestration: Smart 9-Category Context Filtering.
  * 4. Workflow Orchestration: ComfyUI JSON injection.
  */
-export const generateAriaImage = async (
-  contextPrompt: string | null,
-  userPrompt: string,
-  character: CharacterProfile
-): Promise<string | null> => {
-  const baseDescription = (contextPrompt || userPrompt || "").trim();
+const rawCombined = `${userPrompt} ${contextPrompt || ""}`;
+  const baseDescription = rawCombined.trim();
 
   if (!baseDescription) {
     console.warn("No prompt description available for image generation");
     return null;
   }
 
-  // --- 1. SITUATIONAL ANALYSIS (REFINED PERSPECTIVE) ---
+  // --- 1. SITUATIONAL ANALYSIS (Now reads BOTH inputs) ---
   const sceneLower = baseDescription.toLowerCase();
   
   // Smart Face Detection: Prevents 'Portrait Hijack' on body-part closeups
