@@ -13,13 +13,13 @@ import {
   Wand2,          
   ExternalLink,   
   Youtube,
-  Play            // Added Play icon for embeds
+  Play            
 } from 'lucide-react';
 
 interface ChatMessageProps {
   message: Message;
   characterName: string;
-  onMediaClick: (url: string, type: 'image' | 'video') => void;
+  onMediaClick: (url: string, type: 'image' | 'video' | 'embed' | 'youtube') => void;
   onAnimateRequest: (message: Message) => void;
   onRegenerateImage: (message: Message) => void;
 }
@@ -45,7 +45,6 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
   const [isTypingComplete, setIsTypingComplete] = useState(!shouldAnimate);
 
   // --- HELPER: DETECT LINK TYPE ---
-  // Identifies if the URL is a real file, a YouTube link, an Adult Embed, or a generic website
   const getMediaType = (url: string | undefined) => {
     if (!url) return 'none';
     
@@ -53,13 +52,12 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
     if (url.includes('youtube.com') || url.includes('youtu.be')) return 'youtube';
     
     // 2. EMBEDS (Pornhub, Redtube, etc.)
-    // These APIs return URLs with /embed/ or special subdomains
     if (url.includes('/embed/') || url.includes('embed.redtube')) return 'embed'; 
     
     // 3. Native Files (MP4/Blob)
     if (url.match(/\.(mp4|webm|ogg)$/i) || url.startsWith('blob:') || url.includes('firebasestorage')) return 'video_file';
     
-    // 4. Fallback
+    // 4. Fallback (Generic Links)
     return 'external_link'; 
   };
 
@@ -67,28 +65,26 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
 
   // --- HELPER: GET YOUTUBE EMBED ---
   const getYoutubeEmbed = (url: string) => {
-    const videoId = url.split('v=')[1]?.split('&')[0] || url.split('/').pop();
-    return `https://www.youtube.com/embed/${videoId}`;
+    try {
+        const videoId = url.split('v=')[1]?.split('&')[0] || url.split('/').pop();
+        return `https://www.youtube.com/embed/${videoId}`;
+    } catch (e) {
+        return url;
+    }
   };
 
-  /**
-   * TYPING EFFECT LOGIC
-   */
+  // --- TYPING EFFECT LOGIC ---
   useEffect(() => {
     if (!shouldAnimate) {
       if (displayedText !== message.text) setDisplayedText(message.text || '');
       setIsTypingComplete(true);
       return;
     }
-    if (displayedText === message.text) {
-      setIsTypingComplete(true);
-      return;
-    }
+    if (displayedText === message.text) { setIsTypingComplete(true); return; }
     setIsTypingComplete(false);
     
     let currentIndex = 0;
     const fullText = message.text || '';
-    
     const typingInterval = setInterval(() => {
       setDisplayedText((prev) => {
         if (!prev && prev !== '') return fullText.slice(0, 1);
@@ -101,39 +97,31 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
         return fullText.slice(0, nextIndex);
       });
     }, 50);
-
     return () => clearInterval(typingInterval);
   }, [message.text, shouldAnimate]);
   
-  /**
-   * MEDIA SYNC
-   */
+  // --- MEDIA SYNC ---
   useEffect(() => {
     if (message.videoUrl) setViewMode('video');
     else setViewMode('image');
   }, [message.videoUrl]);
 
-  /**
-   * UNIVERSAL DOWNLOAD HANDLER
-   */
+  // --- DOWNLOAD HANDLER ---
   const handleDownload = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (isDownloading) return;
-
     const urlToDownload = viewMode === 'video' && message.videoUrl ? message.videoUrl : message.imageUrl;
-    
     if (!urlToDownload) return;
 
     setIsDownloading(true);
     try {
-      // If it's an external link or embed, just open it
+      // Direct open for external links/embeds
       if (mediaType === 'youtube' || mediaType === 'external_link' || mediaType === 'embed') {
           window.open(urlToDownload, '_blank');
           setIsDownloading(false);
           return;
       }
-
-      // If it's a native file, try to download blob
+      // Blob download for native files
       const response = await fetch(urlToDownload);
       const blob = await response.blob();
       const blobUrl = window.URL.createObjectURL(blob);
@@ -146,7 +134,6 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
       document.body.removeChild(a);
       window.URL.revokeObjectURL(blobUrl);
     } catch (error) {
-      console.error("Download failed:", error);
       window.open(urlToDownload, '_blank'); 
     } finally {
       setIsDownloading(false);
@@ -155,11 +142,17 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
 
   const getImageAspectRatio = () => {
     const text = message.text?.toLowerCase() || '';
-    if (text.includes('landscape') || text.includes('panoramic') || text.includes('wide shot')) {
-      return 'aspect-video'; 
-    }
+    if (text.includes('landscape') || text.includes('panoramic')) return 'aspect-video'; 
     return 'aspect-[3/4]'; 
   };
+
+  // Helper to check if we should show the footer
+  const shouldShowFooter = !message.isVideoLoading && (
+    mediaType === 'video_file' || 
+    mediaType === 'embed' || 
+    mediaType === 'youtube' || 
+    (!message.videoUrl && message.imageUrl)
+  );
 
   return (
     <div className={`flex w-full mb-8 ${isUser ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2 duration-300`}>
@@ -189,7 +182,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
           </div>
         )}
 
-        {/* LOADING SKELETON */}
+        {/* LOADING SKELETON (Imaging Protocol) */}
         {message.isImageLoading && (
            <div className={`mt-3 w-[280px] md:w-[360px] ${getImageAspectRatio()} bg-zinc-900/50 rounded-2xl border border-dashed border-white/10 flex flex-col items-center justify-center gap-4 animate-pulse ${isUser ? '' : 'rounded-tl-none'}`}>
               <div className="relative">
@@ -221,7 +214,6 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
               ) 
               
               /* --- CASE 2: SPICY EMBED (Iframe) --- */
-              /* ✅ This is the logic that makes it play IN CHAT */
               : mediaType === 'embed' && message.videoUrl ? (
                  <iframe 
                    src={message.videoUrl}
@@ -274,50 +266,70 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
                 />
               )}
 
-              {/* OVERLAYS (Only for Native Video/Image, NOT for Iframe Embeds) */}
+              {/* === OVERLAYS (Only for Native Video/Image, NOT for Iframe Embeds) === */}
               {(mediaType === 'video_file' || (!message.videoUrl && message.imageUrl)) && (
                   <>
-                    {/* OVERLAYS AND BUTTONS LOGIC IS UNCHANGED ... */}
+                    {/* HOVER OVERLAY: Neural Motion Button & Fullscreen */}
                     {!message.videoUrl && !message.isVideoLoading && !isUser && (
                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-center gap-3 backdrop-blur-[2px] pointer-events-none hidden md:flex">
-                        <button onClick={(e) => { e.stopPropagation(); onAnimateRequest(message); }} className="pointer-events-auto flex items-center gap-2 px-5 py-2.5 bg-white text-black rounded-full font-black text-[10px] uppercase tracking-tighter hover:bg-purple-500 hover:text-white transition-all active:scale-95 shadow-xl">
-                            <Film className="w-3.5 h-3.5" /> Neural Motion
-                        </button>
-                        <button onClick={(e) => { e.stopPropagation(); onMediaClick(message.imageUrl!, 'image'); }} className="pointer-events-auto text-white/70 hover:text-white text-[9px] uppercase tracking-[0.2em] font-bold py-1">
-                            View Fullscreen
-                        </button>
+                            <button 
+                                onClick={(e) => { e.stopPropagation(); onAnimateRequest(message); }} 
+                                className="pointer-events-auto flex items-center gap-2 px-5 py-2.5 bg-white text-black rounded-full font-black text-[10px] uppercase tracking-tighter hover:bg-purple-500 hover:text-white transition-all active:scale-95 shadow-xl"
+                            >
+                                <Film className="w-3.5 h-3.5" /> Neural Motion
+                            </button>
+                            <button 
+                                onClick={(e) => { e.stopPropagation(); onMediaClick(message.imageUrl!, 'image'); }} 
+                                className="pointer-events-auto text-white/70 hover:text-white text-[9px] uppercase tracking-[0.2em] font-bold py-1"
+                            >
+                                View Fullscreen
+                            </button>
                         </div>
                     )}
                     
-                    {/* LOADING OVERLAY */}
+                    {/* LOADING OVERLAY: "Synthesizing" */}
                     {message.isVideoLoading && (
                         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 backdrop-blur-md pointer-events-none">
-                        <div className="relative mb-3"><div className="absolute -inset-6 bg-purple-600/40 rounded-full blur-3xl animate-pulse"></div><Loader2 className="w-10 h-10 text-purple-400 animate-spin relative" /></div>
-                        <div className="flex flex-col items-center gap-1 relative z-10"><span className="text-[11px] text-white font-black uppercase tracking-[0.4em] animate-pulse">Synthesizing</span></div>
+                            <div className="relative mb-3">
+                                <div className="absolute -inset-6 bg-purple-600/40 rounded-full blur-3xl animate-pulse"></div>
+                                <Loader2 className="w-10 h-10 text-purple-400 animate-spin relative" />
+                            </div>
+                            <div className="flex flex-col items-center gap-1 relative z-10">
+                                <span className="text-[11px] text-white font-black uppercase tracking-[0.4em] animate-pulse">Synthesizing</span>
+                            </div>
                         </div>
                     )}
                     
-                    {/* ZOOM ICON */}
+                    {/* ZOOM ICON (Top Right) */}
                     {!message.isVideoLoading && (
                         <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                        <div className="bg-black/50 backdrop-blur-md p-1.5 rounded-lg border border-white/10">
-                            {message.videoUrl && viewMode === 'video' ? <Maximize2 className="w-3.5 h-3.5 text-white" /> : <ZoomIn className="w-3.5 h-3.5 text-white" />}
-                        </div>
+                            <div className="bg-black/50 backdrop-blur-md p-1.5 rounded-lg border border-white/10">
+                                {message.videoUrl && viewMode === 'video' ? <Maximize2 className="w-3.5 h-3.5 text-white" /> : <ZoomIn className="w-3.5 h-3.5 text-white" />}
+                            </div>
                         </div>
                     )}
                   </>
               )}
             </div>
 
-            {/* CONTROL BAR (Only for Native Files, hidden for Iframes) */}
-            {(mediaType === 'video_file' || (!message.videoUrl && message.imageUrl)) && !message.isVideoLoading && (
+            {/* === FOOTER / CONTROL BAR === */}
+            {shouldShowFooter && (
               <div className="flex items-center justify-between w-[280px] md:w-[360px] px-1">
-                {message.videoUrl ? (
+                
+                {/* LEFT BUTTONS: THEATER MODE or NATIVE CONTROLS */}
+                {mediaType === 'embed' || mediaType === 'youtube' ? (
+                   // ✅ Theater Mode for Embeds
+                   <button onClick={() => onMediaClick(message.videoUrl!, mediaType as any)} className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-purple-400 hover:text-white transition-colors">
+                     <Maximize2 className="w-3 h-3" /> Theater Mode
+                   </button>
+                ) : message.videoUrl ? (
+                  // ✅ Switch View for Native Videos
                   <button onClick={() => setViewMode(prev => prev === 'video' ? 'image' : 'video')} className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-zinc-500 hover:text-white transition-colors">
                     {viewMode === 'video' ? <ImageIcon className="w-3 h-3" /> : <Film className="w-3 h-3" />}
                     {viewMode === 'video' ? 'Show Static' : 'Show Motion'}
                   </button>
                 ) : (
+                   // ✅ Animate Button for Images
                    <button onClick={() => onAnimateRequest(message)} className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-purple-400 hover:text-purple-300 transition-colors animate-pulse">
                     <Wand2 className="w-3 h-3" />
                     <span className="md:hidden">Animate</span>
@@ -325,15 +337,20 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
                   </button>
                 )}
                 
-                <div className="flex items-center gap-3">
-                  <button onClick={() => { if (message.videoUrl && viewMode === 'video') onAnimateRequest(message); else onRegenerateImage(message); }} className="text-zinc-600 hover:text-purple-400 transition-all hover:rotate-180 duration-500">
-                    <RefreshCw className="w-3.5 h-3.5" />
-                  </button>
-                  <button onClick={handleDownload} disabled={isDownloading} className={`flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider transition-colors ${isDownloading ? 'text-zinc-600 cursor-wait' : 'text-zinc-500 hover:text-purple-400'}`}>
-                    {isDownloading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
-                    {isDownloading ? 'Saving...' : (viewMode === 'video' && message.videoUrl ? 'Save MP4' : 'Save PNG')}
-                  </button>
-                </div>
+                {/* RIGHT BUTTONS: DOWNLOAD / REFRESH (Only for Native Files) */}
+                {mediaType !== 'embed' && mediaType !== 'youtube' && (
+                    <div className="flex items-center gap-3">
+                        {/* Refresh Button */}
+                        <button onClick={() => { if (message.videoUrl && viewMode === 'video') onAnimateRequest(message); else onRegenerateImage(message); }} className="text-zinc-600 hover:text-purple-400 transition-all hover:rotate-180 duration-500">
+                            <RefreshCw className="w-3.5 h-3.5" />
+                        </button>
+                        {/* Download Button */}
+                        <button onClick={handleDownload} disabled={isDownloading} className={`flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider transition-colors ${isDownloading ? 'text-zinc-600 cursor-wait' : 'text-zinc-500 hover:text-purple-400'}`}>
+                            {isDownloading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
+                            {isDownloading ? 'Saving...' : (viewMode === 'video' && message.videoUrl ? 'Save MP4' : 'Save PNG')}
+                        </button>
+                    </div>
+                )}
               </div>
             )}
           </div>
