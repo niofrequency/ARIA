@@ -38,13 +38,19 @@ const LORA_MAP: Record<string, string> = {
 };
 
 /**
-   * GENERATE ARIA IMAGE
-   * logic:
-   * 1. Situational Analysis: Detects camera focus and perspective.
-   * 2. LoRA Detection: Syncs with UI settings and chat triggers.
-   * 3. Dynamic Tag Orchestration: Smart 9-Category Context Filtering.
-   * 4. Workflow Orchestration: ComfyUI JSON injection.
-   */
+ * GENERATE ARIA IMAGE
+ * logic:
+ * 1. Situational Analysis: Detects camera focus and perspective.
+ * 2. LoRA Detection: Syncs with UI settings and chat triggers.
+ * 3. Dynamic Tag Orchestration: Smart 9-Category Context Filtering.
+ * 4. Workflow Orchestration: ComfyUI JSON injection.
+ */
+export const generateAriaImage = async (
+  contextPrompt: string | null,
+  userPrompt: string,
+  character: CharacterProfile
+): Promise<string | null> => {
+
   // ✅ FIX 1: PROMPT FUSION
   // We combine User + AI text so the analyzer sees ALL keywords (e.g. "armpits") immediately.
   const rawCombined = `${userPrompt} ${contextPrompt || ""}`;
@@ -127,7 +133,6 @@ const LORA_MAP: Record<string, string> = {
 
     // 🚨 RULE 0: EXPLICIT OVERRIDE (Crucial Fix)
     // If the user's prompt explicitly contains the tag (or key parts of it), ALWAYS let it through.
-    // e.g. If tag is "hairy armpit" and prompt has "armpit", allow it.
     if (s.includes(t)) return true;
     if (t.includes("armpit") && (s.includes("pit") || s.includes("arm"))) return true;
     if (t.includes("ass") && (s.includes("butt") || s.includes("rear"))) return true;
@@ -180,7 +185,7 @@ const LORA_MAP: Record<string, string> = {
   });
 
   const bodyTags = filteredBodyTags.join(", ");
-  
+   
 // PRIMARY IDENTITY ANCHOR: BOOSTED CONSISTENCY
   // Automatically swaps "1girl" for "1boy" if the character is male
   const baseTag = character.gender.toLowerCase() === 'male' ? '1boy' : '1girl';
@@ -308,7 +313,7 @@ const negativeText = [
 ].filter(Boolean).join(", ");
 
 const seed = Math.floor(Math.random() * 1_000_000_000);
-  
+   
   // --- DEBUG LOGGING ---
   console.log(`🚀 Dispatching Neural Sync: ${character.name}`);
   console.log(`📝 Final Prompt: ${promptText}`);
