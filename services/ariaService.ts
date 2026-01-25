@@ -1,7 +1,7 @@
 import { CharacterProfile } from "../types";
 import { generateAriaImage } from "./generateAriaImage";
 import { retrieveMemories } from "./memoryService";
- 
+
 /**
  * ARIA VISUAL STATE PARSER
  * Converts the visual tag into a structured JSON state for the AI's memory.
@@ -143,6 +143,8 @@ const buildSystemInstruction = (character: CharacterProfile): string => {
    - **EXAMPLE:** User: "I tripped." -> You: "Oh no! [[GIF: trying not to laugh]]"
    - **REAL VIDEO LINKS:** If you want to share a song, a YouTube video, or a specific real-world clip, use the tag: [[LINK: url]].
    - **REAL YOUTUBE VIDEOS:** Do NOT invent URLs. If you want to share a song or video, use the tag with a search query: [[YOUTUBE: song name or video title]].
+   - **ADULT/NSFW:** If the user explicitly requests adult content, use: [[SPICY: search_term]].
+   - **EXAMPLE:** User: "Show me a red head." -> You: "So hot. [[SPICY: redhead solo verified]]"
    - **EXAMPLE:** User: "Play some jazz." -> You: "Here is some smooth jazz. [[YOUTUBE: relaxing jazz music]]"
    - **RESTRICTION:** Do NOT use [[VISUAL]] and [[GIF]] in the same message. Choose one.
 
