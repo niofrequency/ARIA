@@ -115,12 +115,18 @@ export const generateAriaImage = async (
   const hairTags = character.hair.length > 0 ? `${character.hair.join(", ")} hair` : "";
   const faceTags = character.face.join(", ");
   const outfit = character.outfit || "";
-  
-  // NOTE: We do NOT define 'bodyTags' here to avoid the crash. We define it at the end.
-
+   
   const filteredBodyTags = (character.body || []).filter(tag => {
     const t = tag.toLowerCase();
     const s = sceneLower;
+
+    // 🚨 RULE 0: EXPLICIT OVERRIDE (Crucial Fix)
+    // If the user's prompt explicitly contains the tag (or key parts of it), ALWAYS let it through.
+    // e.g. If tag is "hairy armpit" and prompt has "armpit", allow it.
+    if (s.includes(t)) return true;
+    if (t.includes("armpit") && (s.includes("pit") || s.includes("arm"))) return true;
+    if (t.includes("ass") && (s.includes("butt") || s.includes("rear"))) return true;
+    if (t.includes("boobs") && (s.includes("chest") || s.includes("tits"))) return true;
 
     // 1. CHEST / BUST / BOOBS
     if ((s.includes("bosom") || s.includes("breast") || s.includes("tits") || s.includes("chest") || s.includes("cleavage") || s.includes("boobs") || s.includes("jugs") || s.includes("bra") || s.includes("motorboat") || s.includes("rack") || s.includes("nipples")) && 
@@ -138,13 +144,13 @@ export const generateAriaImage = async (
     if ((s.includes("legs") || s.includes("thighs") || s.includes("feet") || s.includes("toes") || s.includes("soles") || s.includes("stockings") || s.includes("calves") || s.includes("ankles") || s.includes("stepping") || s.includes("socks") || s.includes("kneeling")) && 
         (t.includes("legs") || t.includes("thighs") || t.includes("feet") || t.includes("toes"))) return true;
 
-    // 5. ARMS & HANDS
-    if ((s.includes("hands") || s.includes("fingers") || s.includes("arms") || s.includes("squeezing") || s.includes("touching") || s.includes("holding") || s.includes("grabbing") || s.includes("nails") || s.includes("shoulders") || s.includes("wrist") || s.includes("reaching")) && 
-        (t.includes("hands") || t.includes("fingers") || t.includes("nails") || t.includes("arms"))) return true;
+    // 5. ARMS & HANDS (Updated to include Armpits)
+    if ((s.includes("hands") || s.includes("fingers") || s.includes("arms") || s.includes("squeezing") || s.includes("touching") || s.includes("holding") || s.includes("grabbing") || s.includes("nails") || s.includes("shoulders") || s.includes("wrist") || s.includes("reaching") || s.includes("armpit") || s.includes("underarm")) && 
+        (t.includes("hands") || t.includes("fingers") || t.includes("nails") || t.includes("arms") || t.includes("armpit"))) return true;
 
     // 6. SKIN / TEXTURE / MIDRIFF
     if ((s.includes("skin") || s.includes("texture") || s.includes("detailed") || s.includes("tan") || s.includes("sweat") || s.includes("abs") || s.includes("stomach") || s.includes("belly") || s.includes("waist") || s.includes("navel") || s.includes("freckles") || s.includes("goosebumps") || s.includes("oiled")) && 
-        (t.includes("skin") || t.includes("tan") || t.includes("freckles") || t.includes("abs") || t.includes("waist") || t.includes("smooth"))) return true;
+        (t.includes("skin") || t.includes("tan") || t.includes("freckles") || t.includes("abs") || t.includes("waist") || t.includes("smooth") || t.includes("hairy"))) return true;
 
     // 7. BODY FRAME / BUILD
     if ((s.includes("body") || s.includes("figure") || s.includes("shape") || s.includes("frame") || s.includes("petite") || s.includes("curvy") || s.includes("thick") || s.includes("slim") || s.includes("skinny") || s.includes("tall") || s.includes("short") || s.includes("silhouette") || s.includes("build")) && 
@@ -158,22 +164,16 @@ export const generateAriaImage = async (
     if ((s.includes("frontview") || s.includes("backview") || s.includes("sideview") || s.includes("profile") || s.includes("from above") || s.includes("from below") || s.includes("high angle") || s.includes("low angle") || s.includes("overhead") || s.includes("birdseye") || s.includes("wormseye")) && 
         (t.includes("front") || t.includes("back") || t.includes("side") || t.includes("rear") || t.includes("profile") || t.includes("bottom view") || t.includes("top view"))) return true;
 
-    // 10. DEFAULT WHITELIST (THE FIX)
-    // If we are NOT in a closeup mode, we allow these tags to pass so the body shape exists under clothes.
+    // 10. DEFAULT WHITELIST
     if (!isFaceFocus && !isUpperBody && !isPartFocus && !isLowerBody) {
-       
-       // ✅ UPDATED REGEX: Added 'bosom', 'bust', 'breast', 'hips', 'ass', 'butt'
-       // This is the line that saves your physique tags in safe mode.
-       const safeTagRegex = /petite|curvy|thick|slim|skinny|tall|short|slender|thin|athletic|fit|toned|muscular|chubby|voluptuous|freckles|pale|tan|dark|skin|bosom|bust|breast|hips|ass|butt/i;
-       
-       if (safeTagRegex.test(t)) return true;
-       
-       // Exclude everything else (prevent random noise)
-       return false;
-     }
+        // Added 'hairy' and 'armpit' to safe list so they survive 'default' mode
+        const safeTagRegex = /petite|curvy|thick|slim|skinny|tall|short|slender|thin|athletic|fit|toned|muscular|chubby|voluptuous|freckles|pale|tan|dark|skin|bosom|bust|breast|hips|ass|butt|hairy|armpit/i;
+        
+        if (safeTagRegex.test(t)) return true;
+        return false;
+      }
   });
 
-  // ✅ DEFINE VARIABLE ONCE HERE
   const bodyTags = filteredBodyTags.join(", ");
   
 // PRIMARY IDENTITY ANCHOR: BOOSTED CONSISTENCY
