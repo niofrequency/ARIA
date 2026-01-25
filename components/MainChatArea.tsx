@@ -8,6 +8,7 @@ import { uploadImageToStorage, deleteMediaFromStorage } from '../services/fireba
 import { Loader2, X, Download, Menu, Settings, Cpu, ArrowUp, PanelLeft } from 'lucide-react';
 import { storeMemory } from '../services/memoryService';
 import { fetchGiphyUrl } from '../services/giphyService';
+import { fetchYoutubeUrl } from '../services/youtubeService';
 
 interface MainChatAreaProps {
   character: CharacterProfile;
@@ -250,7 +251,7 @@ const handleAnimateRequest = async (message: Message) => {
       const rawResponse = await generateAriaResponse(userText, history, character, userData?.uid, botId);
       
       // DESTRUCTURE: Extract memoryText, visual prompts, and GIF tags
-      const { cleanText, contextPrompt, memoryText, gifSearchTerm, externalLink } = extractContextPrompt(rawResponse);
+    const { cleanText, contextPrompt, memoryText, gifSearchTerm, youtubeSearchTerm } = extractContextPrompt(rawResponse);
       
       // AUTO-SAVE MEMORY
       if (memoryText && userData?.uid) {
@@ -258,34 +259,38 @@ const handleAnimateRequest = async (message: Message) => {
         storeMemory(memoryText, userData.uid, botId);
       }
 
-      // --- LOGIC: DETERMINE MEDIA TYPE ---
-      let finalImageUrl = undefined;
-      let finalVideoUrl = externalLink || undefined;
-      const isGeneratingImage = !!contextPrompt;
+// 2. LOGIC: DETERMINE MEDIA TYPE
+let finalImageUrl = undefined;
+let finalVideoUrl = undefined;
+const isGeneratingImage = !!contextPrompt;
 
-      // Check for GIF (Giphy)
-      if (gifSearchTerm) {
-         try {
-            console.log(`🎬 Searching Giphy for: ${gifSearchTerm}`);
-            const gifUrl = await fetchGiphyUrl(gifSearchTerm);
-            if (gifUrl) {
-                finalImageUrl = gifUrl; 
-            }
-         } catch(e) {
-             console.error("Giphy failed", e);
-         }
-      }
+// CHECK 1: Real GIF (Giphy)
+if (gifSearchTerm) {
+    try {
+        const gifUrl = await fetchGiphyUrl(gifSearchTerm);
+        if (gifUrl) finalImageUrl = gifUrl; 
+    } catch(e) { console.error("Giphy failed", e); }
+}
 
-      // 3. SEND BOT RESPONSE (Optimistic Update)
-      onSendMessage({
-        id: responseMessageId,
-        role: 'model',
-        text: cleanText, // This text is clean (no tags)
-        imageUrl: finalImageUrl, // Will be set if GIF found immediately
-        videoUrl: finalVideoUrl,
-        isImageLoading: isGeneratingImage, // Show loader ONLY if SDXL is generating
-        timestamp: Date.now()
-      });
+// ✅ CHECK 2: Real Video (YouTube)
+if (youtubeSearchTerm) {
+    try {
+        console.log(`📺 Searching YouTube for: ${youtubeSearchTerm}`);
+        const ytUrl = await fetchYoutubeUrl(youtubeSearchTerm);
+        if (ytUrl) finalVideoUrl = ytUrl;
+    } catch(e) { console.error("YouTube failed", e); }
+}
+
+// 3. SEND BOT RESPONSE
+onSendMessage({
+    id: responseMessageId,
+    role: 'model',
+    text: cleanText,
+    imageUrl: finalImageUrl,
+    videoUrl: finalVideoUrl, // ✅ Pass the real YouTube URL here
+    isImageLoading: isGeneratingImage,
+    timestamp: Date.now()
+});
 
       // 4. TRIGGER AI IMAGE GENERATION (If needed)
       if (isGeneratingImage) {
