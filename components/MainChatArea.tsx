@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ChatMessage from './ChatMessage';
 import { Message, CharacterProfile, UserData } from '../types';
-import { generateAriaResponse, extractContextPrompt } from '../services/ariaService'; // Removed checkForImageRequest
+import { generateAriaResponse, extractContextPrompt } from '../services/ariaService'; 
 import { generateAriaImage } from '../services/generateAriaImage'; 
 import { initiateNeuralMotion, pollNeuralMotionStatus } from '../services/neuralMotionService';
 import { uploadImageToStorage, deleteMediaFromStorage } from '../services/firebaseService';
 import { Loader2, X, Download, Menu, Settings, Cpu, ArrowUp, PanelLeft } from 'lucide-react';
 import { storeMemory } from '../services/memoryService';
-  
+import { fetchGiphyUrl } from '../services/giphyService';
+
 interface MainChatAreaProps {
   character: CharacterProfile;
   messages: Message[];
@@ -130,10 +131,6 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
 
 /**
  * NEURAL MOTION HANDLER
- * logic:
- * 1. Synchronizes User Intent + AI Context for high-fidelity physics.
- * 2. Persists temporary blobs to Storage before worker ingestion.
- * 3. Forces UI refresh via cache-busting while maintaining backend compatibility.
  */
 const handleAnimateRequest = async (message: Message) => {
   if (!message.imageUrl || !character) {
@@ -150,7 +147,6 @@ const handleAnimateRequest = async (message: Message) => {
 
   try {
     // 2. CONTEXT HARVESTING
-    // Find the User Message immediately preceding this bot response to detect liquid/motion intent
     const messageIndex = messages.findIndex(m => m.id === message.id);
     const userPrompt = (messageIndex > 0 && messages[messageIndex - 1].role === 'user') 
       ? messages[messageIndex - 1].text 
@@ -159,7 +155,6 @@ const handleAnimateRequest = async (message: Message) => {
     let sourceImageUrl = message.imageUrl;
 
     // 3. PERSISTENCE CHECK
-    // Ensure temporary blobs are archived to Storage before the Worker attempts to download them
     if (sourceImageUrl.startsWith('blob:') || sourceImageUrl.startsWith('data:')) {
       if (userData?.uid) {
         sourceImageUrl = await uploadImageToStorage(userData.uid, botId, message.imageUrl);
@@ -173,7 +168,6 @@ const handleAnimateRequest = async (message: Message) => {
     const negPrompt = character.negativePrompt || "blurry, distorted, static, flickering";
 
     // 4. NEURAL DISPATCH (Wan 2.1 Optimized)
-    // Passing all 5 arguments to ensure correct Orchestration and LoRA mapping
     const jobId = await initiateNeuralMotion(
       sourceImageUrl, 
       aiDialogue, 
@@ -190,15 +184,11 @@ const handleAnimateRequest = async (message: Message) => {
       async (videoOutput) => {
         let displayUrl = videoOutput;
 
-        // Convert base64 responses to local blobs for immediate playback performance
         if (videoOutput.startsWith('data:video')) {
           const blob = dataURLtoBlob(videoOutput);
           displayUrl = URL.createObjectURL(blob);
         }
 
-        // --- CACHE BUSTER LOGIC ---
-        // Forces the browser to ignore the video cache and play the fresh generation.
-        // App.tsx handleVideoSynthesized will strip this 't=' before archiving.
         const timestampedUrl = `${displayUrl}${displayUrl.includes('?') ? '&' : '?'}t=${Date.now()}`;
 
         onUpdateMessage(message.id, {
@@ -207,7 +197,6 @@ const handleAnimateRequest = async (message: Message) => {
           motionStatus: 'completed'
         });
 
-        // Delay sync to allow UI to settle before permanent Firebase archiving triggers
         setTimeout(() => {
           onImageGenerated();
         }, 800);
@@ -233,9 +222,7 @@ const handleAnimateRequest = async (message: Message) => {
 
     const userText = input.trim();
     
-    // 🛑 REMOVED: const isImageRequested = checkForImageRequest(userText);
-    // We strictly rely on the AI's [[VISUAL]] tag response now.
-    
+    // 1. SEND USER MESSAGE (Immediately)
     const responseMessageId = generateId('bot'); 
     setInput('');
     
@@ -247,17 +234,12 @@ const handleAnimateRequest = async (message: Message) => {
     });
 
     try {
-// ✅ FIX: REINJECT TAGS INTO HISTORY
-      // If a message has an image, we append a generic tag to the history 
-      // so Grok remembers that it's supposed to use the [[VISUAL]] format.
+      // ✅ FIX: REINJECT TAGS INTO HISTORY
       const history = (messages || []).map(m => {
         let content = m.text || '';
-        
-        // If this message has an image attached, fake the tag in the history
         if (m.role === 'model' && (m.imageUrl || m.videoUrl)) {
           content += ` [[VISUAL: ${character.name}, photo sent]]`;
         }
-
         return {
           role: m.role === 'model' || m.role === 'assistant' ? 'assistant' : 'user',
           content: content
@@ -267,32 +249,48 @@ const handleAnimateRequest = async (message: Message) => {
       // Call Brain Proxy (Now with Memory IDs for recall)
       const rawResponse = await generateAriaResponse(userText, history, character, userData?.uid, botId);
       
-      // DESTRUCTURE: Now extracting memoryText along with visual prompts
-      const { cleanText, contextPrompt, memoryText } = extractContextPrompt(rawResponse);
+      // DESTRUCTURE: Extract memoryText, visual prompts, and GIF tags
+      const { cleanText, contextPrompt, memoryText, gifSearchTerm, externalLink } = extractContextPrompt(rawResponse);
       
-      // AUTO-SAVE MEMORY: If the brain marked a fact, save it to the database
+      // AUTO-SAVE MEMORY
       if (memoryText && userData?.uid) {
         console.log("💾 Auto-Saving Memory:", memoryText);
         storeMemory(memoryText, userData.uid, botId);
       }
 
-      // ✅ LOGIC UPDATE: Only generate if AI provides a contextPrompt
+      // --- LOGIC: DETERMINE MEDIA TYPE ---
+      let finalImageUrl = undefined;
+      let finalVideoUrl = externalLink || undefined;
       const isGeneratingImage = !!contextPrompt;
-      
+
+      // Check for GIF (Giphy)
+      if (gifSearchTerm) {
+         try {
+            console.log(`🎬 Searching Giphy for: ${gifSearchTerm}`);
+            const gifUrl = await fetchGiphyUrl(gifSearchTerm);
+            if (gifUrl) {
+                finalImageUrl = gifUrl; 
+            }
+         } catch(e) {
+             console.error("Giphy failed", e);
+         }
+      }
+
+      // 3. SEND BOT RESPONSE (Optimistic Update)
       onSendMessage({
         id: responseMessageId,
         role: 'model',
-        text: cleanText, // This text is clean (no [[VISUAL]] or [[MEMORY]] tags)
-        isImageLoading: isGeneratingImage,
+        text: cleanText, // This text is clean (no tags)
+        imageUrl: finalImageUrl, // Will be set if GIF found immediately
+        videoUrl: finalVideoUrl,
+        isImageLoading: isGeneratingImage, // Show loader ONLY if SDXL is generating
         timestamp: Date.now()
       });
 
-      // Call Body Generator (Tag-Aware)
+      // 4. TRIGGER AI IMAGE GENERATION (If needed)
       if (isGeneratingImage) {
         try {
-          // If the AI didn't provide a specific visual tag but user asked for one, fallback to userText
           const promptToUse = contextPrompt || userText;
-          
           const tempImageUrl = await generateAriaImage(promptToUse, userText, character);
           
           if (tempImageUrl) {
