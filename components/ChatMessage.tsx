@@ -10,9 +10,10 @@ import {
   Download, 
   RefreshCw, 
   Maximize2,
-  Wand2,          // ✅ For Mobile Button
-  ExternalLink,   // ✅ For Link Cards
-  Youtube         // ✅ For YouTube Icons
+  Wand2,          
+  ExternalLink,   
+  Youtube,
+  Play            // Added Play icon for embeds
 } from 'lucide-react';
 
 interface ChatMessageProps {
@@ -44,12 +45,21 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
   const [isTypingComplete, setIsTypingComplete] = useState(!shouldAnimate);
 
   // --- HELPER: DETECT LINK TYPE ---
-  // Identifies if the URL is a real file, a YouTube link, or a generic website
+  // Identifies if the URL is a real file, a YouTube link, an Adult Embed, or a generic website
   const getMediaType = (url: string | undefined) => {
     if (!url) return 'none';
+    
+    // 1. YouTube
     if (url.includes('youtube.com') || url.includes('youtu.be')) return 'youtube';
-    // If it ends in video extension OR is a blob/firebase storage link, treat as file
+    
+    // 2. EMBEDS (Pornhub, Redtube, etc.)
+    // These APIs return URLs with /embed/ or special subdomains
+    if (url.includes('/embed/') || url.includes('embed.redtube')) return 'embed'; 
+    
+    // 3. Native Files (MP4/Blob)
     if (url.match(/\.(mp4|webm|ogg)$/i) || url.startsWith('blob:') || url.includes('firebasestorage')) return 'video_file';
+    
+    // 4. Fallback
     return 'external_link'; 
   };
 
@@ -57,7 +67,6 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
 
   // --- HELPER: GET YOUTUBE EMBED ---
   const getYoutubeEmbed = (url: string) => {
-    // Extract ID from v=XYZ or short link
     const videoId = url.split('v=')[1]?.split('&')[0] || url.split('/').pop();
     return `https://www.youtube.com/embed/${videoId}`;
   };
@@ -111,21 +120,20 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
     e.stopPropagation();
     if (isDownloading) return;
 
-    // Use videoUrl if we are in video mode (and it exists), otherwise image
     const urlToDownload = viewMode === 'video' && message.videoUrl ? message.videoUrl : message.imageUrl;
     
     if (!urlToDownload) return;
 
     setIsDownloading(true);
     try {
-      // 1. If it's an external link (YouTube/Website), just open it
-      if (mediaType === 'youtube' || mediaType === 'external_link') {
+      // If it's an external link or embed, just open it
+      if (mediaType === 'youtube' || mediaType === 'external_link' || mediaType === 'embed') {
           window.open(urlToDownload, '_blank');
           setIsDownloading(false);
           return;
       }
 
-      // 2. If it's a file, try to download blob
+      // If it's a native file, try to download blob
       const response = await fetch(urlToDownload);
       const blob = await response.blob();
       const blobUrl = window.URL.createObjectURL(blob);
@@ -145,10 +153,6 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
     }
   };
 
-  /**
-   * ASPECT RATIO DETECTOR
-   * ✅ FIX: Default to [3/4] for AI Portraits instead of TikTok [9/16]
-   */
   const getImageAspectRatio = () => {
     const text = message.text?.toLowerCase() || '';
     if (text.includes('landscape') || text.includes('panoramic') || text.includes('wide shot')) {
@@ -215,7 +219,22 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
                    allowFullScreen
                  />
               ) 
-              /* --- CASE 2: GENERIC EXTERNAL LINK (Smart Card) --- */
+              
+              /* --- CASE 2: SPICY EMBED (Iframe) --- */
+              /* ✅ This is the logic that makes it play IN CHAT */
+              : mediaType === 'embed' && message.videoUrl ? (
+                 <iframe 
+                   src={message.videoUrl}
+                   className="w-[280px] md:w-[360px] aspect-video block bg-black"
+                   title="Video Player"
+                   frameBorder="0"
+                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                   allowFullScreen
+                   scrolling="no"
+                 />
+              )
+
+              /* --- CASE 3: GENERIC EXTERNAL LINK (Smart Card) --- */
               : mediaType === 'external_link' && message.videoUrl ? (
                  <a 
                    href={message.videoUrl} 
@@ -232,7 +251,8 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
                     </div>
                  </a>
               )
-              /* --- CASE 3: NATIVE VIDEO FILE (MP4/Blob) --- */
+              
+              /* --- CASE 4: NATIVE VIDEO FILE (MP4/Blob) --- */
               : message.videoUrl && viewMode === 'video' ? (
                 <video 
                   key={message.videoUrl}
@@ -242,7 +262,8 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
                   className="w-[280px] md:w-[360px] h-auto block bg-black shadow-inner rounded-2xl cursor-pointer"
                 />
               ) 
-              /* --- CASE 4: STATIC IMAGE --- */
+              
+              /* --- CASE 5: STATIC IMAGE --- */
               : (
                 <img 
                   key={message.imageUrl}
@@ -253,10 +274,10 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
                 />
               )}
 
-              {/* OVERLAYS (Only for Native Video/Image, NOT for YouTube/Links) */}
+              {/* OVERLAYS (Only for Native Video/Image, NOT for Iframe Embeds) */}
               {(mediaType === 'video_file' || (!message.videoUrl && message.imageUrl)) && (
                   <>
-                    {/* DESKTOP OVERLAY */}
+                    {/* OVERLAYS AND BUTTONS LOGIC IS UNCHANGED ... */}
                     {!message.videoUrl && !message.isVideoLoading && !isUser && (
                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-center gap-3 backdrop-blur-[2px] pointer-events-none hidden md:flex">
                         <button onClick={(e) => { e.stopPropagation(); onAnimateRequest(message); }} className="pointer-events-auto flex items-center gap-2 px-5 py-2.5 bg-white text-black rounded-full font-black text-[10px] uppercase tracking-tighter hover:bg-purple-500 hover:text-white transition-all active:scale-95 shadow-xl">
@@ -288,7 +309,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
               )}
             </div>
 
-            {/* CONTROL BAR (Only for Native Files, hidden for YouTube/Links) */}
+            {/* CONTROL BAR (Only for Native Files, hidden for Iframes) */}
             {(mediaType === 'video_file' || (!message.videoUrl && message.imageUrl)) && !message.isVideoLoading && (
               <div className="flex items-center justify-between w-[280px] md:w-[360px] px-1">
                 {message.videoUrl ? (
@@ -297,7 +318,6 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
                     {viewMode === 'video' ? 'Show Static' : 'Show Motion'}
                   </button>
                 ) : (
-                   /* ✅ FIX: MOBILE MOTION BUTTON (Visible on all screens if no video yet) */
                    <button onClick={() => onAnimateRequest(message)} className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-purple-400 hover:text-purple-300 transition-colors animate-pulse">
                     <Wand2 className="w-3 h-3" />
                     <span className="md:hidden">Animate</span>
@@ -323,7 +343,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
         <div className="flex items-center gap-2 mt-2 px-1 text-[9px] text-zinc-600 font-mono tracking-tighter uppercase">
           <span>[{new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}]</span>
           {mediaType === 'youtube' && <span className="text-red-500 font-bold ml-2 flex items-center gap-1"><Youtube className="w-3 h-3"/> YouTube</span>}
-          {message.videoUrl && mediaType === 'video_file' && <span className="text-purple-500 font-bold ml-2">Motion: Synced</span>}
+          {mediaType === 'embed' && <span className="text-purple-500 font-bold ml-2 flex items-center gap-1"><Play className="w-3 h-3 fill-current"/> Video Feed</span>}
         </div>
       </div>
     </div>
