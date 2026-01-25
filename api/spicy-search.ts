@@ -23,27 +23,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   };
 
   try {
-    console.log(`🔍 Searching for: ${searchTerm}`);
+    console.log(`🔍 Searching for Embeds: ${searchTerm}`);
     let videoData = null;
 
-    // --- TIER 1: OFFICIAL APIs (Fast, Reliable, No Scraping) ---
+    // --- TIER 1: OFFICIAL APIs (Best Quality Embeds) ---
     
-    // 1. Pornhub (Best)
+    // 1. Pornhub
     if (!videoData) videoData = await searchPornhub(searchTerm as string);
     
     // 2. RedTube
     if (!videoData) videoData = await searchRedTube(searchTerm as string);
     
-    // 3. Eporner (4K)
+    // 3. Eporner
     if (!videoData) videoData = await searchEporner(searchTerm as string);
     
     // 4. YouPorn
     if (!videoData) videoData = await searchYouPorn(searchTerm as string);
 
 
-    // --- TIER 2: SCRAPERS (Slower, Fallback for specific sites) ---
-    // Note: These sites do NOT have APIs, so we must scrape them.
-    // They might block Vercel IPs, so they are placed after the APIs.
+    // --- TIER 2: SCRAPERS (Constructing Embeds from IDs) ---
 
     // 5. Spankbang
     if (!videoData) {
@@ -57,7 +55,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         videoData = await scrapeTnaflix(searchTerm as string, headers);
     }
 
-    // 7. XHamster (Hardest)
+    // 7. XHamster
     if (!videoData) {
         console.log("Attempting scraper: XHamster...");
         videoData = await scrapeXhamster(searchTerm as string, headers);
@@ -77,7 +75,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 }
 
 // ==========================================
-// 🚀 TIER 1: OFFICIAL JSON APIs
+// 🚀 TIER 1: OFFICIAL APIs (Returning Embeds)
 // ==========================================
 
 async function searchPornhub(term: string) {
@@ -87,7 +85,11 @@ async function searchPornhub(term: string) {
     const data = await response.json();
     if (data.videos && data.videos.length > 0) {
       const video = data.videos[0];
-      return { url: video.url, provider: 'pornhub', title: video.title, thumbnail: video.default_thumb };
+      // Convert View URL to Embed: pornhub.com/view_video.php?viewkey=ph5... -> pornhub.com/embed/ph5...
+      const viewKey = video.url.split('viewkey=')[1];
+      if (viewKey) {
+          return { url: `https://www.pornhub.com/embed/${viewKey}`, provider: 'pornhub', title: video.title };
+      }
     }
   } catch (e) { console.error("PH API Error", e); }
   return null;
@@ -100,7 +102,8 @@ async function searchRedTube(term: string) {
     const data = await response.json();
     if (data.videos && data.videos.length > 0) {
         const video = data.videos[0].video;
-        return { url: video.url, provider: 'redtube', title: video.title, thumbnail: video.default_thumb };
+        // RedTube provides ID directly
+        return { url: `https://embed.redtube.com/?id=${video.video_id}`, provider: 'redtube', title: video.title };
     }
   } catch (e) { console.error("RT API Error", e); }
   return null;
@@ -113,7 +116,8 @@ async function searchEporner(term: string) {
     const data = await response.json();
     if (data.videos && data.videos.length > 0) {
         const video = data.videos[0];
-        return { url: video.url, provider: 'eporner', title: video.title, thumbnail: video.default_thumb };
+        // Eporner provides .embed directly
+        return { url: video.embed, provider: 'eporner', title: video.title };
     }
   } catch (e) { console.error("EP API Error", e); }
   return null;
@@ -126,14 +130,18 @@ async function searchYouPorn(term: string) {
     const data = await response.json();
     if (data.videos && data.videos.length > 0) {
         const video = data.videos[0];
-        return { url: video.url, provider: 'youporn', title: video.title, thumbnail: video.default_thumb };
+        // Extract ID: https://www.youporn.com/watch/123456/title... -> 123456
+        const match = video.url.match(/\/watch\/(\d+)/);
+        if (match && match[1]) {
+            return { url: `https://www.youporn.com/embed/${match[1]}`, provider: 'youporn', title: video.title };
+        }
     }
   } catch (e) { console.error("YP API Error", e); }
   return null;
 }
 
 // ==========================================
-// 🕷️ TIER 2: HTML SCRAPERS (Fallback)
+// 🕷️ TIER 2: SCRAPERS (Constructing Embeds)
 // ==========================================
 
 async function scrapeSpankbang(term: string, headers: any) {
@@ -150,12 +158,16 @@ async function scrapeSpankbang(term: string, headers: any) {
 
     $('.video-list-video').each((i, el) => {
         const item = $(el);
-        if (item.hasClass('paid') || item.hasClass('cam')) return; // Skip ads
+        if (item.hasClass('paid') || item.hasClass('cam')) return; 
         
-        const relLink = item.find('.thumb').attr('href');
+        const relLink = item.find('.thumb').attr('href'); // /7a3b/video/title
         const text = item.find('.title').text();
-        if (relLink && !validLink) {
-             validLink = `https://spankbang.com${relLink}`;
+        
+        // Extract ID: /7a3b/video... -> 7a3b
+        const idMatch = relLink?.match(/^\/([a-zA-Z0-9]+)\/video/);
+
+        if (idMatch && idMatch[1] && !validLink) {
+             validLink = `https://spankbang.com/${idMatch[1]}/embed/`;
              title = text;
         }
     });
@@ -177,12 +189,14 @@ async function scrapeTnaflix(term: string, headers: any) {
     let validLink = null;
     $('li.video_box').each((i, el) => {
         const item = $(el);
-        const duration = item.find('.info_time').text();
-        if (!duration) return; // Skip ads (no duration)
+        if (!item.find('.info_time').text()) return;
 
-        const relLink = item.find('a').attr('href');
-        if (relLink && !validLink) {
-            validLink = `https://www.tnaflix.com${relLink}`;
+        const relLink = item.find('a').attr('href'); // /porn/Title/video123456
+        // Extract ID: video(\d+)
+        const idMatch = relLink?.match(/video(\d+)$/);
+
+        if (idMatch && idMatch[1] && !validLink) {
+            validLink = `https://www.tnaflix.com/embed/${idMatch[1]}`;
         }
     });
 
@@ -203,9 +217,12 @@ async function scrapeXhamster(term: string, headers: any) {
     const item = $('a.video-thumb__image-container').not('.promo').first();
     
     if (item.length) {
-      const link = item.attr('href');
-      if (link && !link.includes('click')) {
-        return { url: link, provider: 'xhamster', title: 'Video' };
+      const link = item.attr('href'); // https://xhamster.com/videos/title-12345
+      // Extract ID: last numbers in URL
+      const idMatch = link?.match(/-(\d+)$/);
+
+      if (idMatch && idMatch[1]) {
+        return { url: `https://xhamster.com/embed/${idMatch[1]}`, provider: 'xhamster', title: 'Video' };
       }
     }
   } catch (e) { console.error("XH Scrape Error", e); }
