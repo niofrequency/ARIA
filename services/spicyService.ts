@@ -2,11 +2,11 @@
 
 export const fetchSpicyLink = async (searchTerm: string): Promise<string | null> => {
   try {
-    // 1. ATTEMPT: Try the Vercel Scraper API (Direct Video Link)
-    // This attempts to get a specific video URL via your backend
+    // 1. ATTEMPT: Try the Vercel API (Direct Video Link)
+    // This attempts to get a specific, high-quality video URL via Pornhub/RedTube APIs
     const response = await fetch(`/api/spicy-search?term=${encodeURIComponent(searchTerm)}`);
     
-    // Safety Check: Ensure the API actually returned JSON (and not an HTML error page)
+    // Safety Check: Ensure the API actually returned JSON
     const contentType = response.headers.get("content-type");
     if (contentType && contentType.includes("application/json")) {
       const data = await response.json();
@@ -23,12 +23,14 @@ export const fetchSpicyLink = async (searchTerm: string): Promise<string | null>
 
   } catch (error) {
     // 2. FALLBACK: Direct Search Links (Guaranteed to Work)
-    // If the scraper fails, we construct a direct search URL for one of the providers.
+    // If the API fails, we construct a direct search URL for a random provider.
     // This ensures the user ALWAYS sees a clickable link instead of nothing.
     
     console.log(`⚠️ Using Fallback Search Link for: "${searchTerm}"`);
 
     const providers = [
+      { name: 'pornhub', url: `https://www.pornhub.com/video/search?search=${encodeURIComponent(searchTerm)}` },
+      { name: 'redtube', url: `https://www.redtube.com/?search=${encodeURIComponent(searchTerm)}` },
       { name: 'spankbang', url: `https://spankbang.com/s/${encodeURIComponent(searchTerm)}/` },
       { name: 'xhamster', url: `https://xhamster.com/search?q=${encodeURIComponent(searchTerm)}` },
       { name: 'tnaflix', url: `https://www.tnaflix.com/search.php?q=${encodeURIComponent(searchTerm)}` }
