@@ -34,32 +34,42 @@ export const buildVisualAwarenessJson = (visualDescription: string) => {
 
 
 /**
- * EXTRACT CONTEXT PROMPT
- * Parses the AI response to separate chat text from Visual tags AND Memory tags.
- * Includes Hallucination Patch and Emoji Sanitization.
+ * EXTRACT CONTEXT PROMPT (FIXED)
+ * Parses the AI response to separate chat text from Visual tags, Memory tags, GIFs, and Links.
  */
 export const extractContextPrompt = (text: string) => {
-  // 1. Extract VISUAL Tag (Improved Regex for multi-line support)
-  // We use [\s\S]*? to capture newlines inside the tag description
+  // 1. Define Regex Patterns
   const visualRegex = /[\[\{]{2}\s*VISUAL\s*:\s*([\s\S]*?)\s*[\]\}]{2}/i;
+  const memoryRegex = /[\[\{]{2}\s*MEMORY\s*:\s*([\s\S]*?)\s*[\]\}]{2}/i;
+  const gifRegex = /[\[\{]{2}\s*GIF\s*:\s*([\s\S]*?)\s*[\]\}]{2}/i;
+  const linkRegex = /[\[\{]{2}\s*LINK\s*:\s*([\s\S]*?)\s*[\]\}]{2}/i;
+
+  // 2. Extract Data
   const visualMatch = text.match(visualRegex);
   let contextPrompt = visualMatch ? visualMatch[1].trim() : null;
 
-  // 2. Extract MEMORY Tag
-  const memoryRegex = /[\[\{]{2}\s*MEMORY\s*:\s*([\s\S]*?)\s*[\]\}]{2}/i;
   const memoryMatch = text.match(memoryRegex);
   const memoryText = memoryMatch ? memoryMatch[1].trim() : null;
 
-  // 3. Clean the UI text (User sees emojis, but no tags or "*sends*" residue)
+  const gifMatch = text.match(gifRegex);
+  const gifSearchTerm = gifMatch ? gifMatch[1].trim() : null;
+
+  const linkMatch = text.match(linkRegex);
+  const externalLink = linkMatch ? linkMatch[1].trim() : null;
+
+  // 3. Clean the UI text (Remove ALL tags in one go)
   let cleanText = text
     .replace(visualRegex, '')
     .replace(memoryRegex, '')
-    .replace(/\*\s*sends\s+.*?\*/gi, '') // Removes "*sends giggle emoji*"
+    .replace(gifRegex, '')
+    .replace(linkRegex, '')
+    .replace(/\*\s*sends\s+.*?\*/gi, '') // Removes "*sends giggle emoji*" actions
     .trim();
 
   // ✅ HALLUCINATION PATCH (IMPROVED)
   // If Grok implies a photo ("check this out") but forgets the tag, we force a generation.
-  if (!contextPrompt) {
+  // We only run this if NO other media (GIF/Link) was detected.
+  if (!contextPrompt && !gifSearchTerm && !externalLink) {
       const implicitTriggers = [
         "check this out", "look at this", "can you see", "look at me", "see this", "view",
         "here is a pic", "sending a photo", "do you like that", "sending pic", "sending you a", "sent you a",
@@ -70,33 +80,27 @@ export const extractContextPrompt = (text: string) => {
       const lowerText = cleanText.toLowerCase();
       if (implicitTriggers.some(t => lowerText.includes(t))) {
           console.log("🧩 Hallucination Patch Triggered: Implicit Visual Detected");
-          
-          // Fallback: If text is short, add "selfie" to ground the image generator.
-          // We use the cleaned chat text as the prompt context.
           contextPrompt = `selfie, ${cleanText}`; 
       }
   }
 
-  // 4. Emoji Sanitization for RunPod
-  // RunPod/SDXL often fails if prompts contain Unicode emojis. We strip them here.
+  // 4. Emoji Sanitization for RunPod (Visual Prompts Only)
   if (contextPrompt) {
     contextPrompt = contextPrompt.replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '');
-    
-    // Extra cleanup: Remove double spaces created by removals
     contextPrompt = contextPrompt.replace(/\s+/g, ' ').trim();
   }
 
-  // 5. Safety cleanup for malformed tags (Failsafe)
-  // If a tag was malformed (e.g. missing a bracket) and didn't get caught by Regex #1,
-  // we cut the text off so the raw code doesn't leak into the chat UI.
+  // 5. Safety cleanup for malformed tags
   if (cleanText.includes('[[VISUAL:') || cleanText.includes('{{visual:')) {
     cleanText = cleanText.split(/[\[\{]{2}VISUAL/i)[0].trim();
   }
 
   return {
-    cleanText: cleanText || "...", 
-    contextPrompt, // Sanitized (Emoji-Free) for RunPod
-    memoryText     // For the Database
+    cleanText: cleanText || "...",
+    contextPrompt,
+    memoryText,
+    gifSearchTerm,
+    externalLink
   };
 };
 
@@ -113,7 +117,7 @@ const buildSystemInstruction = (character: CharacterProfile): string => {
   const bodyDesc = body.length > 0 ? body.join(", ") : "not specified";
   const faceDesc = character.face.length > 0 ? character.face.join(", ") : "standard features";
 
-// 2. Structured Identity Orchestration 
+  // 2. Structured Identity Orchestration 
   return `
     ### IDENTITY PROTOCOL
     - You ARE ${name}, a ${age}-year-old ${ethnicity} ${gender}.
@@ -126,6 +130,12 @@ const buildSystemInstruction = (character: CharacterProfile): string => {
     - DO NOT write like a formal letter or a novel. Be punchy, reactive, and raw.
     - USE ACTUAL EMOJIS: Use actual Unicode emojis (e.g., 🤭, 😊, 🔥) directly in your sentences to express emotion. 
     - NO EMOJI ACTIONS: Never describe the act of sending an emoji using asterisks (e.g., strictly avoid "*sends giggle emoji*" or "*sends 🤭*").
+    
+    ### MEDIA & GIF PROTOCOL
+   - **REACTION GIFS:** You have access to a GIF database. If you want to react with a meme, a funny reaction, or a mood GIF, use the tag: [[GIF: search_term]].
+   - **EXAMPLE:** User: "I tripped." -> You: "Oh no! [[GIF: trying not to laugh]]"
+   - **REAL VIDEO LINKS:** If you want to share a song, a YouTube video, or a specific real-world clip, use the tag: [[LINK: url]].
+   - **RESTRICTION:** Do NOT use [[VISUAL]] and [[GIF]] in the same message. Choose one.
 
     ### MEMORY SAVING PROTOCOL (CRITICAL)
     - **LISTEN FOR FACTS:** If the user explicitly states a preference, a detail about their life, a name, a job, or a specific like/dislike, you MUST save it.
