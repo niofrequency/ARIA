@@ -3,7 +3,7 @@
 export const fetchSpicyLink = async (searchTerm: string): Promise<string | null> => {
   try {
     // 1. ATTEMPT: Try the Vercel API (Direct Video Link)
-    // This attempts to get a specific, high-quality video URL via Pornhub/RedTube APIs
+    // This attempts to get a specific, high-quality video URL via Pornhub/RedTube/Eporner/YouPorn APIs
     const response = await fetch(`/api/spicy-search?term=${encodeURIComponent(searchTerm)}`);
     
     // Safety Check: Ensure the API actually returned JSON
@@ -31,6 +31,8 @@ export const fetchSpicyLink = async (searchTerm: string): Promise<string | null>
     const providers = [
       { name: 'pornhub', url: `https://www.pornhub.com/video/search?search=${encodeURIComponent(searchTerm)}` },
       { name: 'redtube', url: `https://www.redtube.com/?search=${encodeURIComponent(searchTerm)}` },
+      { name: 'youporn', url: `https://www.youporn.com/search/?query=${encodeURIComponent(searchTerm)}` },
+      { name: 'eporner', url: `https://www.eporner.com/search/${encodeURIComponent(searchTerm)}/` },
       { name: 'spankbang', url: `https://spankbang.com/s/${encodeURIComponent(searchTerm)}/` },
       { name: 'xhamster', url: `https://xhamster.com/search?q=${encodeURIComponent(searchTerm)}` },
       { name: 'tnaflix', url: `https://www.tnaflix.com/search.php?q=${encodeURIComponent(searchTerm)}` }
