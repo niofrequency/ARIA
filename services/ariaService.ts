@@ -45,6 +45,7 @@ export const extractContextPrompt = (text: string) => {
   const gifRegex = /[\[\{]{2}\s*GIF\s*:\s*([\s\S]*?)\s*[\]\}]{2}/i;
   const linkRegex = /[\[\{]{2}\s*LINK\s*:\s*([\s\S]*?)\s*[\]\}]{2}/i;
   const youtubeRegex = /[\[\{]{2}\s*YOUTUBE\s*:\s*([\s\S]*?)\s*[\]\}]{2}/i;
+  const spicyRegex = /[\[\{]{2}\s*SPICY\s*:\s*([\s\S]*?)\s*[\]\}]{2}/i;
 
   // 2. Extract Data
   const visualMatch = text.match(visualRegex);
@@ -62,20 +63,25 @@ export const extractContextPrompt = (text: string) => {
   const linkMatch = text.match(linkRegex);
   const externalLink = linkMatch ? linkMatch[1].trim() : null;
 
-  // 3. Clean the UI text (Remove ALL tags in one go to prevent errors)
+// ✅ Extract Spicy Term
+  const spicyMatch = text.match(spicyRegex);
+  const spicySearchTerm = spicyMatch ? spicyMatch[1].trim() : null;
+
+  // 3. Clean the UI text (Remove ALL tags in one go)
   let cleanText = text
     .replace(visualRegex, '')
     .replace(memoryRegex, '')
     .replace(gifRegex, '')
     .replace(youtubeRegex, '')
     .replace(linkRegex, '')
+    .replace(spicyRegex, '') // ✅ Remove Spicy Tag
     .replace(/\*\s*sends\s+.*?\*/gi, '') // Removes "*sends giggle emoji*"
     .trim();
 
   // ✅ HALLUCINATION PATCH (IMPROVED)
   // If Grok implies a photo but forgets the tag, force a generation.
-  // CRITICAL: We check !youtubeSearchTerm to ensure we don't generate a selfie if she sent a video.
-  if (!contextPrompt && !gifSearchTerm && !externalLink && !youtubeSearchTerm) {
+  // CRITICAL: We check !spicySearchTerm & !youtubeSearchTerm to ensure we don't generate a selfie if she sent a video.
+  if (!contextPrompt && !gifSearchTerm && !externalLink && !youtubeSearchTerm && !spicySearchTerm) {
       const implicitTriggers = [
         "check this out", "look at this", "can you see", "look at me", "see this", "view",
         "here is a pic", "sending a photo", "do you like that", "sending pic", "sending you a", "sent you a",
@@ -106,7 +112,8 @@ export const extractContextPrompt = (text: string) => {
     contextPrompt,
     memoryText,
     gifSearchTerm,
-    youtubeSearchTerm, // ✅ Includes YouTube
+    youtubeSearchTerm,
+    spicySearchTerm, // ✅ Return this new field
     externalLink
   };
 };
@@ -135,10 +142,11 @@ const buildSystemInstruction = (character: CharacterProfile): string => {
     - You are texting on a private messenger app (like iMessage/WhatsApp).
     - Text like a real person: use casual phrasing, reaction gifs (described in asterisks), and direct thoughts.
     - DO NOT write like a formal letter or a novel. Be punchy, reactive, and raw.
-    - USE ACTUAL EMOJIS: Use actual Unicode emojis (e.g., 🤭, 😊, 🔥) directly in your sentences to express emotion. 
+    - USE ACTUAL EMOJIS: Use actual Unicode emojis (e.g., 🤭, 😊, 🔥) directly in your sentences to express emotion.
+    - DO NOT use emoji every message. Use it when only necessary.
     - NO EMOJI ACTIONS: Never describe the act of sending an emoji using asterisks (e.g., strictly avoid "*sends giggle emoji*" or "*sends 🤭*").
     
-    ### MEDIA & GIF PROTOCOL
+   ### MEDIA & GIF PROTOCOL
    - **REACTION GIFS:** You have access to a GIF database. If you want to react with a meme, a funny reaction, or a mood GIF, use the tag: [[GIF: search_term]].
    - **EXAMPLE:** User: "I tripped." -> You: "Oh no! [[GIF: trying not to laugh]]"
    - **REAL VIDEO LINKS:** If you want to share a song, a YouTube video, or a specific real-world clip, use the tag: [[LINK: url]].
