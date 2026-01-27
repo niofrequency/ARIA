@@ -11,6 +11,7 @@ const R2_PUBLIC_DOMAIN = "https://pub-5ad10447a420475ebb914b21e843d79d.r2.dev";
 const LORA_MAP: Record<string, string> = {
   "brittany": "brittanyspears-v1",
   "lia-marie": "lia-marie",
+  "shaghana-doyle": "shaghana-doyle",
   "asmrvida": "asmrvida",
    "chloe-cherry": "chloe-cherry",
   "stephanie": "stephanie-lvl2",
