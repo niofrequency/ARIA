@@ -15,6 +15,7 @@ const LORA_MAP: Record<string, string> = {
   "regina-evilqueen":"regina-evilqueen",
   "maria-brazil":"maria-brazil",
   "larkin-love": "larkin-love",
+  "dreamgurl": "dreamgurl",
   "morticia-addams": "morticia-addams",
   "irina-spalko": "irina-spalko",
   "queenofhearts":"queenofhearts",
