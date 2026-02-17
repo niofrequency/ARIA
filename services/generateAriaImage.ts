@@ -44,6 +44,7 @@ const LORA_MAP: Record<string, string> = {
   "poison ivy": "poison-ivy",
   "priyarai": "priyarai",
   "queenofhearts": "queenofhearts",
+  "raven-v1": "raven-v1",
   "regina-evilqueen": "regina-evilqueen",
   "rizzkallah": "rizzkallah",
   "shaghana-doyle": "shaghana-doyle",
