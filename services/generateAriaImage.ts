@@ -31,6 +31,7 @@ const LORA_MAP: Record<string, string> = {
   "ivy harper": "ivyharper-v1",
   "jenna": "jennaortega-v1",
   "katrina-jade": "katrina-jade",
+  "kim-kardashian":"kim-kardashian",
   "larkin-love": "larkin-love",
   "leighbaker-v1": "leighbaker-v1",
   "lia-marie": "lia-marie",
