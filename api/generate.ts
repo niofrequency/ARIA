@@ -10,7 +10,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 // Configuration: Checking local dev and production keys
 const API_KEY = process.env.RUNPOD_API_KEY || process.env.RUNPOD_API_KEY;
-const ENDPOINT_ID = process.env.RUNPOD_ENDPOINT_ID || "aw464t3sqfnp5h";
+const ENDPOINT_ID = process.env.RUNPOD_ENDPOINT_ID || "4to1a6ym21ucum";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // 1. CORS CONFIGURATION
