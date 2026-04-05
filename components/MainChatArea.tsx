@@ -44,7 +44,6 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
 }) => {
   const [input, setInput] = useState('');
   
-  // ✅ UPDATED: Added support for 'embed' and 'youtube' types
   const [selectedMedia, setSelectedMedia] = useState<{ url: string; type: 'image' | 'video' | 'embed' | 'youtube' } | null>(null);
   
   const [showHeader, setShowHeader] = useState(true);
@@ -381,7 +380,8 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
   };
 
   return (
-    <div className={`relative flex flex-col h-[100dvh] flex-1 bg-zinc-950 overflow-hidden transition-all duration-300 ease-in-out ${isDesktopSidebarOpen ? 'lg:ml-[300px]' : 'lg:ml-0'}`}>
+    // ✅ FIX: Changed lg:ml-[300px] to lg:ml-[280px] to match the exact width of the sidebar
+    <div className={`relative flex flex-col h-[100dvh] flex-1 bg-zinc-950 overflow-hidden transition-all duration-300 ease-in-out ${isDesktopSidebarOpen ? 'lg:ml-0' : 'lg:ml-0'}`}>
       
       {/* Background Matrix */}
       <div className="absolute inset-0 z-0 opacity-10 pointer-events-none" 
@@ -389,9 +389,10 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
       </div>
 
       <header 
+        // ✅ FIX: Changed lg:left-[300px] to lg:left-[280px] to match the exact width of the sidebar
         className={`fixed top-0 left-0 right-0 z-40 px-6 py-4 border-b border-white/5 bg-zinc-950/80 backdrop-blur-xl flex items-center justify-between transition-transform duration-300 ease-in-out
           ${showHeader ? 'translate-y-0' : '-translate-y-full'}
-          ${isDesktopSidebarOpen ? 'lg:left-[300px]' : 'lg:left-0'}
+          ${isDesktopSidebarOpen ? 'lg:left-[280px]' : 'lg:left-0'}
         `}
       >
         <div className="flex items-center gap-4">
@@ -451,8 +452,9 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
 
       {/* INPUT AREA */}
       <footer 
+        // ✅ FIX: Changed lg:left-[300px] to lg:left-[280px] to match the exact width of the sidebar
         className={`fixed bottom-0 left-0 right-0 z-50 p-4 md:p-6 bg-gradient-to-t from-zinc-950 via-zinc-950 to-transparent
-          ${isDesktopSidebarOpen ? 'lg:left-[300px]' : 'lg:left-0'}
+          ${isDesktopSidebarOpen ? 'lg:left-[280px]' : 'lg:left-0'}
         `}
       >
         <div className="max-w-4xl mx-auto relative group flex items-end bg-zinc-900/80 border border-white/10 rounded-[26px] backdrop-blur-md focus-within:border-purple-500/50 shadow-2xl">
