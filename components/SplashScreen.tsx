@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { ChevronRight } from 'lucide-react';
-import { Button } from './ui/button';
 
 interface SplashScreenProps {
     onFinish: () => void;
@@ -59,35 +58,46 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
                     </h1>
                 </div>
 
-                {/* TOGGLE BUTTON */}
-                <div className="mt-14 h-14">
-                    <Button 
+                {/* NEW MODERN TOGGLE BUTTON */}
+                <div className="mt-14 h-14 flex items-center justify-center">
+                    <button
                         onClick={handleInitialize}
                         disabled={isExiting}
-                        variant="outline" 
-                        size="lg"
-                        className={`group relative overflow-hidden transition-all duration-500 min-w-[220px] bg-white/[0.03] border-white/10 hover:border-purple-500/50 backdrop-blur-md rounded-full shadow-2xl ${isExiting ? 'w-[220px] border-purple-500' : ''}`}
+                        className={`group relative flex items-center justify-center rounded-full transition-all duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] outline-none
+                            ${isExiting
+                                ? 'w-14 h-14 bg-purple-600 shadow-[0_0_40px_rgba(147,51,234,0.8)] border-transparent scale-110'
+                                : 'w-[240px] h-14 bg-zinc-950/50 backdrop-blur-xl border border-white/10 hover:border-purple-500/50 hover:bg-zinc-900/80 shadow-2xl cursor-pointer'
+                            }
+                        `}
                     >
-                        <span className={`mr-10 transition-all duration-500 tracking-[0.2em] uppercase text-[11px] font-bold text-white/80 ${isExiting ? 'opacity-0 -translate-x-10' : 'group-hover:opacity-0'}`}>
-                            Get Started
+                        {/* Inner text that blurs and floats away on click */}
+                        <span
+                            className={`absolute left-8 transition-all duration-500 tracking-[0.25em] uppercase text-[11px] font-bold text-zinc-400 group-hover:text-white
+                                ${isExiting ? 'opacity-0 -translate-y-4 blur-sm' : 'opacity-100 translate-y-0 blur-0'}
+                            `}
+                        >
+                            Initialize Link
                         </span>
 
-                        <i className={`absolute right-1 top-1 bottom-1 rounded-full z-10 grid place-items-center transition-all duration-500 not-italic
-                            ${isExiting 
-                                ? 'left-1 w-[calc(100%-0.5rem)] bg-purple-600 shadow-[0_0_30px_rgba(147,51,234,0.6)]' 
-                                : 'w-1/4 bg-white/10 group-hover:w-[calc(100%-0.5rem)] group-hover:bg-purple-600/80 group-hover:shadow-[0_0_20px_rgba(147,51,234,0.4)]'
-                            }`}
+                        {/* The Arrow Container that handles the morph */}
+                        <div
+                            className={`absolute transition-all duration-700 flex items-center justify-center rounded-full
+                                ${isExiting
+                                    ? 'inset-0 w-full h-full bg-transparent text-white -rotate-90 scale-125 animate-pulse'
+                                    : 'right-2 w-10 h-10 bg-white/[0.05] text-zinc-500 group-hover:bg-purple-600 group-hover:text-white group-hover:shadow-[0_0_15px_rgba(147,51,234,0.6)]'
+                                }
+                            `}
                         >
                             <ChevronRight 
-                                className={`transition-all duration-500 text-white ${isExiting ? 'scale-125 rotate-90' : 'group-hover:translate-x-1'}`} 
-                                size={20} 
-                                strokeWidth={2.5} 
+                                size={18} 
+                                strokeWidth={isExiting ? 3 : 2.5} 
+                                className={`transition-all duration-500 ${!isExiting && 'group-hover:translate-x-0.5'}`} 
                             />
-                        </i>
-                    </Button>
+                        </div>
+                    </button>
                 </div>
 
-                {/* Status Footer - Replaced Morph with CSS Dots */}
+                {/* Status Footer */}
                 <div className={`mt-20 flex flex-col items-center gap-3 transition-opacity duration-700 ${isExiting ? 'opacity-0' : 'opacity-100'}`}>
                     <div className="flex gap-1.5">
                         <span className="w-1 h-1 rounded-full bg-purple-500/50 animate-pulse"></span>
