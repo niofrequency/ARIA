@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ChevronRight } from 'lucide-react';
+import { Power } from 'lucide-react'; // ✅ Swapped Chevron for Power icon
 
 interface SplashScreenProps {
     onFinish: () => void;
@@ -39,7 +39,7 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
                 }`}
             >
                 {/* Logo Section */}
-                <div className={`relative group mb-10 transition-all duration-700 ${isExiting ? 'scale-95 opacity-0' : ''}`}>
+                <div className={`relative mb-10 transition-all duration-700 ${isExiting ? 'scale-95 opacity-0' : ''}`}>
                     <div className="absolute -inset-1 bg-gradient-to-r from-purple-600 to-blue-500 rounded-full blur opacity-30"></div>
                     <img 
                         src="/img/ARIA-LOGO.PNG" 
@@ -58,47 +58,45 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
                     </h1>
                 </div>
 
-                {/* NEW MODERN TOGGLE BUTTON */}
-                <div className="mt-14 h-14 flex items-center justify-center">
+                {/* ✅ NEW CONCEPT: THE NEURAL CORE BUTTON */}
+                <div className="mt-14 h-28 flex flex-col items-center justify-center relative group">
                     <button
                         onClick={handleInitialize}
                         disabled={isExiting}
-                        className={`group relative flex items-center justify-center rounded-full transition-all duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] outline-none
+                        className={`relative flex items-center justify-center rounded-full transition-all duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] outline-none
                             ${isExiting
-                                ? 'w-14 h-14 bg-purple-600 shadow-[0_0_40px_rgba(147,51,234,0.8)] border-transparent scale-110'
-                                : 'w-[240px] h-14 bg-zinc-950/50 backdrop-blur-xl border border-white/10 hover:border-purple-500/50 hover:bg-zinc-900/80 shadow-2xl cursor-pointer'
+                                ? 'w-24 h-24 bg-purple-600 shadow-[0_0_100px_rgba(147,51,234,1)] scale-[4] border-transparent opacity-0'
+                                : 'w-20 h-20 bg-zinc-950/80 backdrop-blur-xl border border-purple-500/30 hover:border-purple-400 hover:bg-purple-900/30 shadow-[0_0_30px_rgba(147,51,234,0.2)] cursor-pointer'
                             }
                         `}
                     >
-                        {/* Inner text that blurs and floats away on click */}
-                        <span
-                            className={`absolute left-8 transition-all duration-500 tracking-[0.25em] uppercase text-[11px] font-bold text-zinc-400 group-hover:text-white
-                                ${isExiting ? 'opacity-0 -translate-y-4 blur-sm' : 'opacity-100 translate-y-0 blur-0'}
-                            `}
-                        >
-                            Initialize Link
-                        </span>
+                        {/* Outer rotating orbital ring */}
+                        <div className={`absolute inset-[-6px] rounded-full border-t-2 border-r-2 border-purple-500/40 transition-all duration-500
+                            ${isExiting ? 'opacity-0' : 'animate-[spin_4s_linear_infinite] group-hover:border-purple-400 group-hover:animate-[spin_2s_linear_infinite]'}
+                        `} />
 
-                        {/* The Arrow Container that handles the morph */}
-                        <div
-                            className={`absolute transition-all duration-700 flex items-center justify-center rounded-full
-                                ${isExiting
-                                    ? 'inset-0 w-full h-full bg-transparent text-white -rotate-90 scale-125 animate-pulse'
-                                    : 'right-2 w-10 h-10 bg-white/[0.05] text-zinc-500 group-hover:bg-purple-600 group-hover:text-white group-hover:shadow-[0_0_15px_rgba(147,51,234,0.6)]'
-                                }
-                            `}
-                        >
-                            <ChevronRight 
-                                size={18} 
-                                strokeWidth={isExiting ? 3 : 2.5} 
-                                className={`transition-all duration-500 ${!isExiting && 'group-hover:translate-x-0.5'}`} 
-                            />
-                        </div>
+                        {/* Inner pulsing icon */}
+                        <Power 
+                            size={28} 
+                            strokeWidth={2}
+                            className={`transition-all duration-700
+                                ${isExiting ? 'text-white scale-0 rotate-180 opacity-0' : 'text-purple-400 group-hover:text-white group-hover:scale-110 group-hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]'}
+                            `} 
+                        />
                     </button>
+
+                    {/* Under-text that appears and glows on hover */}
+                    <span
+                        className={`absolute -bottom-6 transition-all duration-500 tracking-[0.3em] uppercase text-[9px] font-bold 
+                            ${isExiting ? 'opacity-0 translate-y-4 blur-sm text-purple-500' : 'opacity-100 translate-y-0 blur-0 text-zinc-600 group-hover:text-purple-400'}
+                        `}
+                    >
+                        Tap to Awaken
+                    </span>
                 </div>
 
                 {/* Status Footer */}
-                <div className={`mt-20 flex flex-col items-center gap-3 transition-opacity duration-700 ${isExiting ? 'opacity-0' : 'opacity-100'}`}>
+                <div className={`mt-16 flex flex-col items-center gap-3 transition-opacity duration-700 ${isExiting ? 'opacity-0' : 'opacity-100'}`}>
                     <div className="flex gap-1.5">
                         <span className="w-1 h-1 rounded-full bg-purple-500/50 animate-pulse"></span>
                         <span className="w-1 h-1 rounded-full bg-purple-500 animate-pulse [animation-delay:200ms]"></span>
