@@ -9,9 +9,9 @@ import {
 } from './services/firebaseService';
 import AuthScreen from './components/AuthScreen';
 import SplashScreen from './components/SplashScreen'; 
+import LoadingScreen from './components/LoadingScreen'; // ✅ IMPORTED NEW LOADING SCREEN
 import { UserData } from './types';
 import ChatDashboard from './components/ChatDashboard';
-import { Loader2 } from 'lucide-react';
 
 /**
  * APP CORE ORCHESTRATOR
@@ -150,20 +150,10 @@ const App: React.FC = () => {
     return <AuthScreen />;
   }
 
+  // ✅ FIXED: Replaced the old static text with the new Loading Screen!
   // Loading / Initialization State (Neural Sync Overlay)
   if (isLoading || (user && !userData)) {
-    return (
-      <div className="flex flex-col items-center justify-center h-screen bg-zinc-950 text-white font-sans">
-        <div className="relative mb-6">
-          <div className="absolute -inset-4 bg-purple-600/20 rounded-full blur-2xl animate-pulse"></div>
-          <Loader2 className="w-10 h-10 text-purple-600 animate-spin relative" />
-        </div>
-        <div className="text-zinc-500 text-[10px] uppercase tracking-[0.3em] animate-pulse font-black text-center">
-          Syncing Neural Interface<br/>
-          <span className="text-[8px] opacity-50 tracking-widest mt-2 block">Verifying Bio-Metrics</span>
-        </div>
-      </div>
-    );
+    return <LoadingScreen isReady={false} />;
   }
 
   return (
