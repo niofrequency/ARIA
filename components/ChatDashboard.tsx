@@ -3,6 +3,7 @@ import { Bot, CharacterProfile, Conversation, Message, UserData } from '../types
 import Sidebar from './Sidebar';
 import MainChatArea from './MainChatArea';
 import BotCustomizationModal from './BotCustomizationModal';
+import LoadingScreen from './LoadingScreen';
 import { 
   saveBotToFirestore, 
   loadBotsFromFirestore, 
@@ -321,73 +322,74 @@ const handleDeleteBot = async (botId: string) => {
   const currentMessages = currentBotConversations.find(c => c.id === currentConversationId)?.messages || [];
 
 return (
-    <div className={`flex h-[100dvh] ${theme === 'dark' ? 'bg-zinc-950' : 'bg-zinc-50'} text-zinc-100 overflow-hidden`}>
-      <Sidebar
-        bots={bots}
-        selectedBotId={selectedBotId}
-        onSelectBot={handleSelectBot}
-        onNewBot={handleNewBot}
-        conversations={currentBotConversations}
-        onSelectConversation={setCurrentConversationId}
-        onDeleteConversation={() => {}} 
-        onDeleteBot={handleDeleteBot}
-        onSignOut={onSignOut}
-        theme={theme}
-        onToggleTheme={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
-        isMobileSidebarOpen={isMobileSidebarOpen}
-        onCloseMobileSidebar={() => setIsMobileSidebarOpen(false)}
-        isDesktopSidebarOpen={isDesktopSidebarOpen}
-        onToggleDesktopSidebar={() => setIsDesktopSidebarOpen(prev => !prev)}
-      />
-      
-      {/* LAYOUT FIX: 
-         1. transition-all duration-300: Matches sidebar animation speed.
-         2. lg:ml-[280px]: Pushes content right when sidebar is open on desktop.
-         3. flex-1: Ensures it fills remaining space.
-      */}
-      <main 
-        className={`flex-1 flex flex-col h-full transition-all duration-300 ease-in-out ${
-          isDesktopSidebarOpen ? 'lg:ml-[280px]' : 'lg:ml-0'
-        }`}
-      >
-        {selectedBot ? (
-          <MainChatArea
-            character={selectedBot.characterProfile}
-            botId={selectedBot.id}
-            messages={currentMessages}
-            userData={userData}
-            onImageGenerated={onImageGenerated}
-            onSendMessage={handleSendMessage}
-            onUpdateMessage={handleUpdateMessage}
-            onToggleMobileSidebar={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
-            onToggleDesktopSidebar={() => setIsDesktopSidebarOpen(!isDesktopSidebarOpen)}
-            isDesktopSidebarOpen={isDesktopSidebarOpen}
-            isLoadingResponse={isLoadingResponse}
-            onOpenBotCustomization={setShowCustomizationModalForBotId}
-            setIsLoading={setIsLoadingResponse}
-          />
-        ) : (
-          /* Handle Empty State (Optional) */
-          <div className="flex-1 flex items-center justify-center text-zinc-500 text-sm uppercase tracking-widest">
-            Select a companion
-          </div>
-        )}
-      </main>
+    <>
+      {/* ✅ Add the Loading Screen as an overlay that fades out when ready */}
+      <LoadingScreen isReady={isInitialLoadComplete} />
 
-      {showCustomizationModalForBotId && (
-        <BotCustomizationModal
-          character={bots.find(b => b.id === showCustomizationModalForBotId)?.characterProfile || defaultNewBotCharacter}
-          onSave={(u) => handleSaveBotCustomization(showCustomizationModalForBotId, u)}
-          onClose={() => { 
-            const wasInitial = isBotBeingCustomizedInitial;
-            setShowCustomizationModalForBotId(null); 
-            setIsBotBeingCustomizedInitial(false);
-            if(wasInitial) handleDeleteBot(showCustomizationModalForBotId); 
-          }}
-          isNewBot={isBotBeingCustomizedInitial}
+      <div className={`flex h-[100dvh] ${theme === 'dark' ? 'bg-zinc-950' : 'bg-zinc-50'} text-zinc-100 overflow-hidden`}>
+        <Sidebar
+          bots={bots}
+          selectedBotId={selectedBotId}
+          onSelectBot={handleSelectBot}
+          onNewBot={handleNewBot}
+          conversations={currentBotConversations}
+          onSelectConversation={setCurrentConversationId}
+          onDeleteConversation={() => {}} 
+          onDeleteBot={handleDeleteBot}
+          onSignOut={onSignOut}
+          theme={theme}
+          onToggleTheme={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
+          isMobileSidebarOpen={isMobileSidebarOpen}
+          onCloseMobileSidebar={() => setIsMobileSidebarOpen(false)}
+          isDesktopSidebarOpen={isDesktopSidebarOpen}
+          onToggleDesktopSidebar={() => setIsDesktopSidebarOpen(prev => !prev)}
         />
-      )}
-    </div>
+        
+        <main 
+          className={`flex-1 flex flex-col h-full transition-all duration-300 ease-in-out ${
+            isDesktopSidebarOpen ? 'lg:ml-[280px]' : 'lg:ml-0'
+          }`}
+        >
+          {selectedBot ? (
+            <MainChatArea
+              character={selectedBot.characterProfile}
+              botId={selectedBot.id}
+              messages={currentMessages}
+              userData={userData}
+              onImageGenerated={onImageGenerated}
+              onSendMessage={handleSendMessage}
+              onUpdateMessage={handleUpdateMessage}
+              onToggleMobileSidebar={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
+              onToggleDesktopSidebar={() => setIsDesktopSidebarOpen(!isDesktopSidebarOpen)}
+              isDesktopSidebarOpen={isDesktopSidebarOpen}
+              isLoadingResponse={isLoadingResponse}
+              onOpenBotCustomization={setShowCustomizationModalForBotId}
+              setIsLoading={setIsLoadingResponse}
+            />
+          ) : (
+            /* ✅ Updated Empty State with Logo */
+            <div className="flex-1 flex flex-col items-center justify-center bg-zinc-950 text-zinc-500">
+              <img src="/img/ARIA-LOGO.PNG" alt="Aria" className="w-12 h-12 opacity-20 mb-4 grayscale" />
+              <h1 className="tracking-widest uppercase text-[10px] font-bold">Awaiting Neural Link</h1>
+            </div>
+          )}
+        </main>
+
+        {showCustomizationModalForBotId && (
+          <BotCustomizationModal
+            character={bots.find(b => b.id === showCustomizationModalForBotId)?.characterProfile || defaultNewBotCharacter}
+            onSave={(u) => handleSaveBotCustomization(showCustomizationModalForBotId, u)}
+            onClose={() => { 
+              const wasInitial = isBotBeingCustomizedInitial;
+              setShowCustomizationModalForBotId(null); 
+              setIsBotBeingCustomizedInitial(false);
+              if(wasInitial) handleDeleteBot(showCustomizationModalForBotId); 
+            }}
+            isNewBot={isBotBeingCustomizedInitial}
+          />
+        )}
+      </div>
+    </>
   );
 };
 
