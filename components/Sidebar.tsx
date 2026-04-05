@@ -33,10 +33,9 @@ const Sidebar: React.FC<SidebarProps> = ({
   onToggleDesktopSidebar,
 }) => {
   
-  // Helper to auto-close sidebar on mobile interactions
   const handleMobileAction = (action: () => void) => {
     action();
-    if (window.innerWidth < 1024) { // Check if on mobile/tablet
+    if (window.innerWidth < 1024) {
       onCloseMobileSidebar();
     }
   };
@@ -45,7 +44,7 @@ return (
     <>
       {/* Overlay for mobile sidebar */}
       <div
-        className={`fixed inset-0 bg-black/80 backdrop-blur-sm z-[90] lg:hidden transition-opacity duration-300 ${ // UPDATED: z-[90]
+        className={`fixed inset-0 bg-black/80 backdrop-blur-sm z-[90] lg:hidden transition-opacity duration-300 ${
           isMobileSidebarOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
         }`}
         onClick={onCloseMobileSidebar}
@@ -58,15 +57,15 @@ return (
           transition-transform duration-300 ease-in-out
           ${isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
           ${isDesktopSidebarOpen ? 'lg:translate-x-0' : 'lg:-translate-x-full'}
-        `} // UPDATED: z-[100] ensures it sits above the Chat Input
+        `}
       >
-        {/* Tech Background for Sidebar */}
+        {/* Tech Background */}
         <div className="absolute inset-0 z-0 opacity-10 pointer-events-none" 
              style={{ backgroundImage: 'linear-gradient(#27272a 1px, transparent 1px), linear-gradient(90deg, #27272a 1px, transparent 1px)', backgroundSize: '30px 30px' }}>
         </div>
 
-        {/* Brand Header */}
-        <div className="relative z-10 p-6 flex items-center justify-between border-b border-white/5 bg-zinc-900/20 backdrop-blur-md">
+        {/* ✅ Brand Header - FIXED FOR iOS SAFE AREA */}
+        <div className={`relative z-10 flex items-center justify-between border-b border-white/5 bg-zinc-900/20 backdrop-blur-md px-6 pb-6 pt-[calc(env(safe-area-inset-top,0px)+1.5rem)]`}>
           <div className="flex items-center gap-3">
             <div className="relative">
               <div className="absolute -inset-1 bg-purple-600/30 rounded-full blur-sm animate-pulse"></div>
@@ -78,19 +77,16 @@ return (
           </div>
           
           <div className="flex items-center gap-1">
-            {/* Desktop Fold Button */}
             <button 
               onClick={(e) => {
                 e.stopPropagation();
                 onToggleDesktopSidebar();
               }} 
               className="hidden lg:flex p-2 text-zinc-500 hover:text-white hover:bg-white/5 rounded-lg transition-all"
-              title={isDesktopSidebarOpen ? "Collapse Sidebar" : "Expand Sidebar"}
             >
               <PanelLeftClose className={`w-5 h-5 transition-transform duration-300 ${!isDesktopSidebarOpen ? 'rotate-180' : ''}`} />
             </button>
 
-            {/* Mobile Close Button */}
             <button 
               onClick={onCloseMobileSidebar} 
               className="lg:hidden p-2 text-zinc-500 hover:text-white"
@@ -112,7 +108,7 @@ return (
           </button>
         </div>
 
-        {/* My Companions Section */}
+        {/* Neural Profiles Section */}
         <section className="relative z-10 flex-1 px-4 overflow-hidden flex flex-col mt-2">
           <div className="flex items-center justify-between mb-4 px-2">
             <h3 className="text-[10px] uppercase tracking-[0.3em] text-zinc-500 font-bold flex items-center gap-2">
@@ -155,7 +151,6 @@ return (
                       onClick={(e) => {
                           e.stopPropagation();
                           if (window.confirm(`Terminate connection with ${bot.name}?`)) {
-                            // Close sidebar BEFORE triggering the delete to prevent UI hang feeling
                             if (window.innerWidth < 1024) onCloseMobileSidebar();
                             onDeleteBot(bot.id);
                           }
@@ -171,8 +166,7 @@ return (
         </section>
 
         {/* Bottom Actions Area */}
-        <div className="relative z-10 p-4 mt-auto space-y-2 border-t border-white/5 bg-zinc-950/80 backdrop-blur-xl">
-          {/* Logout Button */}
+        <div className="relative z-10 p-4 mt-auto space-y-2 border-t border-white/5 bg-zinc-950/80 backdrop-blur-xl pb-[calc(env(safe-area-inset-bottom,0px)+1rem)]">
           <button
             onClick={() => handleMobileAction(onSignOut)}
             className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-red-500/5 text-zinc-500 hover:text-red-400 transition-all group"
@@ -183,7 +177,6 @@ return (
             <span className="text-[10px] uppercase tracking-[0.3em] font-bold">Terminate Session</span>
           </button>
 
-          {/* Secure Branding */}
           <div className="pt-2 flex items-center justify-center gap-2 opacity-30">
              <ShieldCheck className="w-3 h-3 text-purple-500" />
              <span className="text-[8px] uppercase tracking-[0.2em] text-zinc-500">Secure Protocol v2.5</span>
