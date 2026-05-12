@@ -5,113 +5,129 @@ const LoadingScreen = ({ isReady }: { isReady: boolean }) => {
   const [isVisible, setIsVisible] = useState(true);
 
   useEffect(() => {
-    // Simulate a rapid boot sequence
     const interval = setInterval(() => {
       setProgress((old) => {
-        if (old >= 90) return 90; // Hold at 90% until Firebase says 'isReady'
-        return old + Math.floor(Math.random() * 12) + 2;
+        if (old >= 92) return 92; // Hold just before 100 until ready
+        const increment = Math.floor(Math.random() * 9) + 3;
+        return Math.min(92, old + increment);
       });
-    }, 60);
+    }, 45);
 
-    // When Firebase finishes loading
-    if (isReady) {
+    if (isReady && progress >= 92) {
       setProgress(100);
-      // Wait a bit longer so the user sees the satisfying 100% "lock in" animation
-      setTimeout(() => setIsVisible(false), 800); 
+      setTimeout(() => {
+        setIsVisible(false);
+      }, 900);
     }
 
     return () => clearInterval(interval);
-  }, [isReady]);
+  }, [isReady, progress]);
+
+  const getStatusText = () => {
+    if (progress === 100) return "SYSTEM ONLINE";
+    if (progress >= 85) return "ESTABLISHING NEURAL LINK";
+    if (progress > 60) return "SYNCING BIO-SIGNATURE";
+    if (progress > 35) return "LOADING QUANTUM CORE";
+    return "INITIALIZING ARIA PROTOCOL";
+  };
 
   if (!isVisible) return null;
 
-  // Dynamic text that changes based on the fake loading progress
-  const getStatusText = () => {
-    if (progress === 100) return "SYSTEM READY";
-    if (progress >= 90 && !isReady) return "AWAITING SERVER HANDSHAKE";
-    if (progress > 60) return "SYNCING BIO-METRICS";
-    if (progress > 30) return "DECRYPTING NEURAL PATHWAYS";
-    return "INITIALIZING PROTOCOLS";
-  };
-
   return (
-    <div className={`fixed inset-0 z-[999] bg-[#050507] flex flex-col items-center justify-center transition-all duration-700 ease-in-out ${progress === 100 ? 'opacity-0 delay-300' : 'opacity-100'}`}>
-      
-      {/* Subtle Background Grid */}
-      <div 
-          className="absolute inset-0 z-0 opacity-10" 
-          style={{ 
-              backgroundImage: `radial-gradient(#4f46e5 0.5px, transparent 0.5px)`,
-              backgroundSize: '30px 30px' 
-          }}
+    <div className="fixed inset-0 z-[999] bg-[#050507] flex flex-col items-center justify-center overflow-hidden">
+      {/* Subtle animated grid background */}
+      <div
+        className="absolute inset-0 opacity-10"
+        style={{
+          backgroundImage: `radial-gradient(circle at 25px 25px, #4f46e5 1px, transparent 0)`,
+          backgroundSize: '50px 50px',
+          animation: 'gridMove 25s linear infinite',
+        }}
       />
 
-      <div className="relative z-10 flex flex-col items-center">
-        
-        {/* Top Logo Area */}
-        <div className="mb-12 relative flex flex-col items-center">
-          <div className={`absolute -inset-8 bg-purple-600/10 rounded-full blur-2xl transition-all duration-700 ${progress === 100 ? 'bg-purple-500/40 scale-150' : 'animate-pulse'}`}></div>
-          <img src="/img/ARIA-LOGO.PNG" alt="Aria AI" className="w-14 h-14 relative object-contain mb-3 drop-shadow-[0_0_15px_rgba(147,51,234,0.3)]" />
-          <span className="text-lg font-light text-white tracking-[0.3em] uppercase relative">
-            Aria <span className="text-purple-500 font-bold">AI</span>
+      <div className="relative z-10 flex flex-col items-center w-full max-w-md px-8">
+        {/* Logo Area */}
+        <div className="mb-16 flex flex-col items-center">
+          <div className="relative mb-6">
+            <div
+              className={`absolute -inset-12 bg-gradient-to-br from-purple-600/20 to-transparent rounded-full blur-3xl transition-all duration-1000 ${
+                progress === 100 ? 'scale-150 opacity-70' : 'animate-pulse'
+              }`}
+            />
+            <img
+              src="/img/ARIA-LOGO.PNG"
+              alt="Aria AI"
+              className="w-16 h-16 object-contain drop-shadow-[0_0_25px_rgba(168,85,247,0.5)]"
+            />
+          </div>
+          <span className="text-xl font-light tracking-[0.5em] text-white uppercase">
+            Aria <span className="font-semibold text-purple-400">AI</span>
           </span>
         </div>
 
-        {/* CIRCULAR NEURAL LOADER */}
-        <div className="relative w-48 h-48 flex items-center justify-center">
-          
-          {/* Outer Dashed Ring (Slow Spin) */}
-          <div className={`absolute inset-0 rounded-full border border-dashed transition-all duration-500 ease-out
-            ${progress === 100 
-              ? 'border-purple-500/80 scale-110 shadow-[0_0_30px_rgba(147,51,234,0.4)] rotate-0' 
-              : 'border-purple-500/20 animate-[spin_12s_linear_infinite]'
-            }`}
-          />
+        {/* Premium Progress Bar */}
+        <div className="w-full relative">
+          {/* Track */}
+          <div className="h-px w-full bg-zinc-800 relative overflow-hidden">
+            {/* Glow line */}
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-purple-500/30 to-transparent" />
+          </div>
 
-          {/* Middle Broken Ring (Reverse Fast Spin) */}
-          <div className={`absolute inset-3 rounded-full border-t-2 border-l-2 transition-all duration-500 ease-out
-            ${progress === 100 
-              ? 'border-white scale-105 rotate-45' 
-              : 'border-purple-400/60 animate-[spin_4s_linear_infinite_reverse]'
-            }`}
-          />
+          {/* Progress Fill */}
+          <div
+            className="h-px bg-gradient-to-r from-purple-400 via-purple-500 to-purple-400 relative transition-all duration-200 ease-out"
+            style={{ width: `${progress}%` }}
+          >
+            {/* Shine effect */}
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent animate-[shine_1.5s_linear_infinite]" />
+          </div>
 
-          {/* Inner Dotted Ring (Normal Spin) */}
-          <div className={`absolute inset-6 rounded-full border-2 border-dotted transition-all duration-500 ease-out
-            ${progress === 100 
-              ? 'border-transparent scale-125' 
-              : 'border-white/10 animate-[spin_8s_linear_infinite]'
-            }`}
-          />
-
-          {/* Center Percentage Display */}
-          <div className="relative z-10 flex flex-col items-center justify-center">
-            <div className={`tabular-nums font-light transition-all duration-300
-              ${progress === 100 
-                ? 'text-4xl text-white font-bold drop-shadow-[0_0_15px_rgba(255,255,255,0.8)] scale-110' 
-                : 'text-5xl text-purple-100'
-              }`}
-            >
-              {progress}
+          {/* Percentage */}
+          <div className="mt-4 flex justify-between items-baseline text-sm tabular-nums">
+            <span className="text-purple-400/80 text-xs tracking-widest">PROGRESS</span>
+            <div className="flex items-center gap-1">
+              <span
+                className={`font-light text-5xl transition-all duration-300 text-white ${
+                  progress === 100 ? 'tracking-normal' : ''
+                }`}
+              >
+                {progress}
+              </span>
+              <span className="text-purple-400/70 text-2xl font-light -translate-y-1">%</span>
             </div>
-            <span className={`text-[8px] uppercase tracking-[0.4em] mt-1 transition-colors duration-300
-              ${progress === 100 ? 'text-white' : 'text-purple-500/80 font-bold'}`}
-            >
-              Percent
-            </span>
           </div>
         </div>
 
-        {/* Dynamic Status Text Footer */}
-        <div className="mt-12 h-6 flex items-center justify-center">
-          <p className={`text-[10px] tracking-[0.4em] uppercase font-bold transition-all duration-300
-            ${progress === 100 ? 'text-white drop-shadow-[0_0_10px_rgba(147,51,234,0.8)] scale-110' : 'text-zinc-500 animate-pulse'}`}
+        {/* Status Text */}
+        <div className="mt-12 h-7 flex items-center">
+          <p
+            className={`text-[10px] font-mono uppercase tracking-[0.35em] transition-all duration-500 ${
+              progress === 100
+                ? 'text-white drop-shadow-[0_0_8px_rgba(168,85,247,0.9)]'
+                : 'text-zinc-500'
+            }`}
           >
             {getStatusText()}
           </p>
         </div>
-
       </div>
+
+      {/* Bottom subtle branding */}
+      <div className="absolute bottom-8 text-[9px] text-zinc-700 tracking-widest font-mono">
+        NEURAL v0.9 • SECURE BOOT SEQUENCE
+      </div>
+
+      <style jsx>{`
+        @keyframes gridMove {
+          0% { background-position: 0 0; }
+          100% { background-position: 50px 50px; }
+        }
+        
+        @keyframes shine {
+          0% { transform: translateX(-150%); }
+          100% { transform: translateX(400%); }
+        }
+      `}</style>
     </div>
   );
 };
