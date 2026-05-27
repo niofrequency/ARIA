@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { CharacterProfile } from '../types';
-import { X, Save, Sparkles, Cpu, Fingerprint, Activity, Loader2, Plus, AlertCircle, Heart, Camera, Box } from 'lucide-react';
+import { X, Save, Sparkles, Cpu, Fingerprint, Activity, Loader2, Plus, Heart, Camera, Box } from 'lucide-react';
 
 interface BotCustomizationModalProps {
   character: CharacterProfile;
@@ -9,13 +9,13 @@ interface BotCustomizationModalProps {
   isNewBot?: boolean;
 }
 
-// Extended CharacterProfile (add these fields to your type)
+// Extended CharacterProfile
 export interface ExtendedCharacterProfile extends CharacterProfile {
   bodyType?: string;
   preferredAngles?: string[];
   preferredShotTypes?: string[];
-  favoriteLoras?: string[];           // e.g. ["hairypussyv7.safetensors", "ENZOM_BJ.safetensors"]
-  nsfwSpecialties?: string[];         // e.g. ["creampie", "twerk", "fingering"]
+  favoriteLoras?: string[];
+  nsfwSpecialties?: string[];
   aestheticStyle?: string;
 }
 
@@ -56,7 +56,21 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [ageError, setAgeError] = useState<string | null>(null);
 
-  // ... (keep your existing useEffect for scroll lock)
+  // Scroll Lock + Escape Key
+  useEffect(() => {
+    const originalStyle = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+
+    window.addEventListener('keydown', handleEsc);
+    return () => {
+      document.body.style.overflow = originalStyle;
+      window.removeEventListener('keydown', handleEsc);
+    };
+  }, [onClose]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -69,7 +83,7 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({
 
   const toggleArrayItem = (field: keyof ExtendedCharacterProfile, value: string) => {
     setFormData(prev => {
-      const current = Array.isArray(prev[field]) ? prev[field] : [];
+      const current = Array.isArray(prev[field]) ? prev[field] as string[] : [];
       const newArray = current.includes(value)
         ? current.filter(item => item !== value)
         : [...current, value];
@@ -79,16 +93,19 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({
 
   const handleAddTag = (field: 'hair' | 'face' | 'body') => {
     const value = tagInputs[field].trim().toLowerCase();
-    if (!value || formData[field].includes(value)) return;
+    if (!value || (formData[field] as string[]).includes(value)) return;
 
-    setFormData(prev => ({ ...prev, [field]: [...prev[field], value] }));
+    setFormData(prev => ({
+      ...prev,
+      [field]: [...(prev[field] as string[]), value]
+    }));
     setTagInputs(prev => ({ ...prev, [field]: '' }));
   };
 
   const handleRemoveTag = (field: 'hair' | 'face' | 'body', tag: string) => {
     setFormData(prev => ({
       ...prev,
-      [field]: prev[field].filter(t => t !== tag)
+      [field]: (prev[field] as string[]).filter(t => t !== tag)
     }));
   };
 
@@ -104,23 +121,22 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({
       await onSave(formData);
       onClose();
     } catch (err) {
-      console.error(err);
+      console.error("Failed to save character:", err);
     } finally {
       setIsSaving(false);
     }
   };
 
-  // Render Tag Field (unchanged but cleaner)
   const renderTagField = (field: 'hair' | 'face' | 'body', label: string, placeholder: string) => (
     <div className="space-y-2">
       <label className="block text-[10px] uppercase tracking-[0.2em] text-zinc-500 font-bold ml-1">
         {label}
       </label>
       <div className="flex flex-wrap gap-2 p-3 bg-white/[0.02] border border-white/10 rounded-xl min-h-[52px]">
-        {formData[field].map((tag, idx) => (
+        {(formData[field] as string[]).map((tag, idx) => (
           <div key={idx} className="flex items-center gap-1.5 px-3 py-1 bg-purple-500/10 border border-purple-500/20 text-purple-400 text-[11px] rounded-lg">
             {tag}
-            <button onClick={() => handleRemoveTag(field, tag)} className="hover:text-white">
+            <button onClick={() => handleRemoveTag(field, tag)} className="hover:text-white transition-colors">
               <X className="w-3 h-3" />
             </button>
           </div>
@@ -142,8 +158,10 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 backdrop-blur-sm p-2" onClick={onClose}>
-      <div className="relative w-full max-w-2xl max-h-[92dvh] bg-zinc-950 border border-white/10 rounded-3xl overflow-hidden" onClick={e => e.stopPropagation()}>
-        
+      <div 
+        className="relative w-full max-w-2xl max-h-[92dvh] bg-zinc-950 border border-white/10 rounded-3xl overflow-hidden" 
+        onClick={e => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="p-8 pb-6 border-b border-white/5">
           <div className="flex items-center gap-3 mb-2">
@@ -164,12 +182,52 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({
               <h3 className="uppercase text-xs tracking-widest text-zinc-400 font-bold">Core Identity</h3>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>{/* name, age, gender, ethnicity inputs */}</div>
-              {/* Keep your existing renderInput for name, age, gender, ethnicity */}
+              <div>
+                <label className="block text-[10px] uppercase tracking-[0.2em] text-zinc-500 mb-1.5">Designation</label>
+                <input
+                  name="name"
+                  value={formData.name || ''}
+                  onChange={handleChange}
+                  className="w-full bg-white/[0.02] border border-white/10 rounded-xl px-4 py-3 text-sm"
+                  placeholder="Interface Name"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] uppercase tracking-[0.2em] text-zinc-500 mb-1.5">Age</label>
+                <input
+                  type="number"
+                  name="age"
+                  value={formData.age || ''}
+                  onChange={handleChange}
+                  className="w-full bg-white/[0.02] border border-white/10 rounded-xl px-4 py-3 text-sm"
+                  placeholder="18"
+                />
+                {ageError && <p className="text-red-500 text-xs mt-1">{ageError}</p>}
+              </div>
+              <div>
+                <label className="block text-[10px] uppercase tracking-[0.2em] text-zinc-500 mb-1.5">Gender</label>
+                <input
+                  name="gender"
+                  value={formData.gender || ''}
+                  onChange={handleChange}
+                  className="w-full bg-white/[0.02] border border-white/10 rounded-xl px-4 py-3 text-sm"
+                  placeholder="female"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] uppercase tracking-[0.2em] text-zinc-500 mb-1.5">Ethnicity</label>
+                <input
+                  name="ethnicity"
+                  value={formData.ethnicity || ''}
+                  onChange={handleChange}
+                  className="w-full bg-white/[0.02] border border-white/10 rounded-xl px-4 py-3 text-sm"
+                  placeholder="Asian, Latina, etc."
+                />
+              </div>
             </div>
           </div>
 
-          {/* Morphological Specs */}
+          {/* Morphological Profile */}
           <div className="space-y-6">
             <div className="flex items-center gap-2">
               <Box className="w-4 h-4 text-zinc-400" />
@@ -177,11 +235,11 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({
             </div>
 
             <div className="grid grid-cols-1 gap-8">
-              {renderTagField('hair', 'Hair Configuration', 'long silver hair, bangs, ponytail')}
-              {renderTagField('face', 'Facial Details', 'heterochromia, full lips, beauty mark')}
-              {renderTagField('body', 'Body Details', 'thick thighs, slim waist, tan skin')}
+              {renderTagField('hair', 'Hair Configuration', 'long silver hair, bangs...')}
+              {renderTagField('face', 'Facial Details', 'blue eyes, freckles...')}
+              {renderTagField('body', 'Body Details', 'thick thighs, slim waist...')}
 
-              {/* New: Body Type */}
+              {/* Body Type */}
               <div>
                 <label className="block text-[10px] uppercase tracking-widest text-zinc-500 mb-3">Primary Body Type</label>
                 <div className="flex flex-wrap gap-2">
@@ -199,7 +257,6 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({
                 </div>
               </div>
 
-              {/* Outfit */}
               <textarea
                 name="outfit"
                 value={formData.outfit || ''}
@@ -210,14 +267,13 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({
             </div>
           </div>
 
-          {/* Imaging & Generation Preferences */}
+          {/* Generation Preferences */}
           <div className="space-y-6">
             <div className="flex items-center gap-2">
               <Camera className="w-4 h-4 text-zinc-400" />
               <h3 className="uppercase text-xs tracking-widest text-zinc-400 font-bold">Generation Preferences</h3>
             </div>
 
-            {/* Preferred Angles */}
             <div>
               <label className="block text-[10px] uppercase tracking-widest text-zinc-500 mb-3">Preferred Camera Angles</label>
               <div className="flex flex-wrap gap-2">
@@ -235,7 +291,6 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({
               </div>
             </div>
 
-            {/* Shot Types */}
             <div>
               <label className="block text-[10px] uppercase tracking-widest text-zinc-500 mb-3">Preferred Shot Types</label>
               <div className="flex flex-wrap gap-2">
@@ -253,7 +308,6 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({
               </div>
             </div>
 
-            {/* Favorite LoRAs */}
             <div>
               <label className="block text-[10px] uppercase tracking-widest text-zinc-500 mb-3">Favorite LoRAs (Qwen AIO)</label>
               <div className="flex flex-wrap gap-2">
@@ -271,19 +325,17 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({
               </div>
             </div>
 
-            {/* NSFW Specialties */}
             <div>
               <label className="block text-[10px] uppercase tracking-widest text-zinc-500 mb-3 flex items-center gap-2">
                 <Heart className="w-4 h-4" /> NSFW Specialties
               </label>
               <input
                 type="text"
-                placeholder="creampie, ahegao, paizuri, breeding, etc."
+                placeholder="creampie, ahegao, breeding..."
                 className="w-full bg-white/[0.02] border border-white/10 rounded-xl px-4 py-3 text-sm"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && e.currentTarget.value.trim()) {
-                    const val = e.currentTarget.value.trim();
-                    toggleArrayItem('nsfwSpecialties', val);
+                    toggleArrayItem('nsfwSpecialties', e.currentTarget.value.trim());
                     e.currentTarget.value = '';
                   }
                 }}
@@ -299,31 +351,42 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({
             </div>
           </div>
 
-          {/* Behavioral + Negative Prompt */}
+          {/* Behavioral & Negative Prompt */}
           <div className="space-y-6">
+            <div className="flex items-center gap-2">
+              <Activity className="w-4 h-4 text-zinc-400" />
+              <h3 className="uppercase text-xs tracking-widest text-zinc-400 font-bold">Behavioral Logic</h3>
+            </div>
             {renderTagField('vibe', 'Personality Matrix', 'bratty, submissive, teasing...')}
-            <textarea
-              name="negativePrompt"
-              value={formData.negativePrompt || ''}
-              onChange={handleChange}
-              placeholder="Negative prompt for this character..."
-              className="w-full bg-white/[0.02] border border-white/10 rounded-2xl p-4 text-sm min-h-[100px]"
-            />
+
+            <div>
+              <label className="block text-[10px] uppercase tracking-widest text-zinc-500 mb-2">Negative Prompt</label>
+              <textarea
+                name="negativePrompt"
+                value={formData.negativePrompt || ''}
+                onChange={handleChange}
+                placeholder="low quality, blurry, deformed, extra limbs..."
+                className="w-full bg-white/[0.02] border border-white/10 rounded-2xl p-4 text-sm min-h-[100px]"
+              />
+            </div>
           </div>
         </div>
 
         {/* Footer */}
         <div className="p-8 border-t border-white/5 flex gap-4">
-          <button onClick={onClose} className="flex-1 py-4 rounded-2xl border border-white/10 text-zinc-400 hover:bg-white/5">
+          <button 
+            onClick={onClose} 
+            className="flex-1 py-4 rounded-2xl border border-white/10 text-zinc-400 hover:bg-white/5 transition-all"
+          >
             Cancel
           </button>
           <button 
             onClick={handleSubmit}
             disabled={isSaving}
-            className="flex-1 py-4 bg-purple-600 hover:bg-purple-500 rounded-2xl font-bold tracking-widest text-sm flex items-center justify-center gap-2 disabled:opacity-70"
+            className="flex-1 py-4 bg-purple-600 hover:bg-purple-500 rounded-2xl font-bold tracking-widest text-sm flex items-center justify-center gap-2 disabled:opacity-70 transition-all"
           >
-            {isSaving ? <Loader2 className="animate-spin" /> : isNewBot ? <Sparkles /> : <Save />}
-            {isSaving ? 'Saving Profile...' : isNewBot ? 'Initialize Neural Link' : 'Save Character'}
+            {isSaving ? <Loader2 className="animate-spin w-5 h-5" /> : isNewBot ? <Sparkles className="w-5 h-5" /> : <Save className="w-5 h-5" />}
+            {isSaving ? 'Saving...' : isNewBot ? 'Initialize Neural Link' : 'Save Character'}
           </button>
         </div>
       </div>
