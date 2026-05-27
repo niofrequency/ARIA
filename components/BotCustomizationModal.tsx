@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { CharacterProfile } from '../types';
-import { X, Save, Sparkles, Cpu, Fingerprint, Activity, Loader2, Plus, AlertCircle } from 'lucide-react';
- 
+import { X, Save, Sparkles, Cpu, Fingerprint, Activity, Loader2, Plus, AlertCircle, Heart, Camera, Box } from 'lucide-react';
+
 interface BotCustomizationModalProps {
   character: CharacterProfile;
   onSave: (updatedCharacter: CharacterProfile) => void;
@@ -9,128 +9,118 @@ interface BotCustomizationModalProps {
   isNewBot?: boolean;
 }
 
-const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({ character, onSave, onClose, isNewBot = false }) => {
-  // --- UPGRADED INITIALIZATION (ARRAY SAFETY) ---
-  // Ensures components don't crash if old character data (strings) is loaded.
-  const [formData, setFormData] = useState<CharacterProfile>({
+// Extended CharacterProfile (add these fields to your type)
+export interface ExtendedCharacterProfile extends CharacterProfile {
+  bodyType?: string;
+  preferredAngles?: string[];
+  preferredShotTypes?: string[];
+  favoriteLoras?: string[];           // e.g. ["hairypussyv7.safetensors", "ENZOM_BJ.safetensors"]
+  nsfwSpecialties?: string[];         // e.g. ["creampie", "twerk", "fingering"]
+  aestheticStyle?: string;
+}
+
+const BODY_TYPES = ['Petite', 'Slim', 'Athletic', 'Curvy', 'Thick', 'Plus-size', 'Hourglass', 'Random'];
+const CAMERA_ANGLES = ['Eye-level', 'High angle', 'Low angle', 'Three-quarter view', 'Side profile', 'From behind'];
+const SHOT_TYPES = ['Close-up (Face)', 'Close-up (Body)', 'Medium shot', 'Full body', 'Dynamic pose'];
+
+const COMMON_LORAS = [
+  { id: "hairypussyv7.safetensors", name: "Hairy Pussy v7" },
+  { id: "hairypussyv9.safetensors", name: "Hairy Pussy v9" },
+  { id: "ENZOM_BJ.safetensors", name: "Enzo BJ" },
+  { id: "LIMABOG_PUSSY.safetensors", name: "Limabog Pussy" },
+  { id: "qwen4play.safetensors", name: "Qwen 4Play" },
+  { id: "FemNde.safetensors", name: "Fem Nude" },
+  { id: "creampie.safetensors", name: "Creampie" },
+  { id: "twerk.safetensors", name: "Twerk" },
+];
+
+const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({ 
+  character, 
+  onSave, 
+  onClose, 
+  isNewBot = false 
+}) => {
+
+  const [formData, setFormData] = useState<ExtendedCharacterProfile>({
     ...character,
     hair: Array.isArray(character.hair) ? character.hair : [],
     face: Array.isArray(character.face) ? character.face : [],
     body: Array.isArray(character.body) ? character.body : [],
+    preferredAngles: Array.isArray(character.preferredAngles) ? character.preferredAngles : [],
+    preferredShotTypes: Array.isArray(character.preferredShotTypes) ? character.preferredShotTypes : [],
+    favoriteLoras: Array.isArray(character.favoriteLoras) ? character.favoriteLoras : [],
+    nsfwSpecialties: Array.isArray(character.nsfwSpecialties) ? character.nsfwSpecialties : [],
   });
-  
-  const [ageError, setAgeError] = useState<string | null>(null);
+
+  const [tagInputs, setTagInputs] = useState({ hair: '', face: '', body: '' });
   const [isSaving, setIsSaving] = useState(false);
-  
-  // Local state for the text currently being typed in a tag input
-  const [tagInputs, setTagInputs] = useState({
-    hair: '',
-    face: '',
-    body: ''
-  });
+  const [ageError, setAgeError] = useState<string | null>(null);
 
-  // Handle body scroll lock and Escape key listener
-  useEffect(() => {
-    const originalStyle = window.getComputedStyle(document.body).overflow;
-    document.body.style.overflow = 'hidden';
-
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', handleEsc);
-    
-    return () => {
-      document.body.style.overflow = originalStyle;
-      window.removeEventListener('keydown', handleEsc);
-    };
-  }, [onClose]);
+  // ... (keep your existing useEffect for scroll lock)
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    
     if (name === 'age') {
       const ageNum = parseInt(value, 10);
-      if (!isNaN(ageNum) && ageNum >= 18) {
-        setAgeError(null);
-      }
+      if (!isNaN(ageNum) && ageNum >= 18) setAgeError(null);
     }
-    
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  // --- TAG MANAGEMENT LOGIC ---
+  const toggleArrayItem = (field: keyof ExtendedCharacterProfile, value: string) => {
+    setFormData(prev => {
+      const current = Array.isArray(prev[field]) ? prev[field] : [];
+      const newArray = current.includes(value)
+        ? current.filter(item => item !== value)
+        : [...current, value];
+      return { ...prev, [field]: newArray };
+    });
+  };
 
   const handleAddTag = (field: 'hair' | 'face' | 'body') => {
-    const value = tagInputs[field].trim().toLowerCase(); // Normalize to lowercase for consistency
-    if (!value) return;
+    const value = tagInputs[field].trim().toLowerCase();
+    if (!value || formData[field].includes(value)) return;
 
-    // Prevent duplicates
-    if (!formData[field].includes(value)) {
-      setFormData(prev => ({
-        ...prev,
-        [field]: [...prev[field], value]
-      }));
-    }
-
-    // Reset local input
+    setFormData(prev => ({ ...prev, [field]: [...prev[field], value] }));
     setTagInputs(prev => ({ ...prev, [field]: '' }));
   };
 
-  const handleRemoveTag = (field: 'hair' | 'face' | 'body', tagToRemove: string) => {
+  const handleRemoveTag = (field: 'hair' | 'face' | 'body', tag: string) => {
     setFormData(prev => ({
       ...prev,
-      [field]: prev[field].filter(tag => tag !== tagToRemove)
+      [field]: prev[field].filter(t => t !== tag)
     }));
   };
 
-  const handleTagKeyDown = (e: React.KeyboardEvent, field: 'hair' | 'face' | 'body') => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      handleAddTag(field);
-    }
-  };
-
-  const handleSubmit = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (isSaving) return;
-
-    // VALIDATION
-    const ageNum = parseInt(formData.age, 10);
+  const handleSubmit = async () => {
+    const ageNum = parseInt(formData.age as string, 10);
     if (isNaN(ageNum) || ageNum < 18) {
       setAgeError('Neural link requires age 18 or older.');
       return;
     }
-    
-    setAgeError(null);
+
     setIsSaving(true);
-    
     try {
       await onSave(formData);
+      onClose();
     } catch (err) {
-      console.error("Failed to save character:", err);
+      console.error(err);
+    } finally {
       setIsSaving(false);
     }
   };
 
-  // --- RENDER HELPERS ---
-
+  // Render Tag Field (unchanged but cleaner)
   const renderTagField = (field: 'hair' | 'face' | 'body', label: string, placeholder: string) => (
     <div className="space-y-2">
       <label className="block text-[10px] uppercase tracking-[0.2em] text-zinc-500 font-bold ml-1">
         {label}
       </label>
-      <div className="flex flex-wrap gap-2 p-3 bg-white/[0.02] border border-white/10 rounded-xl min-h-[52px] focus-within:border-purple-500/50 transition-all">
+      <div className="flex flex-wrap gap-2 p-3 bg-white/[0.02] border border-white/10 rounded-xl min-h-[52px]">
         {formData[field].map((tag, idx) => (
-          <div 
-            key={`${field}-${idx}`} 
-            className="flex items-center gap-1.5 px-3 py-1 bg-purple-500/10 border border-purple-500/20 text-purple-400 text-[11px] font-bold rounded-lg animate-in zoom-in duration-200"
-          >
+          <div key={idx} className="flex items-center gap-1.5 px-3 py-1 bg-purple-500/10 border border-purple-500/20 text-purple-400 text-[11px] rounded-lg">
             {tag}
-            <button 
-              type="button" 
-              onClick={() => handleRemoveTag(field, tag)}
-              className="hover:text-white transition-colors"
-            >
+            <button onClick={() => handleRemoveTag(field, tag)} className="hover:text-white">
               <X className="w-3 h-3" />
             </button>
           </div>
@@ -139,164 +129,202 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({ character
           type="text"
           value={tagInputs[field]}
           onChange={(e) => setTagInputs(prev => ({ ...prev, [field]: e.target.value }))}
-          onKeyDown={(e) => handleTagKeyDown(e, field)}
-          placeholder={formData[field].length === 0 ? placeholder : "Add more..."}
-          className="flex-1 min-w-[120px] bg-transparent text-sm text-white placeholder-zinc-700 focus:outline-none"
+          onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddTag(field))}
+          placeholder={placeholder}
+          className="flex-1 min-w-[140px] bg-transparent text-sm placeholder-zinc-700 focus:outline-none"
         />
-        <button 
-          type="button"
-          onClick={() => handleAddTag(field)}
-          className="p-1 hover:bg-white/5 rounded-md text-zinc-500 transition-colors"
-        >
+        <button onClick={() => handleAddTag(field)} className="text-zinc-400 hover:text-purple-400">
           <Plus className="w-4 h-4" />
         </button>
       </div>
     </div>
   );
 
-  const renderInput = (
-    name: keyof CharacterProfile, 
-    label: string, 
-    placeholder: string, 
-    type: 'text' | 'number' | 'textarea' = 'text',
-    isAnchor: boolean = false // Added flag for Identity Anchor highlighting
-  ) => (
-    <div className="space-y-1.5">
-      <label htmlFor={name} className={`block text-[10px] uppercase tracking-[0.2em] font-bold ml-1 ${isAnchor ? 'text-purple-500' : 'text-zinc-500'}`}>
-        {isAnchor ? `Identity Anchor (${label})` : label}
-      </label>
-      {type === 'textarea' ? (
-        <textarea
-          id={name}
-          name={name}
-          disabled={isSaving}
-          value={formData[name] as string || ''}
-          onChange={handleChange}
-          placeholder={placeholder}
-          rows={3}
-          className="w-full bg-white/[0.02] border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/50 transition-all resize-none custom-scrollbar disabled:opacity-50"
-        />
-      ) : (
-        <input
-          type={type}
-          id={name}
-          name={name}
-          disabled={isSaving}
-          value={formData[name] as string || ''}
-          onChange={handleChange}
-          placeholder={placeholder}
-          className={`w-full bg-white/[0.02] border rounded-xl px-4 py-3 text-sm text-white placeholder-zinc-600 focus:outline-none focus:ring-1 transition-all disabled:opacity-50 ${isAnchor ? 'border-purple-500/40 focus:border-purple-500 focus:ring-purple-500/50 shadow-[0_0_15px_rgba(147,51,234,0.05)]' : 'border-white/10 focus:border-purple-500/50 focus:ring-purple-500/50'}`}
-        />
-      )}
-    </div>
-  );
-
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 backdrop-blur-sm p-2 sm:p-4 animate-in fade-in duration-300" onClick={onClose}>
-      <div 
-        className="relative w-full max-w-2xl max-h-[90dvh] flex flex-col bg-zinc-950 border border-white/10 rounded-[1.5rem] md:rounded-[2rem] shadow-2xl overflow-hidden" 
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="absolute inset-0 z-0 opacity-10 pointer-events-none" 
-              style={{ backgroundImage: 'linear-gradient(#27272a 1px, transparent 1px), linear-gradient(90deg, #27272a 1px, transparent 1px)', backgroundSize: '30px 30px' }}>
-        </div>
-        <div className="absolute top-0 right-0 w-64 h-64 bg-purple-600/10 rounded-full blur-[100px] z-0 pointer-events-none" />
-
-        {/* Header */}
-        <div className="relative z-10 flex justify-between items-start p-6 md:p-10 pb-4 md:pb-6">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-                <Cpu className="w-4 h-4 text-purple-500" />
-                <span className="text-[10px] uppercase tracking-[0.4em] text-purple-500 font-bold">Neural Configuration</span>
-            </div>
-            <h2 className="text-2xl md:text-3xl font-light text-white tracking-tight">
-              {isNewBot ? 'Initialize' : 'Modify'} <span className="font-semibold text-purple-500">Interface</span>
-            </h2>
-          </div>
-          <button onClick={onClose} disabled={isSaving} className="p-2 bg-white/5 text-zinc-500 hover:text-white rounded-xl transition-all disabled:opacity-30">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 backdrop-blur-sm p-2" onClick={onClose}>
+      <div className="relative w-full max-w-2xl max-h-[92dvh] bg-zinc-950 border border-white/10 rounded-3xl overflow-hidden" onClick={e => e.stopPropagation()}>
         
-        {/* Form Content */}
-        <form onSubmit={handleSubmit} className="relative z-10 flex-1 overflow-y-auto px-6 md:px-10 pb-6 custom-scrollbar space-y-8">
+        {/* Header */}
+        <div className="p-8 pb-6 border-b border-white/5">
+          <div className="flex items-center gap-3 mb-2">
+            <Cpu className="w-5 h-5 text-purple-500" />
+            <span className="uppercase tracking-[0.4em] text-xs text-purple-500 font-bold">Qwen AIO NSFW Profile</span>
+          </div>
+          <h2 className="text-3xl font-light tracking-tight">
+            {isNewBot ? 'Create New' : 'Configure'} <span className="text-purple-500 font-semibold">Interface</span>
+          </h2>
+        </div>
+
+        <div className="overflow-y-auto p-8 space-y-10 custom-scrollbar max-h-[calc(92dvh-180px)]">
           
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 pb-2 border-b border-white/5">
-                <Fingerprint className="w-4 h-4 text-zinc-500" />
-                <h3 className="text-xs uppercase tracking-widest text-zinc-300 font-bold">Core Identity</h3>
+          {/* Core Identity */}
+          <div className="space-y-6">
+            <div className="flex items-center gap-2">
+              <Fingerprint className="w-4 h-4 text-zinc-400" />
+              <h3 className="uppercase text-xs tracking-widest text-zinc-400 font-bold">Core Identity</h3>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {renderInput('name', 'Designation', 'Unique Interface Name', 'text', true)}
-                <div>
-                  {renderInput('age', 'Chronological Age', 'Min. 18', 'number')}
-                  {ageError && <p className="text-red-500 text-[10px] uppercase mt-1 font-bold">{ageError}</p>}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>{/* name, age, gender, ethnicity inputs */}</div>
+              {/* Keep your existing renderInput for name, age, gender, ethnicity */}
+            </div>
+          </div>
+
+          {/* Morphological Specs */}
+          <div className="space-y-6">
+            <div className="flex items-center gap-2">
+              <Box className="w-4 h-4 text-zinc-400" />
+              <h3 className="uppercase text-xs tracking-widest text-zinc-400 font-bold">Morphological Profile</h3>
+            </div>
+
+            <div className="grid grid-cols-1 gap-8">
+              {renderTagField('hair', 'Hair Configuration', 'long silver hair, bangs, ponytail')}
+              {renderTagField('face', 'Facial Details', 'heterochromia, full lips, beauty mark')}
+              {renderTagField('body', 'Body Details', 'thick thighs, slim waist, tan skin')}
+
+              {/* New: Body Type */}
+              <div>
+                <label className="block text-[10px] uppercase tracking-widest text-zinc-500 mb-3">Primary Body Type</label>
+                <div className="flex flex-wrap gap-2">
+                  {BODY_TYPES.map(bt => (
+                    <button
+                      key={bt}
+                      onClick={() => setFormData(prev => ({ ...prev, bodyType: bt }))}
+                      className={`px-4 py-2 rounded-xl text-sm transition-all ${formData.bodyType === bt 
+                        ? 'bg-purple-600 text-white' 
+                        : 'bg-white/5 hover:bg-white/10 text-zinc-400'}`}
+                    >
+                      {bt}
+                    </button>
+                  ))}
                 </div>
-                {renderInput('gender', 'Biological Blueprint', 'female, male, etc.')}
-                {renderInput('ethnicity', 'Ethnicity', 'Latina, Asian, Caucasian, etc.')}
+              </div>
+
+              {/* Outfit */}
+              <textarea
+                name="outfit"
+                value={formData.outfit || ''}
+                onChange={handleChange}
+                placeholder="Default outfit / clothing style..."
+                className="w-full bg-white/[0.02] border border-white/10 rounded-2xl p-4 text-sm min-h-[80px]"
+              />
             </div>
           </div>
 
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 pb-2 border-b border-white/5">
-                <Activity className="w-4 h-4 text-zinc-500" />
-                <h3 className="text-xs uppercase tracking-widest text-zinc-300 font-bold">Morphological Specs</h3>
-            </div>
-            
-            <div className="space-y-4">
-                {renderTagField('hair', 'Hair Detail Configuration', 'blonde, long, wavy')}
-                {renderTagField('face', 'Facial Neural Markers', 'freckles, blue eyes, sharp jawline')}
-                {renderTagField('body', 'Physique Parameters', 'athletic, tall, hourglass')}
+          {/* Imaging & Generation Preferences */}
+          <div className="space-y-6">
+            <div className="flex items-center gap-2">
+              <Camera className="w-4 h-4 text-zinc-400" />
+              <h3 className="uppercase text-xs tracking-widest text-zinc-400 font-bold">Generation Preferences</h3>
             </div>
 
-            {renderInput('outfit', 'Apparel Protocol', 'Silk dress, oversized sweater, etc.', 'textarea')}
+            {/* Preferred Angles */}
+            <div>
+              <label className="block text-[10px] uppercase tracking-widest text-zinc-500 mb-3">Preferred Camera Angles</label>
+              <div className="flex flex-wrap gap-2">
+                {CAMERA_ANGLES.map(angle => (
+                  <button
+                    key={angle}
+                    onClick={() => toggleArrayItem('preferredAngles', angle)}
+                    className={`px-4 py-1.5 text-sm rounded-xl transition-all border ${formData.preferredAngles?.includes(angle) 
+                      ? 'border-purple-500 bg-purple-500/10 text-purple-400' 
+                      : 'border-white/10 hover:border-white/30'}`}
+                  >
+                    {angle}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Shot Types */}
+            <div>
+              <label className="block text-[10px] uppercase tracking-widest text-zinc-500 mb-3">Preferred Shot Types</label>
+              <div className="flex flex-wrap gap-2">
+                {SHOT_TYPES.map(shot => (
+                  <button
+                    key={shot}
+                    onClick={() => toggleArrayItem('preferredShotTypes', shot)}
+                    className={`px-4 py-1.5 text-sm rounded-xl transition-all border ${formData.preferredShotTypes?.includes(shot) 
+                      ? 'border-purple-500 bg-purple-500/10 text-purple-400' 
+                      : 'border-white/10 hover:border-white/30'}`}
+                  >
+                    {shot}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Favorite LoRAs */}
+            <div>
+              <label className="block text-[10px] uppercase tracking-widest text-zinc-500 mb-3">Favorite LoRAs (Qwen AIO)</label>
+              <div className="flex flex-wrap gap-2">
+                {COMMON_LORAS.map(lora => (
+                  <button
+                    key={lora.id}
+                    onClick={() => toggleArrayItem('favoriteLoras', lora.id)}
+                    className={`px-4 py-1.5 text-xs rounded-xl transition-all border ${formData.favoriteLoras?.includes(lora.id) 
+                      ? 'border-rose-500 bg-rose-500/10 text-rose-400' 
+                      : 'border-white/10 hover:border-white/30'}`}
+                  >
+                    {lora.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* NSFW Specialties */}
+            <div>
+              <label className="block text-[10px] uppercase tracking-widest text-zinc-500 mb-3 flex items-center gap-2">
+                <Heart className="w-4 h-4" /> NSFW Specialties
+              </label>
+              <input
+                type="text"
+                placeholder="creampie, ahegao, paizuri, breeding, etc."
+                className="w-full bg-white/[0.02] border border-white/10 rounded-xl px-4 py-3 text-sm"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && e.currentTarget.value.trim()) {
+                    const val = e.currentTarget.value.trim();
+                    toggleArrayItem('nsfwSpecialties', val);
+                    e.currentTarget.value = '';
+                  }
+                }}
+              />
+              <div className="flex flex-wrap gap-2 mt-3">
+                {formData.nsfwSpecialties?.map((spec, i) => (
+                  <div key={i} className="bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs px-3 py-1 rounded-lg flex items-center gap-1">
+                    {spec}
+                    <X className="w-3 h-3 cursor-pointer" onClick={() => toggleArrayItem('nsfwSpecialties', spec)} />
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
 
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 pb-2 border-b border-white/5">
-                <Cpu className="w-4 h-4 text-zinc-500" />
-                <h3 className="text-xs uppercase tracking-widest text-zinc-300 font-bold">Behavioral Logic</h3>
-            </div>
-            <div className="p-4 bg-purple-500/5 rounded-2xl border border-purple-500/10">
-                {renderInput('vibe', 'Personality Matrix', 'Nurturing, playful, etc.', 'textarea')}
-            </div>
+          {/* Behavioral + Negative Prompt */}
+          <div className="space-y-6">
+            {renderTagField('vibe', 'Personality Matrix', 'bratty, submissive, teasing...')}
+            <textarea
+              name="negativePrompt"
+              value={formData.negativePrompt || ''}
+              onChange={handleChange}
+              placeholder="Negative prompt for this character..."
+              className="w-full bg-white/[0.02] border border-white/10 rounded-2xl p-4 text-sm min-h-[100px]"
+            />
           </div>
-          
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 pb-2 border-b border-white/5">
-                <Sparkles className="w-4 h-4 text-zinc-500" />
-                <h3 className="text-xs uppercase tracking-widest text-zinc-300 font-bold">Imaging Filters (Negative)</h3>
-            </div>
-            {renderInput('negativePrompt', 'Exclusion Parameters', 'Glasses, hats, jewelry, extra fingers...', 'textarea')}
-          </div>
-        </form>
+        </div>
 
         {/* Footer */}
-        <div className="relative z-10 flex flex-col-reverse sm:flex-row justify-end gap-3 p-6 md:p-10 pt-4 md:pt-6 border-t border-white/5 bg-zinc-950">
-            <button 
-              type="button" 
-              onClick={onClose} 
-              disabled={isSaving}
-              className="w-full sm:w-auto px-8 py-3 rounded-xl border border-white/10 text-zinc-400 text-xs uppercase tracking-widest font-bold hover:bg-white/5 transition-all disabled:opacity-30"
-            >
-              Abort
-            </button>
-            <button 
-              onClick={() => handleSubmit()}
-              type="button" 
-              onPointerDown={(e) => e.preventDefault()} 
-              disabled={isSaving}
-              className="w-full sm:w-auto px-8 py-3 bg-purple-600 text-white text-xs uppercase tracking-[0.2em] font-bold rounded-xl flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(147,51,234,0.3)] hover:bg-purple-500 transition-all active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed"
-            >
-              {isSaving ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : isNewBot ? (
-                <Sparkles className="w-4 h-4" />
-              ) : (
-                <Save className="w-4 h-4" />
-              )}
-              {isSaving ? 'Processing...' : isNewBot ? 'Initialize Link' : 'Sync Protocols'}
-            </button>
+        <div className="p-8 border-t border-white/5 flex gap-4">
+          <button onClick={onClose} className="flex-1 py-4 rounded-2xl border border-white/10 text-zinc-400 hover:bg-white/5">
+            Cancel
+          </button>
+          <button 
+            onClick={handleSubmit}
+            disabled={isSaving}
+            className="flex-1 py-4 bg-purple-600 hover:bg-purple-500 rounded-2xl font-bold tracking-widest text-sm flex items-center justify-center gap-2 disabled:opacity-70"
+          >
+            {isSaving ? <Loader2 className="animate-spin" /> : isNewBot ? <Sparkles /> : <Save />}
+            {isSaving ? 'Saving Profile...' : isNewBot ? 'Initialize Neural Link' : 'Save Character'}
+          </button>
         </div>
       </div>
     </div>
