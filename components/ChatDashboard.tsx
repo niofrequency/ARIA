@@ -346,6 +346,7 @@ const ChatDashboard: React.FC<ChatDashboardProps> = ({
       {/* NEW COMPANION MODAL */}
       {isCreationModalOpen && (
         <CompanionCreationModal
+          isMandatory={bots.length === 0}
           onSave={handleCreateNewCompanion}
           onClose={() => setIsCreationModalOpen(false)}
         />
