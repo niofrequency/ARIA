@@ -439,4 +439,4 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({ character
   );
 };
 
-export default
+export default BotCustomizationModal;
