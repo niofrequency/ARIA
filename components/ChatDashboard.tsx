@@ -80,11 +80,11 @@ const ChatDashboard: React.FC<ChatDashboardProps> = ({
             hair: Array.isArray(bot.characterProfile.hair) ? bot.characterProfile.hair : [],
             face: Array.isArray(bot.characterProfile.face) ? bot.characterProfile.face : [],
             body: Array.isArray(bot.characterProfile.body) ? bot.characterProfile.body : [],
-            preferredAngles: Array.isArray(bot.characterProfile.preferredAngles) ? bot.characterProfile.preferredAngles : [],
-            preferredShotTypes: Array.isArray(bot.characterProfile.preferredShotTypes) ? bot.characterProfile.preferredShotTypes : [],
-            favoriteLoras: Array.isArray(bot.characterProfile.favoriteLoras) ? bot.characterProfile.favoriteLoras : [],
-            nsfwSpecialties: Array.isArray(bot.characterProfile.nsfwSpecialties) ? bot.characterProfile.nsfwSpecialties : [],
-          } as ExtendedCharacterProfile
+            preferredAngles: Array.isArray((bot.characterProfile as ExtendedCharacterProfile).preferredAngles) ? (bot.characterProfile as ExtendedCharacterProfile).preferredAngles : [],
+            preferredShotTypes: Array.isArray((bot.characterProfile as ExtendedCharacterProfile).preferredShotTypes) ? (bot.characterProfile as ExtendedCharacterProfile).preferredShotTypes : [],
+            favoriteLoras: Array.isArray((bot.characterProfile as ExtendedCharacterProfile).favoriteLoras) ? (bot.characterProfile as ExtendedCharacterProfile).favoriteLoras : [],
+            nsfwSpecialties: Array.isArray((bot.characterProfile as ExtendedCharacterProfile).nsfwSpecialties) ? (bot.characterProfile as ExtendedCharacterProfile).nsfwSpecialties : [],
+          } as CharacterProfile
         }));
 
         for (const bot of normalizedBots) {
@@ -233,7 +233,7 @@ const ChatDashboard: React.FC<ChatDashboardProps> = ({
       name: newBotName,
       personality: defaultNewBotCharacter.vibe || '',
       avatarColor: 'bg-purple-600',
-      characterProfile: { ...defaultNewBotCharacter, name: newBotName },
+      characterProfile: { ...defaultNewBotCharacter, name: newBotName } as CharacterProfile,
       lastMessagePreview: 'Initialize Link...',
       lastActivity: Date.now(),
     };
@@ -313,11 +313,11 @@ const ChatDashboard: React.FC<ChatDashboardProps> = ({
     const selected = bots.find(b => b.id === botId);
     if (!selected) return;
     
-    const updatedBot = { 
+    const updatedBot: Bot = { 
       ...selected, 
       name: updated.name || selected.name, 
       personality: updated.vibe || selected.personality, 
-      characterProfile: updated 
+      characterProfile: updated as CharacterProfile // Safely cast extended profile to satisfy Bot interface
     };
     
     await saveBotToFirestore(userData.uid, updatedBot);
