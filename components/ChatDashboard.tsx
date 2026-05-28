@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Bot, CharacterProfile, Conversation, Message, UserData } from '../types';
 import Sidebar from './Sidebar';
 import MainChatArea from './MainChatArea';
-import BotCustomizationModal from './BotCustomizationModal';
+import BotCustomizationModal, { ExtendedCharacterProfile } from './BotCustomizationModal';
 import LoadingScreen from './LoadingScreen';
 import { 
   saveBotToFirestore, 
@@ -22,19 +22,26 @@ interface ChatDashboardProps {
 
 /**
  * DEFAULT NEW BOT TEMPLATE
- * Updated for the Tagging System: Morphological specs are now empty arrays [].
+ * Updated for Extended Profile with new fields
  */
-const defaultNewBotCharacter: CharacterProfile = {
+const defaultNewBotCharacter: ExtendedCharacterProfile = {
   name: 'New Companion',
   gender: 'female', 
   age: '24',
-  hair: [], // Array for tagging
-  face: [], // Array for tagging
-  body: [], // Array for tagging
+  hair: [], 
+  face: [], 
+  body: [], 
   vibe: 'A friendly and curious AI companion.',
   outfit: 'Casual modern attire',
   ethnicity: 'Latina', 
-  negativePrompt: 'blurry, lowres, extra limbs, bad anatomy, watermark, text.'
+  negativePrompt: 'blurry, lowres, extra limbs, bad anatomy, watermark, text.',
+  
+  // New Extended Fields
+  bodyType: 'Curvy',
+  preferredAngles: ['Eye-level'],
+  preferredShotTypes: ['Medium shot'],
+  favoriteLoras: [],
+  nsfwSpecialties: [],
 };
 
 const ChatDashboard: React.FC<ChatDashboardProps> = ({ 
@@ -65,7 +72,7 @@ const ChatDashboard: React.FC<ChatDashboardProps> = ({
         const loadedBots = await loadBotsFromFirestore(userData.uid);
         const loadedConvsMap = new Map<string, Conversation[]>();
         
-        // Ensure legacy bots with string specs are normalized to arrays to prevent crashes
+        // Enhanced normalization for new extended fields
         const normalizedBots = loadedBots.map(bot => ({
           ...bot,
           characterProfile: {
@@ -73,7 +80,11 @@ const ChatDashboard: React.FC<ChatDashboardProps> = ({
             hair: Array.isArray(bot.characterProfile.hair) ? bot.characterProfile.hair : [],
             face: Array.isArray(bot.characterProfile.face) ? bot.characterProfile.face : [],
             body: Array.isArray(bot.characterProfile.body) ? bot.characterProfile.body : [],
-          }
+            preferredAngles: Array.isArray(bot.characterProfile.preferredAngles) ? bot.characterProfile.preferredAngles : [],
+            preferredShotTypes: Array.isArray(bot.characterProfile.preferredShotTypes) ? bot.characterProfile.preferredShotTypes : [],
+            favoriteLoras: Array.isArray(bot.characterProfile.favoriteLoras) ? bot.characterProfile.favoriteLoras : [],
+            nsfwSpecialties: Array.isArray(bot.characterProfile.nsfwSpecialties) ? bot.characterProfile.nsfwSpecialties : [],
+          } as ExtendedCharacterProfile
         }));
 
         for (const bot of normalizedBots) {
@@ -220,7 +231,7 @@ const ChatDashboard: React.FC<ChatDashboardProps> = ({
     const newBot: Bot = {
       id: newBotId,
       name: newBotName,
-      personality: defaultNewBotCharacter.vibe,
+      personality: defaultNewBotCharacter.vibe || '',
       avatarColor: 'bg-purple-600',
       characterProfile: { ...defaultNewBotCharacter, name: newBotName },
       lastMessagePreview: 'Initialize Link...',
@@ -258,14 +269,12 @@ const ChatDashboard: React.FC<ChatDashboardProps> = ({
     setCurrentConversationId(newConvId);
   };
 
-const handleDeleteBot = async (botId: string) => {
+  const handleDeleteBot = async (botId: string) => {
     if (!userData?.uid) return;
     
     try {
-      // 1. Remove from Database
       await deleteBotFromFirestore(userData.uid, botId);
       
-      // 2. Filter local state
       const updatedBots = bots.filter(b => b.id !== botId);
       setBots(updatedBots);
       
@@ -275,15 +284,12 @@ const handleDeleteBot = async (botId: string) => {
         return next;
       });
 
-      // 3. HANDLE REDIRECTION (Prevent Black Screen)
       if (selectedBotId === botId) {
         if (updatedBots.length > 0) {
-          // Select the first available bot in the list
           const nextBot = updatedBots[0];
           setSelectedBotId(nextBot.id);
           localStorage.setItem('aria_last_active_bot', nextBot.id);
           
-          // Sync conversation for the new bot
           const botConvs = conversations.get(nextBot.id) || [];
           if (botConvs.length > 0) {
             setCurrentConversationId(botConvs[0].id);
@@ -291,7 +297,6 @@ const handleDeleteBot = async (botId: string) => {
             handleNewConversation(nextBot.id, true);
           }
         } else {
-          // No bots left? Clear everything and trigger the "New Bot" flow
           setSelectedBotId('');
           setCurrentConversationId(null);
           localStorage.removeItem('aria_last_active_bot');
@@ -303,13 +308,21 @@ const handleDeleteBot = async (botId: string) => {
     }
   };
 
-  const handleSaveBotCustomization = async (botId: string, updated: CharacterProfile) => {
+  const handleSaveBotCustomization = async (botId: string, updated: ExtendedCharacterProfile) => {
     if (!userData?.uid) return;
     const selected = bots.find(b => b.id === botId);
     if (!selected) return;
-    const updatedBot = { ...selected, name: updated.name, personality: updated.vibe, characterProfile: updated };
+    
+    const updatedBot = { 
+      ...selected, 
+      name: updated.name || selected.name, 
+      personality: updated.vibe || selected.personality, 
+      characterProfile: updated 
+    };
+    
     await saveBotToFirestore(userData.uid, updatedBot);
     setBots(prev => prev.map(b => b.id === botId ? updatedBot : b));
+    
     if (isBotBeingCustomizedInitial) {
         setIsBotBeingCustomizedInitial(false);
         handleNewConversation(botId, true);
@@ -321,9 +334,8 @@ const handleDeleteBot = async (botId: string) => {
   const currentBotConversations = conversations.get(selectedBotId) || [];
   const currentMessages = currentBotConversations.find(c => c.id === currentConversationId)?.messages || [];
 
-return (
+  return (
     <>
-      {/* ✅ Add the Loading Screen as an overlay that fades out when ready */}
       <LoadingScreen isReady={isInitialLoadComplete} />
 
       <div className={`flex h-[100dvh] ${theme === 'dark' ? 'bg-zinc-950' : 'bg-zinc-50'} text-zinc-100 overflow-hidden`}>
@@ -367,7 +379,6 @@ return (
               setIsLoading={setIsLoadingResponse}
             />
           ) : (
-            /* ✅ Updated Empty State with Logo */
             <div className="flex-1 flex flex-col items-center justify-center bg-zinc-950 text-zinc-500">
               <img src="/img/ARIA-LOGO.PNG" alt="Aria" className="w-12 h-12 opacity-20 mb-4 grayscale" />
               <h1 className="tracking-widest uppercase text-[10px] font-bold">Awaiting Neural Link</h1>
@@ -383,7 +394,7 @@ return (
               const wasInitial = isBotBeingCustomizedInitial;
               setShowCustomizationModalForBotId(null); 
               setIsBotBeingCustomizedInitial(false);
-              if(wasInitial) handleDeleteBot(showCustomizationModalForBotId); 
+              if(wasInitial) handleDeleteBot(showCustomizationModalForBotId!); 
             }}
             isNewBot={isBotBeingCustomizedInitial}
           />
