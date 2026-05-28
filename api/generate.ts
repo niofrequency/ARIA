@@ -62,8 +62,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
   }
-
-  // --- POST: DISPATCH IMAGE JOB ---
+// --- POST: DISPATCH IMAGE JOB ---
   if (req.method === 'POST') {
     try {
       // 1. Extract workflow AND images from the request body
@@ -76,15 +75,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       console.log(`🎨 Dispatching Imaging Workflow to Endpoint: ${ENDPOINT_ID}`);
 
       // 2. Prepare the payload for RunPod
-      // We must merge the workflow and the image data into one 'input' object
       const runpodInput: any = { workflow };
 
-      // If images exist (e.g., input_image.png), add them as keys to the input object
+      // ✅ FIX: Keep the images array intact so the RunPod worker writes it to disk!
       if (images && Array.isArray(images)) {
-        images.forEach((img: any) => {
-          // The key (img.name) must match exactly what the "LoadImage" node expects
-          runpodInput[img.name] = img.image; 
-        });
+        runpodInput.images = images;
+        console.log("📸 Image array successfully attached to workflow payload.");
       }
 
       // ✅ ADDED LOGS FOR PROMPT DEBUGGING
