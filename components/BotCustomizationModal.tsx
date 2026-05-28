@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { CharacterProfile } from '../types';
-import { X, Save, Sparkles, Cpu, Fingerprint, Activity, Loader2, Plus, AlertCircle, Box, Camera, Heart, Upload, Server, Image as ImageIcon } from 'lucide-react';
+import { X, Save, Sparkles, Cpu, Fingerprint, Activity, Loader2, Plus, AlertCircle, Box, Camera, Upload, Server, Image as ImageIcon } from 'lucide-react';
 
 // --- INTERFACES & TYPES ---
 export interface ActiveLora { 
@@ -10,11 +10,7 @@ export interface ActiveLora {
 }
 
 export interface ExtendedCharacterProfile extends CharacterProfile {
-  bodyType?: string;
-  preferredAngles?: string[];
-  preferredShotTypes?: string[];
   favoriteLoras?: string[];
-  nsfwSpecialties?: string[];
   // --- NEW RUNPOD & IMAGE FIELDS ---
   avatarImage?: string | null;
   runpodModel?: string;
@@ -29,9 +25,6 @@ interface BotCustomizationModalProps {
 }
 
 // --- CONSTANTS ---
-const BODY_TYPES = ['Petite', 'Slim', 'Athletic', 'Curvy', 'Thick', 'Plus-size', 'Hourglass', 'Random'];
-const CAMERA_ANGLES = ['Eye-level', 'High angle', 'Low angle', 'Three-quarter view', 'Side profile', 'From behind'];
-const SHOT_TYPES = ['Close-up (Face)', 'Close-up (Body)', 'Medium shot', 'Full body', 'Dynamic pose'];
 const COMMON_LORAS = [
   { id: "hairypussyv7.safetensors", name: "Hairy Pussy v7" },
   { id: "hairypussyv9.safetensors", name: "Hairy Pussy v9" },
@@ -96,7 +89,6 @@ const UploadZone = ({ label, file, preview, onClear, onProcess, icon: Icon = Upl
   );
 };
 
-
 const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({ character, onSave, onClose, isNewBot = false }) => {
   // --- INITIALIZATION ---
   const [formData, setFormData] = useState<ExtendedCharacterProfile>({
@@ -104,11 +96,7 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({ character
     hair: Array.isArray(character.hair) ? character.hair : [],
     face: Array.isArray(character.face) ? character.face : [],
     body: Array.isArray(character.body) ? character.body : [],
-    preferredAngles: Array.isArray((character as ExtendedCharacterProfile).preferredAngles) ? (character as ExtendedCharacterProfile).preferredAngles : [],
-    preferredShotTypes: Array.isArray((character as ExtendedCharacterProfile).preferredShotTypes) ? (character as ExtendedCharacterProfile).preferredShotTypes : [],
     favoriteLoras: Array.isArray((character as ExtendedCharacterProfile).favoriteLoras) ? (character as ExtendedCharacterProfile).favoriteLoras : [],
-    nsfwSpecialties: Array.isArray((character as ExtendedCharacterProfile).nsfwSpecialties) ? (character as ExtendedCharacterProfile).nsfwSpecialties : [],
-    bodyType: (character as ExtendedCharacterProfile).bodyType || 'Random',
     runpodModel: (character as ExtendedCharacterProfile).runpodModel || 'Qwen-Rapid-AIO-NSFW-v23.safetensors',
     activeRunpodLoras: Array.isArray((character as ExtendedCharacterProfile).activeRunpodLoras) ? (character as ExtendedCharacterProfile).activeRunpodLoras : [],
     avatarImage: (character as ExtendedCharacterProfile).avatarImage || null,
@@ -374,7 +362,7 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({ character
             </div>
           </div>
 
-          {/* SECTION 2: RunPod Engine Integration (NEW) */}
+          {/* SECTION 2: RunPod Engine Integration */}
           <div className="space-y-4">
             <div className="flex items-center gap-2 pb-2 border-b border-white/5">
               <Server className="w-4 h-4 text-zinc-500" />
@@ -470,24 +458,6 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({ character
                 {renderTagField('body', 'Physique Parameters', 'athletic, tall, hourglass')}
             </div>
 
-            <div>
-              <label className="block text-[10px] uppercase tracking-[0.2em] font-bold text-zinc-500 mb-2 ml-1">Primary Body Type</label>
-              <div className="flex flex-wrap gap-2">
-                {BODY_TYPES.map(bt => (
-                  <button
-                    key={bt}
-                    type="button"
-                    onClick={() => setFormData(prev => ({ ...prev, bodyType: bt }))}
-                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${formData.bodyType === bt 
-                      ? 'bg-purple-600 text-white' 
-                      : 'bg-white/5 hover:bg-white/10 text-zinc-400'}`}
-                  >
-                    {bt}
-                  </button>
-                ))}
-              </div>
-            </div>
-
             {renderInput('outfit', 'Apparel Protocol', 'Silk dress, oversized sweater, etc.', 'textarea')}
           </div>
 
@@ -496,42 +466,6 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({ character
             <div className="flex items-center gap-2 pb-2 border-b border-white/5">
               <Camera className="w-4 h-4 text-zinc-500" />
               <h3 className="text-xs uppercase tracking-widest text-zinc-300 font-bold">Generation Preferences</h3>
-            </div>
-
-            <div>
-              <label className="block text-[10px] uppercase tracking-[0.2em] font-bold text-zinc-500 mb-2 ml-1">Preferred Camera Angles</label>
-              <div className="flex flex-wrap gap-2">
-                {CAMERA_ANGLES.map(angle => (
-                  <button
-                    key={angle}
-                    type="button"
-                    onClick={() => toggleArrayItem('preferredAngles', angle)}
-                    className={`px-4 py-1.5 text-xs font-bold rounded-xl transition-all border ${formData.preferredAngles?.includes(angle) 
-                      ? 'border-purple-500 bg-purple-500/10 text-purple-400' 
-                      : 'border-white/10 hover:border-white/30 text-zinc-400'}`}
-                  >
-                    {angle}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-[10px] uppercase tracking-[0.2em] font-bold text-zinc-500 mb-2 ml-1">Preferred Shot Types</label>
-              <div className="flex flex-wrap gap-2">
-                {SHOT_TYPES.map(shot => (
-                  <button
-                    key={shot}
-                    type="button"
-                    onClick={() => toggleArrayItem('preferredShotTypes', shot)}
-                    className={`px-4 py-1.5 text-xs font-bold rounded-xl transition-all border ${formData.preferredShotTypes?.includes(shot) 
-                      ? 'border-purple-500 bg-purple-500/10 text-purple-400' 
-                      : 'border-white/10 hover:border-white/30 text-zinc-400'}`}
-                  >
-                    {shot}
-                  </button>
-                ))}
-              </div>
             </div>
 
             <div>
@@ -548,32 +482,6 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({ character
                   >
                     {lora.name}
                   </button>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-[10px] uppercase tracking-[0.2em] font-bold text-zinc-500 mb-2 ml-1 flex items-center gap-1.5">
-                <Heart className="w-3 h-3 text-rose-500" /> NSFW Specialties
-              </label>
-              <input
-                type="text"
-                placeholder="Type and press Enter (e.g., ahegao, breeding)"
-                className="w-full bg-white/[0.02] border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-purple-500/50"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && e.currentTarget.value.trim()) {
-                    e.preventDefault();
-                    toggleArrayItem('nsfwSpecialties', e.currentTarget.value.trim().toLowerCase());
-                    e.currentTarget.value = '';
-                  }
-                }}
-              />
-              <div className="flex flex-wrap gap-2 mt-2">
-                {formData.nsfwSpecialties?.map((spec, i) => (
-                  <div key={i} className="bg-rose-500/10 border border-rose-500/30 text-rose-400 font-bold text-[10px] uppercase tracking-wider px-3 py-1 rounded-lg flex items-center gap-1.5 animate-in zoom-in duration-200">
-                    {spec}
-                    <X className="w-3 h-3 cursor-pointer hover:text-white" onClick={() => toggleArrayItem('nsfwSpecialties', spec)} />
-                  </div>
                 ))}
               </div>
             </div>
