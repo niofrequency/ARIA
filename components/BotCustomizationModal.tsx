@@ -1,25 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { CharacterProfile } from '../types';
+import { generateAriaImage } from '../services/ariaService';
 import { X, Save, Sparkles, Cpu, Fingerprint, Activity, Loader2, Plus, AlertCircle, Box, Camera, Upload, Server, Image as ImageIcon } from 'lucide-react';
 
-// --- INTERFACES & TYPES ---
 export interface ActiveLora { 
   id: string; 
   name: string; 
   strength: number; 
 }
 
-export interface ExtendedCharacterProfile extends CharacterProfile {
-  favoriteLoras?: string[];
-  // --- NEW RUNPOD & IMAGE FIELDS ---
-  avatarImage?: string | null;
-  runpodModel?: string;
-  activeRunpodLoras?: ActiveLora[];
-}
-
 interface BotCustomizationModalProps {
-  character: CharacterProfile | ExtendedCharacterProfile;
-  onSave: (updatedCharacter: ExtendedCharacterProfile) => void;
+  character: CharacterProfile;
+  onSave: (updatedCharacter: CharacterProfile) => void;
   onClose: () => void;
   isNewBot?: boolean;
 }
@@ -54,56 +46,23 @@ const LORA_OPTIONS = [
   { id: "NATURALSKIN.safetensors", name: "NATURALSKIN" }
 ];
 
-// --- UPLOAD ZONE COMPONENT ---
-const UploadZone = ({ label, file, preview, onClear, onProcess, icon: Icon = Upload, accept = "image/*" }: any) => {
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [isDragging, setIsDragging] = useState(false);
-  return (
-    <div 
-      onClick={() => !file && fileInputRef.current?.click()}
-      onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-      onDragLeave={() => setIsDragging(false)}
-      onDrop={(e) => { e.preventDefault(); setIsDragging(false); const f = e.dataTransfer.files?.[0]; if (f) onProcess(f); }}
-      className={`relative group cursor-pointer border rounded-2xl p-4 sm:p-6 transition-all duration-300 overflow-hidden h-full flex flex-col items-center justify-center min-h-[140px] ${
-        isDragging ? 'border-purple-400 bg-purple-500/10 scale-[1.02]' : file ? 'bg-white/[0.02] border-white/20' : 'border-white/10 bg-white/[0.01] hover:bg-white/[0.03] hover:border-white/30'
-      }`}
-    >
-      <input type="file" ref={fileInputRef} onChange={(e) => { const f = e.target.files?.[0]; if(f) onProcess(f); }} className="hidden" accept={accept} />
-      {preview ? (
-        <div onClick={() => fileInputRef.current?.click()} className="relative w-full h-full rounded-xl overflow-hidden shadow-md border border-white/10 flex-1 flex items-center justify-center group bg-black/50">
-          <img src={preview} alt="Preview" className="max-h-[160px] w-full object-cover rounded-xl" />
-          <div className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center backdrop-blur-sm gap-2">
-            <span className="text-zinc-100 text-[10px] sm:text-xs font-medium uppercase tracking-widest bg-zinc-900/80 px-4 py-2 rounded-full border border-zinc-700">Replace</span>
-            <button onClick={(e) => { e.stopPropagation(); onClear(); }} className="text-red-400 text-[10px] font-medium uppercase tracking-widest bg-zinc-900/80 border border-zinc-700 px-5 py-2 rounded-full hover:bg-red-500/20 transition-colors">Clear</button>
-          </div>
-        </div>
-      ) : (
-        <div className="flex flex-col items-center text-center pointer-events-none">
-          <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center mb-3 transition-all duration-500 ${isDragging ? 'bg-purple-500 text-white scale-110' : 'bg-white/5 border border-white/10 text-zinc-400 group-hover:scale-110 group-hover:border-white/20 group-hover:text-zinc-100'}`}>
-            <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
-          </div>
-          <p className="text-[10px] sm:text-xs font-bold text-zinc-400 mb-1 tracking-widest uppercase">{label}</p>
-        </div>
-      )}
-    </div>
-  );
-};
-
 const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({ character, onSave, onClose, isNewBot = false }) => {
   // --- INITIALIZATION ---
-  const [formData, setFormData] = useState<ExtendedCharacterProfile>({
+  const [formData, setFormData] = useState<CharacterProfile>({
     ...character,
     hair: Array.isArray(character.hair) ? character.hair : [],
     face: Array.isArray(character.face) ? character.face : [],
     body: Array.isArray(character.body) ? character.body : [],
-    favoriteLoras: Array.isArray((character as ExtendedCharacterProfile).favoriteLoras) ? (character as ExtendedCharacterProfile).favoriteLoras : [],
-    runpodModel: (character as ExtendedCharacterProfile).runpodModel || 'Qwen-Rapid-AIO-NSFW-v23.safetensors',
-    activeRunpodLoras: Array.isArray((character as ExtendedCharacterProfile).activeRunpodLoras) ? (character as ExtendedCharacterProfile).activeRunpodLoras : [],
-    avatarImage: (character as ExtendedCharacterProfile).avatarImage || null,
+    favoriteLoras: Array.isArray(character.favoriteLoras) ? character.favoriteLoras : [],
+    runpodModel: character.runpodModel || 'Qwen-Rapid-AIO-NSFW-v23.safetensors',
+    activeRunpodLoras: Array.isArray(character.activeRunpodLoras) ? character.activeRunpodLoras : [],
+    avatarImage: character.avatarImage || null,
   });
   
   const [ageError, setAgeError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isForging, setIsForging] = useState(false);
+  const [forgeError, setForgeError] = useState<string | null>(null);
   const [tagInputs, setTagInputs] = useState({ hair: '', face: '', body: '' });
 
   useEffect(() => {
@@ -135,13 +94,13 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({ character
   };
 
   // --- TAG & ARRAY MANAGEMENT ---
-  const toggleArrayItem = (field: keyof ExtendedCharacterProfile, value: string) => {
+  const toggleArrayItem = (field: keyof CharacterProfile, value: string) => {
     setFormData(prev => {
       const current = Array.isArray(prev[field]) ? prev[field] as string[] : [];
       const newArray = current.includes(value)
         ? current.filter(item => item !== value)
         : [...current, value];
-      return { ...prev, [field]: newArray };
+      return { ...prev, [field]: newArray } as CharacterProfile;
     });
   };
 
@@ -172,16 +131,42 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({ character
     }
   };
 
-  // --- RUNPOD & LORA LOGIC ---
+  // --- RUNPOD IDENTITY ARCHITECT LOGIC ---
   const handleImageProcess = (file: File) => {
     if (!file.type.startsWith('image/')) return;
-    
-    // Create base64 for saving in profile
     const reader = new FileReader();
     reader.readAsDataURL(file);
     reader.onload = () => {
       setFormData(prev => ({ ...prev, avatarImage: reader.result as string }));
     };
+  };
+
+  const triggerIdentityGenerator = async () => {
+    setIsForging(true);
+    setForgeError(null);
+    try {
+      const hair = formData.hair.length > 0 ? formData.hair.join(', ') : 'natural hair';
+      const face = formData.face.length > 0 ? formData.face.join(', ') : 'beautiful face';
+      const body = formData.body.length > 0 ? formData.body.join(', ') : 'slim body';
+      
+      const identityPrompt = `Cinematic portrait of a ${formData.age || '24'} year old ${formData.ethnicity || 'woman'} ${formData.gender || 'female'}, ${hair}, ${face}, ${body}, looking directly at camera, medium shot portrait, neutral studio background, photorealistic, 8k, highly detailed`;
+      
+      // We pass avatarImage: null to strictly enforce the standard T2I Biglust branch
+      const tempCharacterObj = { ...formData, avatarImage: null };
+      
+      const generatedUrl = await generateAriaImage(null, identityPrompt, tempCharacterObj);
+      
+      if (generatedUrl) {
+        setFormData(prev => ({ ...prev, avatarImage: generatedUrl }));
+      } else {
+        setForgeError("Neural generation timed out. Please try again.");
+      }
+    } catch (err: any) {
+      console.error(err);
+      setForgeError("Error forging identity: " + err.message);
+    } finally {
+      setIsForging(false);
+    }
   };
 
   const addRunpodLora = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -218,7 +203,7 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({ character
   // --- SUBMIT ---
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (isSaving) return;
+    if (isSaving || isForging) return;
 
     const ageNum = parseInt(formData.age as string, 10);
     if (isNaN(ageNum) || ageNum < 18) {
@@ -279,7 +264,7 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({ character
   );
 
   const renderInput = (
-    name: keyof ExtendedCharacterProfile, 
+    name: keyof CharacterProfile, 
     label: string, 
     placeholder: string, 
     type: 'text' | 'number' | 'textarea' = 'text',
@@ -337,7 +322,7 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({ character
               {isNewBot ? 'Initialize' : 'Modify'} <span className="font-semibold text-purple-500">Interface</span>
             </h2>
           </div>
-          <button onClick={onClose} disabled={isSaving} className="p-2 bg-white/5 text-zinc-500 hover:text-white rounded-xl transition-all disabled:opacity-30">
+          <button onClick={onClose} disabled={isSaving || isForging} className="p-2 bg-white/5 text-zinc-500 hover:text-white rounded-xl transition-all disabled:opacity-30">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -362,25 +347,75 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({ character
             </div>
           </div>
 
-          {/* SECTION 2: RunPod Engine Integration */}
+          {/* SECTION 3: Morphological Specs (Moved up for logic flow) */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 pb-2 border-b border-white/5">
+                <Box className="w-4 h-4 text-zinc-500" />
+                <h3 className="text-xs uppercase tracking-widest text-zinc-300 font-bold">Morphological Specs</h3>
+            </div>
+            
+            <div className="space-y-4">
+                {renderTagField('hair', 'Hair Detail Configuration', 'blonde, long, wavy')}
+                {renderTagField('face', 'Facial Neural Markers', 'freckles, blue eyes, sharp jawline')}
+                {renderTagField('body', 'Physique Parameters', 'athletic, tall, hourglass')}
+            </div>
+
+            {renderInput('outfit', 'Apparel Protocol', 'Silk dress, oversized sweater, etc.', 'textarea')}
+          </div>
+
+          {/* SECTION 2: RunPod Engine Integration (The Architect Choice) */}
           <div className="space-y-4">
             <div className="flex items-center gap-2 pb-2 border-b border-white/5">
               <Server className="w-4 h-4 text-zinc-500" />
-              <h3 className="text-xs uppercase tracking-widest text-zinc-300 font-bold">RunPod Engine & Avatar</h3>
+              <h3 className="text-xs uppercase tracking-widest text-zinc-300 font-bold">Identity Architect</h3>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Image Drop Zone */}
-              <div className="h-48">
-                <label className="block text-[10px] uppercase tracking-[0.2em] font-bold text-zinc-500 mb-2 ml-1">Identity Image (Reference)</label>
-                <UploadZone 
-                  label="Drop Identity Image" 
-                  file={formData.avatarImage} 
-                  preview={formData.avatarImage} 
-                  accept="image/*"
-                  onClear={() => setFormData(prev => ({ ...prev, avatarImage: null }))} 
-                  onProcess={(f: File) => handleImageProcess(f)} 
-                />
+              
+              {/* Image Drop Zone / Forge Choice */}
+              <div className="flex flex-col gap-2">
+                <label className="block text-[10px] uppercase tracking-[0.2em] font-bold text-zinc-500 ml-1">
+                  Identity Anchor (Reference)
+                </label>
+                
+                {formData.avatarImage ? (
+                  <div className="relative w-full h-48 rounded-xl overflow-hidden shadow-md border border-white/10 flex items-center justify-center group bg-black/50">
+                    <img src={formData.avatarImage} alt="Avatar Preview" className="h-full w-full object-cover rounded-xl" />
+                    <div className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center backdrop-blur-sm gap-2">
+                      <span className="text-zinc-100 text-[10px] font-medium uppercase tracking-widest bg-zinc-900/80 px-4 py-2 rounded-full border border-zinc-700">Identity Set</span>
+                      <button type="button" onClick={() => setFormData(prev => ({ ...prev, avatarImage: null }))} className="text-red-400 text-[10px] font-medium uppercase tracking-widest bg-zinc-900/80 border border-zinc-700 px-5 py-2 rounded-full hover:bg-red-500/20 transition-colors">
+                        Clear & Rebuild
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-3 h-48">
+                    {/* Upload Button */}
+                    <div className="relative group cursor-pointer border border-white/10 bg-white/[0.01] hover:bg-white/[0.03] hover:border-white/30 rounded-xl p-4 transition-all flex flex-col items-center justify-center text-center">
+                       <input type="file" onChange={(e) => { const f = e.target.files?.[0]; if(f) handleImageProcess(f); }} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" accept="image/*" />
+                       <Upload className="w-6 h-6 text-zinc-400 mb-2 group-hover:text-purple-400 transition-colors" />
+                       <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold group-hover:text-zinc-200">Manual Upload</span>
+                    </div>
+
+                    {/* Forge Button */}
+                    <button 
+                      type="button"
+                      onClick={triggerIdentityGenerator}
+                      disabled={isForging}
+                      className="group border border-purple-500/30 bg-purple-500/5 hover:bg-purple-500/10 rounded-xl p-4 transition-all flex flex-col items-center justify-center text-center disabled:opacity-50"
+                    >
+                      {isForging ? (
+                        <Loader2 className="w-6 h-6 text-purple-400 mb-2 animate-spin" />
+                      ) : (
+                        <Sparkles className="w-6 h-6 text-purple-400 mb-2 group-hover:scale-110 transition-transform" />
+                      )}
+                      <span className="text-[10px] uppercase tracking-widest text-purple-400 font-bold">
+                        {isForging ? 'Synthesizing...' : 'Forge AI Identity'}
+                      </span>
+                    </button>
+                  </div>
+                )}
+                {forgeError && <p className="text-red-500 text-[10px] uppercase mt-1 font-bold">{forgeError}</p>}
               </div>
 
               {/* RunPod Models & LoRAs */}
@@ -404,7 +439,7 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({ character
                     <span>Active LoRAs</span>
                   </label>
                   
-                  <div className="space-y-2 mb-3">
+                  <div className="space-y-2 mb-3 max-h-[120px] overflow-y-auto custom-scrollbar">
                     {(formData.activeRunpodLoras || []).map(lora => (
                       <div key={lora.id} className="flex items-center gap-3 bg-white/[0.02] p-2 rounded-lg border border-white/10">
                         <span className="text-[10px] font-mono text-zinc-300 w-24 truncate">{lora.name}</span>
@@ -443,22 +478,6 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({ character
                 </div>
               </div>
             </div>
-          </div>
-
-          {/* SECTION 3: Morphological Specs */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 pb-2 border-b border-white/5">
-                <Box className="w-4 h-4 text-zinc-500" />
-                <h3 className="text-xs uppercase tracking-widest text-zinc-300 font-bold">Morphological Specs</h3>
-            </div>
-            
-            <div className="space-y-4">
-                {renderTagField('hair', 'Hair Detail Configuration', 'blonde, long, wavy')}
-                {renderTagField('face', 'Facial Neural Markers', 'freckles, blue eyes, sharp jawline')}
-                {renderTagField('body', 'Physique Parameters', 'athletic, tall, hourglass')}
-            </div>
-
-            {renderInput('outfit', 'Apparel Protocol', 'Silk dress, oversized sweater, etc.', 'textarea')}
           </div>
 
           {/* SECTION 4: Generation Preferences */}
@@ -512,7 +531,7 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({ character
             <button 
               type="button" 
               onClick={onClose} 
-              disabled={isSaving}
+              disabled={isSaving || isForging}
               className="w-full sm:w-auto px-8 py-3 rounded-xl border border-white/10 text-zinc-400 text-xs uppercase tracking-widest font-bold hover:bg-white/5 transition-all disabled:opacity-30"
             >
               Abort
@@ -521,7 +540,7 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({ character
               onClick={() => handleSubmit()}
               type="button" 
               onPointerDown={(e) => e.preventDefault()} 
-              disabled={isSaving}
+              disabled={isSaving || isForging}
               className="w-full sm:w-auto px-8 py-3 bg-purple-600 text-white text-xs uppercase tracking-[0.2em] font-bold rounded-xl flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(147,51,234,0.3)] hover:bg-purple-500 transition-all active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed"
             >
               {isSaving ? (
