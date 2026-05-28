@@ -69,6 +69,7 @@ export const extractContextPrompt = (text: string) => {
     .replace(/\*\s*sends\s+.*?\*/gi, '')
     .trim();
 
+  // Hallucination Patch
   if (!contextPrompt && !gifSearchTerm && !externalLink && !youtubeSearchTerm && !spicySearchTerm) {
       const implicitTriggers = [
         "check this out", "look at this", "can you see", "look at me", "see this", "view",
@@ -84,6 +85,7 @@ export const extractContextPrompt = (text: string) => {
       }
   }
 
+  // Emoji Sanitization
   if (contextPrompt) {
     contextPrompt = contextPrompt.replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '');
     contextPrompt = contextPrompt.replace(/\s+/g, ' ').trim();
@@ -206,6 +208,7 @@ STRICT OPERATING RULES:
    - Start the [[VISUAL]] tag with: "[[VISUAL: ${name}, medium closeup from chest to thighs showing face and pussy".
 13. ACTION & MOVEMENT RULE: If the user describes an action or motion, you MUST include dynamic details showing the action clearly.
 14. EXPRESSION & GAZE RULE: When the face is visible in frame, always include an appropriate emotional expression and gaze direction based on context.
+   - Default: sultry come-hither eyes looking directly at viewer
 15. FACE PRIORITY RULE: When the user requests seeing the face during an explicit act, ALWAYS prioritize an extreme closeup on the face. Use framing such as "[[VISUAL: ${name}, extreme closeup focus on face".
    - EYES VISIBILITY MANDATE: Eyes MUST remain visible and expressive in these shots. NEVER fully close the eyes or roll them completely back unless the user explicitly says "eyes closed" or "eyes rolled all the way back".
 16. SPONTANEITY MANDATE: Do not ask "Do you want to see?" just SEND THE PICTURE using the [[VISUAL]] tag.
@@ -485,8 +488,6 @@ export const generateAriaImage = async (
 
   const bodyTags = filteredBodyTags.join(", ");
    
-  // PRIMARY IDENTITY ANCHOR: BOOSTED CONSISTENCY
-  // REMOVED 'outfit' to prevent clothing lock-in against user prompts
   const baseTag = character.gender?.toLowerCase() === 'male' ? '1boy' : '1girl';
   const botIdentity = `(solo, ${baseTag}:1.2), (${character.name}:1.1), a ${character.age}-year-old ${character.gender}`;
 
