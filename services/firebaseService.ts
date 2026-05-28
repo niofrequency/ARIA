@@ -60,6 +60,34 @@ export const uploadImageToStorage = (userId: string, botId: string, url: string)
   uploadMediaToStorage(userId, botId, url, 'image');
 
 /**
+ * --- AVATAR/IDENTITY UPLOAD ---
+ * Dedicated storage upload for Identity Images (bypasses the 10-item rotation limit)
+ */
+export const uploadAvatarToStorage = async (
+  userId: string, 
+  botId: string, 
+  base64Data: string
+): Promise<string> => {
+  try {
+    const fileName = `avatars/${userId}/${botId}_avatar.png`;
+    const storageRef = storage.ref().child(fileName);
+
+    const response = await fetch(base64Data);
+    const blob = await response.blob();
+    
+    await storageRef.put(blob);
+    const permanentUrl = await storageRef.getDownloadURL();
+
+    console.log(`✅ Identity Avatar saved:`, permanentUrl);
+    return permanentUrl;
+  } catch (error) {
+    console.error(`Error persisting avatar to storage:`, error);
+    throw error;
+  }
+};
+
+
+/**
  * --- DELETE SINGLE MEDIA ---
  */
 export const deleteMediaFromStorage = async (mediaUrl: string) => {
@@ -158,6 +186,18 @@ export const createUserData = async (userId: string): Promise<UserData> => {
 export const saveBotToFirestore = async (userId: string, bot: Bot): Promise<void> => {
   try {
     const botToSave = JSON.parse(JSON.stringify(bot));
+
+    // ✅ If the user dropped a new avatar (base64 data), upload it to Storage first
+    if (
+      botToSave.characterProfile && 
+      botToSave.characterProfile.avatarImage && 
+      botToSave.characterProfile.avatarImage.startsWith('data:image')
+    ) {
+      console.log(`Uploading new identity image for bot ${bot.id}...`);
+      const avatarUrl = await uploadAvatarToStorage(userId, bot.id, botToSave.characterProfile.avatarImage);
+      botToSave.characterProfile.avatarImage = avatarUrl; // Replace base64 with URL
+    }
+
     await db.collection(USERS_COLLECTION)
       .doc(userId)
       .collection('bots')
@@ -199,16 +239,25 @@ export const deleteBotFromFirestore = async (userId: string, botId: string): Pro
   try {
     console.log(`🗑️ Terminating Bot: ${botId}...`);
     
-    // 1. Delete Media (Images/Videos in Storage)
+    // 1. Delete Media (Images/Videos in Chat Storage)
     const mediaPath = `chat_media/${userId}/${botId}`;
     await deleteStorageFolder(mediaPath);
 
-    // 2. Delete Sub-Collections (Memories & Conversations)
+    // 2. Delete Avatar Image from Storage
+    try {
+      const avatarRef = storage.ref().child(`avatars/${userId}/${botId}_avatar.png`);
+      await avatarRef.delete();
+      console.log(`🗑️ Identity Avatar purged.`);
+    } catch (e) {
+      // Silently ignore if avatar doesn't exist
+    }
+
+    // 3. Delete Sub-Collections (Memories & Conversations)
     const botPath = `${USERS_COLLECTION}/${userId}/bots/${botId}`;
     await deleteCollection(`${botPath}/memories`);
     await deleteCollection(`${botPath}/conversations`);
 
-    // 3. Delete the Bot Profile itself
+    // 4. Delete the Bot Profile itself
     await db.collection(USERS_COLLECTION)
       .doc(userId)
       .collection('bots')
