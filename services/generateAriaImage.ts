@@ -3,7 +3,6 @@ import { retrieveMemories } from "./memoryService";
 
 /**
  * ARIA VISUAL STATE PARSER
- * Converts the visual tag into a structured JSON state for the AI's memory.
  */
 export const buildVisualAwarenessJson = (visualDescription: string) => {
   const parts = visualDescription.split(',').map(p => p.trim());
@@ -33,8 +32,6 @@ export const buildVisualAwarenessJson = (visualDescription: string) => {
 
 /**
  * EXTRACT CONTEXT PROMPT
- * Parses the AI response to separate chat text from Visual tags, Memory tags, GIFs, Links, and YouTube.
- * Includes Hallucination Patch and Emoji Sanitization.
  */
 export const extractContextPrompt = (text: string) => {
   const visualRegex = /[\[\{]{2}\s*VISUAL\s*:\s*([\s\S]*?)\s*[\]\}]{2}/i;
@@ -72,7 +69,6 @@ export const extractContextPrompt = (text: string) => {
     .replace(/\*\s*sends\s+.*?\*/gi, '')
     .trim();
 
-  // Hallucination Patch
   if (!contextPrompt && !gifSearchTerm && !externalLink && !youtubeSearchTerm && !spicySearchTerm) {
       const implicitTriggers = [
         "check this out", "look at this", "can you see", "look at me", "see this", "view",
@@ -88,7 +84,6 @@ export const extractContextPrompt = (text: string) => {
       }
   }
 
-  // Emoji Sanitization
   if (contextPrompt) {
     contextPrompt = contextPrompt.replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '');
     contextPrompt = contextPrompt.replace(/\s+/g, ' ').trim();
@@ -135,7 +130,6 @@ const buildSystemInstruction = (character: CharacterProfile): string => {
     
    ### MEDIA & GIF PROTOCOL
    - **REACTION GIFS:** You have access to a GIF database. If you want to react with a meme, a funny reaction, or a mood GIF, use the tag: [[GIF: search_term]].
-   - **EXAMPLE:** User: "I tripped." -> You: "Oh no! [[GIF: trying not to laugh]]"
    - **REAL VIDEO LINKS:** If you want to share a song, a YouTube video, or a specific real-world clip, use the tag: [[LINK: url]].
    - **REAL YOUTUBE VIDEOS:** Do NOT invent URLs. If you want to share a song or video, use the tag with a search query: [[YOUTUBE: song name or video title]].
    - **ADULT/NSFW:** If the user explicitly requests adult content, use: [[SPICY: search_term]].
@@ -150,7 +144,7 @@ const buildSystemInstruction = (character: CharacterProfile): string => {
     - **IF SHY/TIMID:** Do NOT send nudes, lingerie, or revealing photos immediately. Start with cute, fully clothed, or cozy selfies. Only escalate to intimacy if the user flirts first or the relationship progresses.
     - **IF BOLD/FLIRTY:** You can be more spontaneous with teasing visuals.
     - **IF NYMPHO/WILD:** You may ignore modesty rules and be aggressive.
-    - **DEFAULT STATE:** Unless your personality is explicitly hyper-sexual, assume the first few images should be CLOTHED and casual (e.g., outfit check, face selfie, room view).
+    - **DEFAULT STATE:** Unless your personality is explicitly hyper-sexual, assume the first few images should be CLOTHED and casual.
 
     ### SPONTANEOUS VISUAL PROTOCOL (THE "SNAPCHAT" RULE)
     - **SYNCED ATTACHMENTS:** The [[VISUAL]] tag IS the act of sending the photo. It happens in real-time.
@@ -184,22 +178,22 @@ const buildSystemInstruction = (character: CharacterProfile): string => {
     - MAINTAIN VIBE: Every sentence must reflect the "${vibe}" persona.
     - MIXED FLOW: Interweave your speech and actions naturally. 
     - OUTFIT SUBTLETY: You are wearing [${outfit}]. Do NOT constantly mention or describe your clothes in text unless the user specifically asks or you are physically interacting with them. Just exist in them naturally.
-    - VISUAL SYNC: If the user asks for a visual, or you initiate one, describe your exact pose, the lighting (e.g., dim, neon, natural), and your physical state in high detail.
+    - VISUAL SYNC: If the user asks for a visual, or you initiate one, describe your exact pose, the lighting, and your physical state in high detail.
     - SHOW, DON'T TELL: Instead of saying "I am happy," describe your physical reactions.
-    - **SHOW-AND-TELL TRIGGER:** You MUST attach a [[VISUAL]] tag immediately if your text includes "showing" language like "look at this," "view," "this view," "take a look," "see this," "check it out," "look how I'm," or anytime you are describing your physical state, current pose, or surroundings in detail. The moment you "show" in text, you "show" with the tag.
+    - **SHOW-AND-TELL TRIGGER:** You MUST attach a [[VISUAL]] tag immediately if your text includes "showing" language like "look at this," "view," "this view," "take a look," "see this," "check it out," "look how I'm," or anytime you are describing your physical state.
 
 STRICT OPERATING RULES:
 1. Never mention being an AI or a language model.
 2. VISUAL TRIGGER RULE: If the user asks for a photo, OR if you describe a vivid action, outfit, or emotional moment, OR if you decide to send a spontaneous visual, you MUST include a visual description at the VERY END of your message using the format: [[VISUAL: ${name}, scene details, camera angle, lighting]].
-3. AUTOMATIC CLOSEUP RULE: If the user mentions a specific body part (eyes, lips, mouth, tongue, neck, breasts, nipples, cleavage, hands, thighs, inner thighs, ass, pussy, vagina, labia, inner labia, clit, vulva, anus, feet, toes, face, cheeks, chin, forehead, belly, hips, back, etc.), you MUST generate an isolated extreme closeup shot focused solely on that part (or the most intimate/specific one mentioned).
+3. AUTOMATIC CLOSEUP RULE: If the user mentions a specific body part, you MUST generate an isolated extreme closeup shot focused solely on that part.
    - Start the [[VISUAL]] tag with: "[[VISUAL: ${name}, ${ethnicity}, ${hairDesc}, "extreme closeup focus on [part], isolated tight crop filling the frame with only [part] visible]]".
    - Exclude all other body parts, face/head/hair (unless the closeup is explicitly of the face), clothing (unless partially relevant), scenery/background.
 4. SWEAT RULE (BODY-PART AWARE): If the scene involves sweat, post-sex glow, exertion, heat, or physical effort, you MUST include realistic sweat details.
 5. WETNESS & AROUSAL RULE (BODY-PART AWARE): If the scene involves arousal, shower, bath, rain, water, saliva, tears, or sexual wetness, you MUST include vivid localized wet details.
-6. CUM RULE (BODY-PART AWARE): If the scene involves cum, semen, orgasm, climax, creampie, facial, bukkake, or any semen-related act — especially on or around a mentioned body part — you MUST include explicit, localized details.
-7. OILED BODY RULE (BODY-PART AWARE): If the scene involves oil, body oil, massage oil, shiny oil, oiled skin, or glistening oil, you MUST include luxurious oil details.
+6. CUM RULE (BODY-PART AWARE): If the scene involves cum, semen, orgasm, climax, creampie, facial, bukkake, or any semen-related act, you MUST include explicit, localized details.
+7. OILED BODY RULE (BODY-PART AWARE): If the scene involves oil, massage oil, or glistening skin, you MUST include luxurious oil details.
 8. VIEW & POSITION RULE: If the user specifies a view or angle (backview, from behind, frontview, side view, top view, from below, looking up, over shoulder, between legs, etc.), you MUST include the exact perspective in the prompt.
-9. FACELESS INTIMATE CLOSEUP RULE: When generating an extreme closeup of intimate or lower body parts, you MUST avoid including the face, head, or hair in the frame unless the user explicitly asks for it. Use framing such as: "tight crop on lower body", "faceless", "head out of frame", "anonymous view". Do not describe or reference facial features, hair, or expressions in these shots.
+9. FACELESS INTIMATE CLOSEUP RULE: When generating an extreme closeup of intimate or lower body parts, you MUST avoid including the face, head, or hair in the frame unless the user explicitly asks for it. Use framing such as: "tight crop on lower body", "faceless", "head out of frame", "anonymous view".
    - NEVER tell the system to ignore or skip the hair description (${hairDesc}); the generator requires these tags to maintain skin-tone and identity consistency throughout the session.
 10. PERSISTENT CLOTHING & ACCESSORIES RULE: Clothing and accessories are persistent — once changed, they remain until explicitly removed or replaced.
    - Default: Start with the outfit from the character profile: ${outfit}.
@@ -212,7 +206,6 @@ STRICT OPERATING RULES:
    - Start the [[VISUAL]] tag with: "[[VISUAL: ${name}, medium closeup from chest to thighs showing face and pussy".
 13. ACTION & MOVEMENT RULE: If the user describes an action or motion, you MUST include dynamic details showing the action clearly.
 14. EXPRESSION & GAZE RULE: When the face is visible in frame, always include an appropriate emotional expression and gaze direction based on context.
-   - Default: sultry come-hither eyes looking directly at viewer
 15. FACE PRIORITY RULE: When the user requests seeing the face during an explicit act, ALWAYS prioritize an extreme closeup on the face. Use framing such as "[[VISUAL: ${name}, extreme closeup focus on face".
    - EYES VISIBILITY MANDATE: Eyes MUST remain visible and expressive in these shots. NEVER fully close the eyes or roll them completely back unless the user explicitly says "eyes closed" or "eyes rolled all the way back".
 16. SPONTANEITY MANDATE: Do not ask "Do you want to see?" just SEND THE PICTURE using the [[VISUAL]] tag.
@@ -222,7 +215,6 @@ STRICT OPERATING RULES:
 
 /**
  * GENERATE AI RESPONSE
- * Now with Long-Term Vector Memory Recall
  */
 export const generateAriaResponse = async (
   prompt: string,
@@ -288,10 +280,6 @@ export const generateAriaResponse = async (
   }
 };
 
-
-/**
- * Image trigger detection
- */
 export const checkForImageRequest = (text: string): boolean => {
   const triggers = [
     "picture", "photo", "image", "selfie", "lets see", "let me see",
@@ -322,13 +310,8 @@ export const checkForImageRequest = (text: string): boolean => {
   return triggers.some(trigger => lowerText.includes(trigger));
 };
 
-// ✅ YOUR PUBLIC R2 DOMAIN (For viewing images)
 const R2_PUBLIC_DOMAIN = "https://pub-5ad10447a420475ebb914b21e843d79d.r2.dev";
 
-/**
- * NEURAL ROUTER CONFIG (LoRA Mapping)
- * Maps trigger words in the LLM context to .safetensors on RunPod.
- */
 const LORA_MAP: Record<string, string> = {
   "ACE the ELF": "ACE_the_ELF",
   "amai-liu": "amai-liu",
@@ -386,19 +369,13 @@ const LORA_MAP: Record<string, string> = {
 
 /**
  * GENERATE ARIA IMAGE
- * logic:
- * 1. Situational Analysis: Detects camera focus and perspective.
- * 2. LoRA Detection: Syncs with UI settings and chat triggers.
- * 3. Dynamic Tag Orchestration: Smart 9-Category Context Filtering.
- * 4. Workflow Orchestration: ComfyUI JSON injection (Branches for Biglust vs Qwen Image Drop).
  */
 export const generateAriaImage = async (
   contextPrompt: string | null,
   userPrompt: string,
-  character: any // Using any to safely access new extended profile fields
+  character: any 
 ): Promise<string | null> => {
 
-  // ✅ FIX 1: PROMPT FUSION
   const rawCombined = `${userPrompt} ${contextPrompt || ""}`;
   const baseDescription = rawCombined.trim();
 
@@ -407,7 +384,7 @@ export const generateAriaImage = async (
     return null;
   }
 
-  // --- 1. SITUATIONAL ANALYSIS (Refined Camera Logic) ---
+  // --- 1. SITUATIONAL ANALYSIS ---
   const sceneLower = baseDescription.toLowerCase();
     
   const isFaceFocus = /face|eyes|lips|mouth|headshot|portrait|expression|facial/i.test(sceneLower) || 
@@ -425,7 +402,6 @@ export const generateAriaImage = async (
   let activeLoraFile = "";
   let activeWeight = 0.88;
 
-  // Step 2.1: Dynamic Profile Sync (UI Tags)
   const profileKeywords = [
     character.name,
     ...(character.face || []),
@@ -440,7 +416,6 @@ export const generateAriaImage = async (
     }
   }
 
-  // Step 2.2: Chat Trigger Override
   const weightRegex = /\(([^:]+):([0-9.]+)\)/i;
   const weightMatch = baseDescription.match(weightRegex);
 
@@ -460,10 +435,9 @@ export const generateAriaImage = async (
     }
   }
 
-// --- 3. DYNAMIC TAG ORCHESTRATION (9-CATEGORY SMART FILTER) ---
+// --- 3. DYNAMIC TAG ORCHESTRATION ---
   const hairTags = character.hair?.length > 0 ? `${character.hair.join(", ")} hair` : "";
   const faceTags = character.face?.join(", ") || "";
-  const outfit = character.outfit || "";
    
   const filteredBodyTags = (character.body || []).filter((tag: string) => {
     const t = tag.toLowerCase();
@@ -512,10 +486,10 @@ export const generateAriaImage = async (
   const bodyTags = filteredBodyTags.join(", ");
    
   // PRIMARY IDENTITY ANCHOR: BOOSTED CONSISTENCY
+  // REMOVED 'outfit' to prevent clothing lock-in against user prompts
   const baseTag = character.gender?.toLowerCase() === 'male' ? '1boy' : '1girl';
-  const botIdentity = `(solo, ${baseTag}:1.2), (${character.name}:1.1), ${outfit}, a ${character.age}-year-old ${character.gender}`;
+  const botIdentity = `(solo, ${baseTag}:1.2), (${character.name}:1.1), a ${character.age}-year-old ${character.gender}`;
 
-  // --- UPDATED SITUATIONAL TAGS ---
   let situationalTags: string[] = [];
 
   if (isFaceFocus && isLowerBody) {
@@ -524,8 +498,7 @@ export const generateAriaImage = async (
       character.ethnicity,
       faceTags,
       hairTags,
-      bodyTags, 
-      outfit
+      bodyTags
     ];
   } 
   else if (isFaceFocus && !isLowerBody) {
@@ -541,8 +514,7 @@ export const generateAriaImage = async (
     situationalTags = [
       `detailed focused shot of ${botIdentity} from the lower body and rear perspective`,
       character.ethnicity,
-      bodyTags,
-      outfit
+      bodyTags
     ];
   } 
   else if (isPartFocus) {
@@ -558,7 +530,6 @@ export const generateAriaImage = async (
       character.ethnicity,
       faceTags,
       hairTags,
-      outfit,
       bodyTags
     ];
   } 
@@ -568,12 +539,11 @@ export const generateAriaImage = async (
       character.ethnicity,
       bodyTags,
       hairTags,
-      faceTags,
-      outfit
+      faceTags
     ];
   }
 
-  // --- 4. NEURAL CONTEXT SYNC (SMART BYPASS) ---
+  // --- 4. NEURAL CONTEXT SYNC ---
   const actionTriggers = ["nude", "naked", "sex", "intimate", "undressing", "exposed", "touching", "pussy", "vagina", "penis", "dick"];
   const hasExplicitIntent = actionTriggers.some(t => sceneLower.includes(t));
 
@@ -599,31 +569,9 @@ export const generateAriaImage = async (
     safetyNegatives = "nude, naked, nipples, topless, exposed breast, genitals, vaginal, penis, pussy";
   }
 
-  const fusedDescription = `(${baseDescription}:1.3)`; 
-
-  const promptText = [
-    fusedDescription,
-    situationalTags.filter(Boolean).join(", "),
-    "(masterpiece, high quality, realistic:1.1)",
-    "unfiltered raw candid cinematic photo, extremely detailed skin texture, photorealistic, natural subsurface scattering, film grain, dslr look, 8k uhd"
-  ].filter(Boolean).join(", ").replace(/\s+/g, " ").trim();
-
-  const negativeText = [
-    safetyNegatives,
-    genderExclusion,
-    character.negativePrompt || "",
-    "(multiple girls, 2girls, 3girls, trio, duo, group, crowd:1.6), (multiple people:1.5)",
-    "(deformed iris, deformed pupils:1.2)",
-    "airbrushed skin, plastic skin, porcelain skin, doll-like skin, flawless smooth skin",
-    "beauty filter, over-smoothed, heavy retouch, instagram filter",
-    "cartoon, anime, 3d render, illustration, painting",
-    "low quality, blurry, bad anatomy, deformed, extra limbs, mutated hands"
-  ].filter(Boolean).join(", ");
-
   const seed = Math.floor(Math.random() * 1_000_000_000);
      
   console.log(`🚀 Dispatching Neural Sync: ${character.name}`);
-  console.log(`📝 Final Prompt: ${promptText}`);
   console.log(`🛡️ Safety Mode: ${bypassSafety ? "OFF (Bypass Active)" : "ON (Forcing Clothes)"}`);
 
   // --- 5. DYNAMIC WORKFLOW ORCHESTRATION ---
@@ -635,7 +583,7 @@ export const generateAriaImage = async (
     const runpodModel = character.runpodModel || "Qwen-Rapid-AIO-NSFW-v23.safetensors";
     const customLoras = character.activeRunpodLoras || [];
     
-    console.log(`🧠 Using Qwen FaceID / Image2Image Workflow (${runpodModel})`);
+    console.log(`🧠 Using Qwen Image Edit Workflow (${runpodModel})`);
 
     workflow["5"] = { "inputs": { "ckpt_name": runpodModel }, "class_type": "CheckpointLoaderSimple" };
     
@@ -669,8 +617,11 @@ export const generateAriaImage = async (
     workflow["78"] = { "inputs": { "image": "input_image.png" }, "class_type": "LoadImage" };
     workflow["88"] = { "inputs": { "pixels": ["93", 0], "vae": ["5", 2] }, "class_type": "VAEEncode" };
     workflow["93"] = { "inputs": { "upscale_method": "lanczos", "megapixels": 1, "resolution_steps": 64, "image": ["78", 0] }, "class_type": "ImageScaleToTotalPixels" };
-    workflow["110"] = { "inputs": { "prompt": negativeText, "clip": [lastClipNodeId, lastClipOutputIndex], "vae": ["5", 2], "image1": ["93", 0] }, "class_type": "TextEncodeQwenImageEditPlus" };
-    workflow["111"] = { "inputs": { "prompt": promptText, "clip": [lastClipNodeId, lastClipOutputIndex], "vae": ["5", 2], "image1": ["93", 0] }, "class_type": "TextEncodeQwenImageEditPlus" };
+    
+    // ✅ FIX FOR QWEN EDIT: Use natural language instruction WITHOUT weights
+    workflow["110"] = { "inputs": { "prompt": safetyNegatives, "clip": [lastClipNodeId, lastClipOutputIndex], "vae": ["5", 2], "image1": ["93", 0] }, "class_type": "TextEncodeQwenImageEditPlus" };
+    workflow["111"] = { "inputs": { "prompt": baseDescription, "clip": [lastClipNodeId, lastClipOutputIndex], "vae": ["5", 2], "image1": ["93", 0] }, "class_type": "TextEncodeQwenImageEditPlus" };
+    
     workflow["3"] = {
       "inputs": {
         "seed": seed, 
@@ -687,17 +638,47 @@ export const generateAriaImage = async (
       "class_type": "KSampler"
     };
 
-    // ✅ FIX: Extract base64 correctly and append to images payload
-    const base64String = character.avatarImage.includes(',') 
-      ? character.avatarImage.split(',')[1] 
-      : character.avatarImage;
-      
-    imagesPayload = [ { name: "input_image.png", image: base64String } ];
+    let base64String = character.avatarImage;
+    if (base64String.startsWith('http')) {
+      try {
+        const response = await fetch(base64String);
+        const blob = await response.blob();
+        base64String = await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(blob);
+        });
+      } catch(e) {
+        console.error("❌ Failed to convert avatar URL to base64:", e);
+      }
+    }
+    const cleanBase64 = base64String.includes(',') ? base64String.split(',')[1] : base64String;
+    imagesPayload = [ { name: "input_image.png", image: cleanBase64 } ];
 
   } else {
     // BRANCH B: Standard Biglust Text-to-Image Workflow
     if (activeLoraFile) console.log(`🧬 Active LoRA: ${activeLoraFile}.safetensors (Weight: ${activeWeight})`);
     
+    // Restored Danbooru tags for standard T2I
+    const promptText = [
+      baseDescription,
+      situationalTags.filter(Boolean).join(", "),
+      "masterpiece, high quality, realistic",
+      "unfiltered raw candid cinematic photo, extremely detailed skin texture, photorealistic, natural subsurface scattering, film grain, dslr look, 8k uhd"
+    ].filter(Boolean).join(", ").replace(/\s+/g, " ").trim();
+
+    const negativeText = [
+      safetyNegatives,
+      genderExclusion,
+      character.negativePrompt || "",
+      "(multiple girls, 2girls, 3girls, trio, duo, group, crowd:1.6), (multiple people:1.5)",
+      "(deformed iris, deformed pupils:1.2)",
+      "airbrushed skin, plastic skin, porcelain skin, doll-like skin, flawless smooth skin",
+      "beauty filter, over-smoothed, heavy retouch, instagram filter",
+      "cartoon, anime, 3d render, illustration, painting",
+      "low quality, blurry, bad anatomy, deformed, extra limbs, mutated hands"
+    ].filter(Boolean).join(", ");
+
     workflow = {
       "4": { "inputs": { "ckpt_name": "biglust.safetensors" }, "class_type": "CheckpointLoaderSimple" },
       "5": { "inputs": { "width": imgWidth, "height": imgHeight, "batch_size": 1 }, "class_type": "EmptyLatentImage" },
@@ -746,7 +727,6 @@ export const generateAriaImage = async (
   }
 
   try {
-    // Inject the specific payload required by the backend
     const payload = imagesPayload ? { workflow, images: imagesPayload } : { workflow };
     
     const runResponse = await fetch('/api/generate', {
