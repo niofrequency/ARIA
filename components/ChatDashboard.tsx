@@ -2,7 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Bot, CharacterProfile, Conversation, Message, UserData } from '../types';
 import Sidebar from './Sidebar';
 import MainChatArea from './MainChatArea';
-import BotCustomizationModal, { ExtendedCharacterProfile } from './BotCustomizationModal';
+import BotCustomizationModal from './BotCustomizationModal';
+import CompanionCreationModal from './CompanionCreationModal';
 import LoadingScreen from './LoadingScreen';
 import { 
   saveBotToFirestore, 
@@ -22,9 +23,9 @@ interface ChatDashboardProps {
 
 /**
  * DEFAULT NEW BOT TEMPLATE
- * Updated for the Tagging System & Extended Fields
+ * Fallback used for edge cases.
  */
-const defaultNewBotCharacter: ExtendedCharacterProfile = {
+const defaultNewBotCharacter: CharacterProfile = {
   name: 'New Companion',
   gender: 'female', 
   age: '24',
@@ -35,8 +36,6 @@ const defaultNewBotCharacter: ExtendedCharacterProfile = {
   outfit: 'Casual modern attire',
   ethnicity: 'Latina', 
   negativePrompt: 'blurry, lowres, extra limbs, bad anatomy, watermark, text.',
-  
-  // Safe Fallbacks for Extended Profile
   favoriteLoras: [],
 };
 
@@ -54,8 +53,10 @@ const ChatDashboard: React.FC<ChatDashboardProps> = ({
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isDesktopSidebarOpen, setIsDesktopSidebarOpen] = useState(true);
   const [isLoadingResponse, setIsLoadingResponse] = useState(false);
+  
+  // Modal States
   const [showCustomizationModalForBotId, setShowCustomizationModalForBotId] = useState<string | null>(null);
-  const [isBotBeingCustomizedInitial, setIsBotBeingCustomizedInitial] = useState(false);
+  const [isCreationModalOpen, setIsCreationModalOpen] = useState(false);
   const [isInitialLoadComplete, setIsInitialLoadComplete] = useState(false);
 
   const generateUniqueId = (prefix: string) => `${prefix}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
@@ -112,10 +113,10 @@ const ChatDashboard: React.FC<ChatDashboardProps> = ({
 
   // AUTO-CREATE INITIAL BOT IF NONE EXIST
   useEffect(() => {
-    if (isInitialLoadComplete && bots.length === 0 && !showCustomizationModalForBotId) {
-      handleNewBot();
+    if (isInitialLoadComplete && bots.length === 0 && !showCustomizationModalForBotId && !isCreationModalOpen) {
+      setIsCreationModalOpen(true);
     }
-  }, [isInitialLoadComplete, bots.length]);
+  }, [isInitialLoadComplete, bots.length, showCustomizationModalForBotId, isCreationModalOpen]);
 
   /**
    * HANDLE SEND MESSAGE
@@ -216,26 +217,34 @@ const ChatDashboard: React.FC<ChatDashboardProps> = ({
     setIsMobileSidebarOpen(false);
   };
 
-  const handleNewBot = async () => {
+  const handleNewBot = () => {
+    setIsCreationModalOpen(true);
+    setIsMobileSidebarOpen(false);
+  };
+
+  const handleCreateNewCompanion = async (newCharacter: CharacterProfile) => {
     if (!userData?.uid) return;
     const newBotId = generateUniqueId('bot');
-    const newBotName = `Companion ${bots.length + 1}`;
+    const newBotName = newCharacter.name || `Companion ${bots.length + 1}`;
+    
     const newBot: Bot = {
       id: newBotId,
       name: newBotName,
-      personality: defaultNewBotCharacter.vibe,
+      personality: newCharacter.vibe || 'A friendly companion.',
       avatarColor: 'bg-purple-600',
-      characterProfile: { ...defaultNewBotCharacter, name: newBotName },
+      characterProfile: newCharacter,
       lastMessagePreview: 'Initialize Link...',
       lastActivity: Date.now(),
     };
+
     await saveBotToFirestore(userData.uid, newBot);
     setBots(prev => [...prev, newBot]);
     setSelectedBotId(newBotId);
     localStorage.setItem('aria_last_active_bot', newBotId);
     setConversations(prev => new Map(prev).set(newBotId, []));
-    setShowCustomizationModalForBotId(newBotId);
-    setIsBotBeingCustomizedInitial(true);
+    
+    setIsCreationModalOpen(false);
+    handleNewConversation(newBotId, true);
   };
 
   const handleNewConversation = async (botId: string, skipInitialMessage = false) => {
@@ -281,18 +290,14 @@ const ChatDashboard: React.FC<ChatDashboardProps> = ({
     }
   };
 
-  // ✅ SAFELY CAST THE INCOMING DATA TO ExtendedCharacterProfile
-  const handleSaveBotCustomization = async (botId: string, updated: ExtendedCharacterProfile | CharacterProfile) => {
+  const handleSaveBotCustomization = async (botId: string, updated: CharacterProfile) => {
     if (!userData?.uid) return;
     const selected = bots.find(b => b.id === botId);
     if (!selected) return;
+    
     const updatedBot = { ...selected, name: updated.name, personality: updated.vibe, characterProfile: updated };
     await saveBotToFirestore(userData.uid, updatedBot);
     setBots(prev => prev.map(b => b.id === botId ? updatedBot : b));
-    if (isBotBeingCustomizedInitial) {
-        setIsBotBeingCustomizedInitial(false);
-        handleNewConversation(botId, true);
-    }
     setShowCustomizationModalForBotId(null);
   };
 
@@ -338,17 +343,20 @@ const ChatDashboard: React.FC<ChatDashboardProps> = ({
         />
       )}
 
+      {/* NEW COMPANION MODAL */}
+      {isCreationModalOpen && (
+        <CompanionCreationModal
+          onSave={handleCreateNewCompanion}
+          onClose={() => setIsCreationModalOpen(false)}
+        />
+      )}
+
+      {/* EXISTING BOT SETTINGS MODAL */}
       {showCustomizationModalForBotId && (
         <BotCustomizationModal
           character={bots.find(b => b.id === showCustomizationModalForBotId)?.characterProfile || defaultNewBotCharacter}
-          onSave={(u) => handleSaveBotCustomization(showCustomizationModalForBotId, u as ExtendedCharacterProfile)}
-          onClose={() => { 
-            const wasInitial = isBotBeingCustomizedInitial;
-            setShowCustomizationModalForBotId(null); 
-            setIsBotBeingCustomizedInitial(false);
-            if(wasInitial) handleDeleteBot(showCustomizationModalForBotId); 
-          }}
-          isNewBot={isBotBeingCustomizedInitial}
+          onSave={(u) => handleSaveBotCustomization(showCustomizationModalForBotId, u as CharacterProfile)}
+          onClose={() => setShowCustomizationModalForBotId(null)}
         />
       )}
     </div>
