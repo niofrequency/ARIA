@@ -46,7 +46,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Message payload is empty after sanitization.' });
     }
 
-    const targetModel = model || "grok-3"; // Note: Ensure your API tier supports the literal string "grok-3"
+    const targetModel = model || "grok-4.3"; // Note: Ensure your API tier supports the literal string "grok-3"
     console.log(`🧠 Proxying request to xAI: ${targetModel}`);
     
     // 3. EXECUTE NEURAL REQUEST
