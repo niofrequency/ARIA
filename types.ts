@@ -26,6 +26,12 @@ export interface CharacterProfile {
   outfit: string;      // Persistent clothing state (String/TextArea as it's dynamic)
   ethnicity: string;   // Single select base morphology
   negativePrompt: string;
+  
+  // ✅ NEW FIELDS FOR IDENTITY DROPS & LORAS
+  avatarImage?: string | null;
+  runpodModel?: string;
+  activeRunpodLoras?: { id: string; name: string; strength: number }[];
+  favoriteLoras?: string[];
 }
 
 export interface UserData {
