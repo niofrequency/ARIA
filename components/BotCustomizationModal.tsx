@@ -1,30 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import { CharacterProfile } from '../types';
-import { X, Save, Sparkles, Cpu, Fingerprint, Activity, Loader2, Plus, Heart, Camera, Box } from 'lucide-react';
+import { X, Save, Sparkles, Cpu, Fingerprint, Activity, Loader2, Plus, AlertCircle, Box, Camera, Heart } from 'lucide-react';
 
-// Extended CharacterProfile
+// --- EXTENDED PROFILE INTERFACE ---
 export interface ExtendedCharacterProfile extends CharacterProfile {
   bodyType?: string;
   preferredAngles?: string[];
   preferredShotTypes?: string[];
   favoriteLoras?: string[];
   nsfwSpecialties?: string[];
-  aestheticStyle?: string;
 }
 
 interface BotCustomizationModalProps {
-  // ✅ FIX: Accept either base profile or extended profile
   character: CharacterProfile | ExtendedCharacterProfile;
-  // ✅ FIX: Explicitly emit the extended profile on save
   onSave: (updatedCharacter: ExtendedCharacterProfile) => void;
   onClose: () => void;
   isNewBot?: boolean;
 }
 
+// --- CONSTANTS ---
 const BODY_TYPES = ['Petite', 'Slim', 'Athletic', 'Curvy', 'Thick', 'Plus-size', 'Hourglass', 'Random'];
 const CAMERA_ANGLES = ['Eye-level', 'High angle', 'Low angle', 'Three-quarter view', 'Side profile', 'From behind'];
 const SHOT_TYPES = ['Close-up (Face)', 'Close-up (Body)', 'Medium shot', 'Full body', 'Dynamic pose'];
-
 const COMMON_LORAS = [
   { id: "hairypussyv7.safetensors", name: "Hairy Pussy v7" },
   { id: "hairypussyv9.safetensors", name: "Hairy Pussy v9" },
@@ -36,42 +33,34 @@ const COMMON_LORAS = [
   { id: "twerk.safetensors", name: "Twerk" },
 ];
 
-const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({ 
-  character, 
-  onSave, 
-  onClose, 
-  isNewBot = false 
-}) => {
-
-  // ✅ FIX: Safely cast to ExtendedCharacterProfile to prevent TypeScript crashes
-  const extChar = character as ExtendedCharacterProfile;
-
+const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({ character, onSave, onClose, isNewBot = false }) => {
+  // --- UPGRADED INITIALIZATION (ARRAY SAFETY) ---
   const [formData, setFormData] = useState<ExtendedCharacterProfile>({
     ...character,
     hair: Array.isArray(character.hair) ? character.hair : [],
     face: Array.isArray(character.face) ? character.face : [],
     body: Array.isArray(character.body) ? character.body : [],
-    preferredAngles: Array.isArray(extChar.preferredAngles) ? extChar.preferredAngles : [],
-    preferredShotTypes: Array.isArray(extChar.preferredShotTypes) ? extChar.preferredShotTypes : [],
-    favoriteLoras: Array.isArray(extChar.favoriteLoras) ? extChar.favoriteLoras : [],
-    nsfwSpecialties: Array.isArray(extChar.nsfwSpecialties) ? extChar.nsfwSpecialties : [],
-    bodyType: extChar.bodyType || 'Random',
+    preferredAngles: Array.isArray((character as ExtendedCharacterProfile).preferredAngles) ? (character as ExtendedCharacterProfile).preferredAngles : [],
+    preferredShotTypes: Array.isArray((character as ExtendedCharacterProfile).preferredShotTypes) ? (character as ExtendedCharacterProfile).preferredShotTypes : [],
+    favoriteLoras: Array.isArray((character as ExtendedCharacterProfile).favoriteLoras) ? (character as ExtendedCharacterProfile).favoriteLoras : [],
+    nsfwSpecialties: Array.isArray((character as ExtendedCharacterProfile).nsfwSpecialties) ? (character as ExtendedCharacterProfile).nsfwSpecialties : [],
+    bodyType: (character as ExtendedCharacterProfile).bodyType || 'Random',
   });
-
-  const [tagInputs, setTagInputs] = useState({ hair: '', face: '', body: '' });
-  const [isSaving, setIsSaving] = useState(false);
+  
   const [ageError, setAgeError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  
+  const [tagInputs, setTagInputs] = useState({ hair: '', face: '', body: '' });
 
-  // Scroll Lock + Escape Key
   useEffect(() => {
-    const originalStyle = document.body.style.overflow;
+    const originalStyle = window.getComputedStyle(document.body).overflow;
     document.body.style.overflow = 'hidden';
 
     const handleEsc = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
-
     window.addEventListener('keydown', handleEsc);
+    
     return () => {
       document.body.style.overflow = originalStyle;
       window.removeEventListener('keydown', handleEsc);
@@ -80,13 +69,18 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
+    
     if (name === 'age') {
       const ageNum = parseInt(value, 10);
-      if (!isNaN(ageNum) && ageNum >= 18) setAgeError(null);
+      if (!isNaN(ageNum) && ageNum >= 18) {
+        setAgeError(null);
+      }
     }
+    
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  // --- TAG & ARRAY MANAGEMENT ---
   const toggleArrayItem = (field: keyof ExtendedCharacterProfile, value: string) => {
     setFormData(prev => {
       const current = Array.isArray(prev[field]) ? prev[field] as string[] : [];
@@ -99,50 +93,70 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({
 
   const handleAddTag = (field: 'hair' | 'face' | 'body') => {
     const value = tagInputs[field].trim().toLowerCase();
-    if (!value || (formData[field] as string[]).includes(value)) return;
+    if (!value) return;
 
-    setFormData(prev => ({
-      ...prev,
-      [field]: [...(prev[field] as string[]), value]
-    }));
+    if (!(formData[field] as string[]).includes(value)) {
+      setFormData(prev => ({
+        ...prev,
+        [field]: [...(prev[field] as string[]), value]
+      }));
+    }
     setTagInputs(prev => ({ ...prev, [field]: '' }));
   };
 
-  const handleRemoveTag = (field: 'hair' | 'face' | 'body', tag: string) => {
+  const handleRemoveTag = (field: 'hair' | 'face' | 'body', tagToRemove: string) => {
     setFormData(prev => ({
       ...prev,
-      [field]: (prev[field] as string[]).filter(t => t !== tag)
+      [field]: (prev[field] as string[]).filter(tag => tag !== tagToRemove)
     }));
   };
 
-  const handleSubmit = async () => {
-    const ageNum = parseInt(formData.age as string, 10);
+  const handleTagKeyDown = (e: React.KeyboardEvent, field: 'hair' | 'face' | 'body') => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleAddTag(field);
+    }
+  };
+
+  const handleSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (isSaving) return;
+
+    const ageNum = parseInt(formData.age, 10);
     if (isNaN(ageNum) || ageNum < 18) {
       setAgeError('Neural link requires age 18 or older.');
       return;
     }
-
+    
+    setAgeError(null);
     setIsSaving(true);
+    
     try {
       await onSave(formData);
-      onClose();
     } catch (err) {
       console.error("Failed to save character:", err);
-    } finally {
       setIsSaving(false);
     }
   };
 
+  // --- RENDER HELPERS ---
   const renderTagField = (field: 'hair' | 'face' | 'body', label: string, placeholder: string) => (
     <div className="space-y-2">
       <label className="block text-[10px] uppercase tracking-[0.2em] text-zinc-500 font-bold ml-1">
         {label}
       </label>
-      <div className="flex flex-wrap gap-2 p-3 bg-white/[0.02] border border-white/10 rounded-xl min-h-[52px]">
+      <div className="flex flex-wrap gap-2 p-3 bg-white/[0.02] border border-white/10 rounded-xl min-h-[52px] focus-within:border-purple-500/50 transition-all">
         {(formData[field] as string[]).map((tag, idx) => (
-          <div key={idx} className="flex items-center gap-1.5 px-3 py-1 bg-purple-500/10 border border-purple-500/20 text-purple-400 text-[11px] rounded-lg">
+          <div 
+            key={`${field}-${idx}`} 
+            className="flex items-center gap-1.5 px-3 py-1 bg-purple-500/10 border border-purple-500/20 text-purple-400 text-[11px] font-bold rounded-lg animate-in zoom-in duration-200"
+          >
             {tag}
-            <button onClick={() => handleRemoveTag(field, tag)} className="hover:text-white transition-colors">
+            <button 
+              type="button" 
+              onClick={() => handleRemoveTag(field, tag)}
+              className="hover:text-white transition-colors"
+            >
               <X className="w-3 h-3" />
             </button>
           </div>
@@ -151,146 +165,158 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({
           type="text"
           value={tagInputs[field]}
           onChange={(e) => setTagInputs(prev => ({ ...prev, [field]: e.target.value }))}
-          onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddTag(field))}
-          placeholder={placeholder}
-          className="flex-1 min-w-[140px] bg-transparent text-sm placeholder-zinc-700 focus:outline-none"
+          onKeyDown={(e) => handleTagKeyDown(e, field)}
+          placeholder={(formData[field] as string[]).length === 0 ? placeholder : "Add more..."}
+          className="flex-1 min-w-[120px] bg-transparent text-sm text-white placeholder-zinc-700 focus:outline-none"
         />
-        <button onClick={() => handleAddTag(field)} className="text-zinc-400 hover:text-purple-400">
+        <button 
+          type="button"
+          onClick={() => handleAddTag(field)}
+          className="p-1 hover:bg-white/5 rounded-md text-zinc-500 transition-colors"
+        >
           <Plus className="w-4 h-4" />
         </button>
       </div>
     </div>
   );
 
+  const renderInput = (
+    name: keyof ExtendedCharacterProfile, 
+    label: string, 
+    placeholder: string, 
+    type: 'text' | 'number' | 'textarea' = 'text',
+    isAnchor: boolean = false
+  ) => (
+    <div className="space-y-1.5">
+      <label htmlFor={name} className={`block text-[10px] uppercase tracking-[0.2em] font-bold ml-1 ${isAnchor ? 'text-purple-500' : 'text-zinc-500'}`}>
+        {isAnchor ? `Identity Anchor (${label})` : label}
+      </label>
+      {type === 'textarea' ? (
+        <textarea
+          id={name}
+          name={name}
+          disabled={isSaving}
+          value={formData[name] as string || ''}
+          onChange={handleChange}
+          placeholder={placeholder}
+          rows={3}
+          className="w-full bg-white/[0.02] border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/50 transition-all resize-none custom-scrollbar disabled:opacity-50"
+        />
+      ) : (
+        <input
+          type={type}
+          id={name}
+          name={name}
+          disabled={isSaving}
+          value={formData[name] as string || ''}
+          onChange={handleChange}
+          placeholder={placeholder}
+          className={`w-full bg-white/[0.02] border rounded-xl px-4 py-3 text-sm text-white placeholder-zinc-600 focus:outline-none focus:ring-1 transition-all disabled:opacity-50 ${isAnchor ? 'border-purple-500/40 focus:border-purple-500 focus:ring-purple-500/50 shadow-[0_0_15px_rgba(147,51,234,0.05)]' : 'border-white/10 focus:border-purple-500/50 focus:ring-purple-500/50'}`}
+        />
+      )}
+    </div>
+  );
+
   return (
-    // ✅ FIX: Bumped z-index to z-[9999] to prevent it from hiding behind the sidebar or main chat area
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/95 backdrop-blur-sm p-2" onClick={onClose}>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 backdrop-blur-sm p-2 sm:p-4 animate-in fade-in duration-300" onClick={onClose}>
       <div 
-        className="relative w-full max-w-2xl max-h-[92dvh] bg-zinc-950 border border-white/10 rounded-3xl overflow-hidden flex flex-col" 
-        onClick={e => e.stopPropagation()}
+        className="relative w-full max-w-2xl max-h-[90dvh] flex flex-col bg-zinc-950 border border-white/10 rounded-[1.5rem] md:rounded-[2rem] shadow-2xl overflow-hidden" 
+        onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="p-8 pb-6 border-b border-white/5 shrink-0">
-          <div className="flex items-center gap-3 mb-2">
-            <Cpu className="w-5 h-5 text-purple-500" />
-            <span className="uppercase tracking-[0.4em] text-xs text-purple-500 font-bold">Qwen AIO NSFW Profile</span>
-          </div>
-          <h2 className="text-3xl font-light tracking-tight">
-            {isNewBot ? 'Create New' : 'Configure'} <span className="text-purple-500 font-semibold">Interface</span>
-          </h2>
+        <div className="absolute inset-0 z-0 opacity-10 pointer-events-none" 
+              style={{ backgroundImage: 'linear-gradient(#27272a 1px, transparent 1px), linear-gradient(90deg, #27272a 1px, transparent 1px)', backgroundSize: '30px 30px' }}>
         </div>
+        <div className="absolute top-0 right-0 w-64 h-64 bg-purple-600/10 rounded-full blur-[100px] z-0 pointer-events-none" />
 
-        <div className="overflow-y-auto p-8 space-y-10 custom-scrollbar flex-1">
+        {/* Header */}
+        <div className="relative z-10 flex justify-between items-start p-6 md:p-10 pb-4 md:pb-6">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+                <Cpu className="w-4 h-4 text-purple-500" />
+                <span className="text-[10px] uppercase tracking-[0.4em] text-purple-500 font-bold">Neural Configuration</span>
+            </div>
+            <h2 className="text-2xl md:text-3xl font-light text-white tracking-tight">
+              {isNewBot ? 'Initialize' : 'Modify'} <span className="font-semibold text-purple-500">Interface</span>
+            </h2>
+          </div>
+          <button onClick={onClose} disabled={isSaving} className="p-2 bg-white/5 text-zinc-500 hover:text-white rounded-xl transition-all disabled:opacity-30">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        
+        {/* Form Content */}
+        <form onSubmit={handleSubmit} className="relative z-10 flex-1 overflow-y-auto px-6 md:px-10 pb-6 custom-scrollbar space-y-8">
           
-          {/* Core Identity */}
-          <div className="space-y-6">
-            <div className="flex items-center gap-2">
-              <Fingerprint className="w-4 h-4 text-zinc-400" />
-              <h3 className="uppercase text-xs tracking-widest text-zinc-400 font-bold">Core Identity</h3>
+          {/* SECTION 1: Core Identity */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 pb-2 border-b border-white/5">
+                <Fingerprint className="w-4 h-4 text-zinc-500" />
+                <h3 className="text-xs uppercase tracking-widest text-zinc-300 font-bold">Core Identity</h3>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-[10px] uppercase tracking-[0.2em] text-zinc-500 mb-1.5">Designation</label>
-                <input
-                  name="name"
-                  value={formData.name || ''}
-                  onChange={handleChange}
-                  className="w-full bg-white/[0.02] border border-white/10 rounded-xl px-4 py-3 text-sm"
-                  placeholder="Interface Name"
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] uppercase tracking-[0.2em] text-zinc-500 mb-1.5">Age</label>
-                <input
-                  type="number"
-                  name="age"
-                  value={formData.age || ''}
-                  onChange={handleChange}
-                  className="w-full bg-white/[0.02] border border-white/10 rounded-xl px-4 py-3 text-sm"
-                  placeholder="18"
-                />
-                {ageError && <p className="text-red-500 text-xs mt-1">{ageError}</p>}
-              </div>
-              <div>
-                <label className="block text-[10px] uppercase tracking-[0.2em] text-zinc-500 mb-1.5">Gender</label>
-                <input
-                  name="gender"
-                  value={formData.gender || ''}
-                  onChange={handleChange}
-                  className="w-full bg-white/[0.02] border border-white/10 rounded-xl px-4 py-3 text-sm"
-                  placeholder="female"
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] uppercase tracking-[0.2em] text-zinc-500 mb-1.5">Ethnicity</label>
-                <input
-                  name="ethnicity"
-                  value={formData.ethnicity || ''}
-                  onChange={handleChange}
-                  className="w-full bg-white/[0.02] border border-white/10 rounded-xl px-4 py-3 text-sm"
-                  placeholder="Asian, Latina, etc."
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Morphological Profile */}
-          <div className="space-y-6">
-            <div className="flex items-center gap-2">
-              <Box className="w-4 h-4 text-zinc-400" />
-              <h3 className="uppercase text-xs tracking-widest text-zinc-400 font-bold">Morphological Profile</h3>
-            </div>
-
-            <div className="grid grid-cols-1 gap-8">
-              {renderTagField('hair', 'Hair Configuration', 'long silver hair, bangs...')}
-              {renderTagField('face', 'Facial Details', 'blue eyes, freckles...')}
-              {renderTagField('body', 'Body Details', 'thick thighs, slim waist...')}
-
-              {/* Body Type */}
-              <div>
-                <label className="block text-[10px] uppercase tracking-widest text-zinc-500 mb-3">Primary Body Type</label>
-                <div className="flex flex-wrap gap-2">
-                  {BODY_TYPES.map(bt => (
-                    <button
-                      key={bt}
-                      onClick={() => setFormData(prev => ({ ...prev, bodyType: bt }))}
-                      className={`px-4 py-2 rounded-xl text-sm transition-all ${formData.bodyType === bt 
-                        ? 'bg-purple-600 text-white' 
-                        : 'bg-white/5 hover:bg-white/10 text-zinc-400'}`}
-                    >
-                      {bt}
-                    </button>
-                  ))}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {renderInput('name', 'Designation', 'Unique Interface Name', 'text', true)}
+                <div>
+                  {renderInput('age', 'Chronological Age', 'Min. 18', 'number')}
+                  {ageError && <p className="text-red-500 text-[10px] uppercase mt-1 font-bold">{ageError}</p>}
                 </div>
-              </div>
-
-              <textarea
-                name="outfit"
-                value={formData.outfit || ''}
-                onChange={handleChange}
-                placeholder="Default outfit / clothing style..."
-                className="w-full bg-white/[0.02] border border-white/10 rounded-2xl p-4 text-sm min-h-[80px]"
-              />
+                {renderInput('gender', 'Biological Blueprint', 'female, male, etc.')}
+                {renderInput('ethnicity', 'Ethnicity', 'Latina, Asian, Caucasian, etc.')}
             </div>
           </div>
 
-          {/* Generation Preferences */}
-          <div className="space-y-6">
-            <div className="flex items-center gap-2">
-              <Camera className="w-4 h-4 text-zinc-400" />
-              <h3 className="uppercase text-xs tracking-widest text-zinc-400 font-bold">Generation Preferences</h3>
+          {/* SECTION 2: Morphological Specs (UPGRADED) */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 pb-2 border-b border-white/5">
+                <Box className="w-4 h-4 text-zinc-500" />
+                <h3 className="text-xs uppercase tracking-widest text-zinc-300 font-bold">Morphological Specs</h3>
+            </div>
+            
+            <div className="space-y-4">
+                {renderTagField('hair', 'Hair Detail Configuration', 'blonde, long, wavy')}
+                {renderTagField('face', 'Facial Neural Markers', 'freckles, blue eyes, sharp jawline')}
+                {renderTagField('body', 'Physique Parameters', 'athletic, tall, hourglass')}
+            </div>
+
+            {/* NEW: Body Type Selector */}
+            <div>
+              <label className="block text-[10px] uppercase tracking-[0.2em] font-bold text-zinc-500 mb-2 ml-1">Primary Body Type</label>
+              <div className="flex flex-wrap gap-2">
+                {BODY_TYPES.map(bt => (
+                  <button
+                    key={bt}
+                    type="button"
+                    onClick={() => setFormData(prev => ({ ...prev, bodyType: bt }))}
+                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${formData.bodyType === bt 
+                      ? 'bg-purple-600 text-white' 
+                      : 'bg-white/5 hover:bg-white/10 text-zinc-400'}`}
+                  >
+                    {bt}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {renderInput('outfit', 'Apparel Protocol', 'Silk dress, oversized sweater, etc.', 'textarea')}
+          </div>
+
+          {/* SECTION 3: Generation Preferences (NEW) */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 pb-2 border-b border-white/5">
+              <Camera className="w-4 h-4 text-zinc-500" />
+              <h3 className="text-xs uppercase tracking-widest text-zinc-300 font-bold">Generation Preferences</h3>
             </div>
 
             <div>
-              <label className="block text-[10px] uppercase tracking-widest text-zinc-500 mb-3">Preferred Camera Angles</label>
+              <label className="block text-[10px] uppercase tracking-[0.2em] font-bold text-zinc-500 mb-2 ml-1">Preferred Camera Angles</label>
               <div className="flex flex-wrap gap-2">
                 {CAMERA_ANGLES.map(angle => (
                   <button
                     key={angle}
+                    type="button"
                     onClick={() => toggleArrayItem('preferredAngles', angle)}
-                    className={`px-4 py-1.5 text-sm rounded-xl transition-all border ${formData.preferredAngles?.includes(angle) 
+                    className={`px-4 py-1.5 text-xs font-bold rounded-xl transition-all border ${formData.preferredAngles?.includes(angle) 
                       ? 'border-purple-500 bg-purple-500/10 text-purple-400' 
-                      : 'border-white/10 hover:border-white/30'}`}
+                      : 'border-white/10 hover:border-white/30 text-zinc-400'}`}
                   >
                     {angle}
                   </button>
@@ -299,15 +325,16 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-[10px] uppercase tracking-widest text-zinc-500 mb-3">Preferred Shot Types</label>
+              <label className="block text-[10px] uppercase tracking-[0.2em] font-bold text-zinc-500 mb-2 ml-1">Preferred Shot Types</label>
               <div className="flex flex-wrap gap-2">
                 {SHOT_TYPES.map(shot => (
                   <button
                     key={shot}
+                    type="button"
                     onClick={() => toggleArrayItem('preferredShotTypes', shot)}
-                    className={`px-4 py-1.5 text-sm rounded-xl transition-all border ${formData.preferredShotTypes?.includes(shot) 
+                    className={`px-4 py-1.5 text-xs font-bold rounded-xl transition-all border ${formData.preferredShotTypes?.includes(shot) 
                       ? 'border-purple-500 bg-purple-500/10 text-purple-400' 
-                      : 'border-white/10 hover:border-white/30'}`}
+                      : 'border-white/10 hover:border-white/30 text-zinc-400'}`}
                   >
                     {shot}
                   </button>
@@ -316,15 +343,16 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-[10px] uppercase tracking-widest text-zinc-500 mb-3">Favorite LoRAs (Qwen AIO)</label>
+              <label className="block text-[10px] uppercase tracking-[0.2em] font-bold text-zinc-500 mb-2 ml-1">Favorite LoRAs</label>
               <div className="flex flex-wrap gap-2">
                 {COMMON_LORAS.map(lora => (
                   <button
                     key={lora.id}
+                    type="button"
                     onClick={() => toggleArrayItem('favoriteLoras', lora.id)}
-                    className={`px-4 py-1.5 text-xs rounded-xl transition-all border ${formData.favoriteLoras?.includes(lora.id) 
+                    className={`px-3 py-1 text-xs font-bold rounded-lg transition-all border ${formData.favoriteLoras?.includes(lora.id) 
                       ? 'border-rose-500 bg-rose-500/10 text-rose-400' 
-                      : 'border-white/10 hover:border-white/30'}`}
+                      : 'border-white/10 hover:border-white/30 text-zinc-400'}`}
                   >
                     {lora.name}
                   </button>
@@ -333,72 +361,82 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-[10px] uppercase tracking-widest text-zinc-500 mb-3 flex items-center gap-2">
-                <Heart className="w-4 h-4" /> NSFW Specialties
+              <label className="block text-[10px] uppercase tracking-[0.2em] font-bold text-zinc-500 mb-2 ml-1 flex items-center gap-1.5">
+                <Heart className="w-3 h-3 text-rose-500" /> NSFW Specialties
               </label>
               <input
                 type="text"
-                placeholder="creampie, ahegao, breeding..."
-                className="w-full bg-white/[0.02] border border-white/10 rounded-xl px-4 py-3 text-sm"
+                placeholder="Type and press Enter (e.g., ahegao, breeding)"
+                className="w-full bg-white/[0.02] border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-purple-500/50"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && e.currentTarget.value.trim()) {
-                    toggleArrayItem('nsfwSpecialties', e.currentTarget.value.trim());
+                    e.preventDefault();
+                    toggleArrayItem('nsfwSpecialties', e.currentTarget.value.trim().toLowerCase());
                     e.currentTarget.value = '';
                   }
                 }}
               />
-              <div className="flex flex-wrap gap-2 mt-3">
+              <div className="flex flex-wrap gap-2 mt-2">
                 {formData.nsfwSpecialties?.map((spec, i) => (
-                  <div key={i} className="bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs px-3 py-1 rounded-lg flex items-center gap-1">
+                  <div key={i} className="bg-rose-500/10 border border-rose-500/30 text-rose-400 font-bold text-[10px] uppercase tracking-wider px-3 py-1 rounded-lg flex items-center gap-1.5 animate-in zoom-in duration-200">
                     {spec}
-                    <X className="w-3 h-3 cursor-pointer" onClick={() => toggleArrayItem('nsfwSpecialties', spec)} />
+                    <X className="w-3 h-3 cursor-pointer hover:text-white" onClick={() => toggleArrayItem('nsfwSpecialties', spec)} />
                   </div>
                 ))}
               </div>
             </div>
           </div>
 
-          {/* Behavioral & Negative Prompt */}
-          <div className="space-y-6">
-            <div className="flex items-center gap-2">
-              <Activity className="w-4 h-4 text-zinc-400" />
-              <h3 className="uppercase text-xs tracking-widest text-zinc-400 font-bold">Behavioral Logic</h3>
+          {/* SECTION 4: Behavioral Logic */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 pb-2 border-b border-white/5">
+                <Activity className="w-4 h-4 text-zinc-500" />
+                <h3 className="text-xs uppercase tracking-widest text-zinc-300 font-bold">Behavioral Logic</h3>
             </div>
-            {renderTagField('vibe', 'Personality Matrix', 'bratty, submissive, teasing...')}
-
-            <div>
-              <label className="block text-[10px] uppercase tracking-widest text-zinc-500 mb-2">Negative Prompt</label>
-              <textarea
-                name="negativePrompt"
-                value={formData.negativePrompt || ''}
-                onChange={handleChange}
-                placeholder="low quality, blurry, deformed, extra limbs..."
-                className="w-full bg-white/[0.02] border border-white/10 rounded-2xl p-4 text-sm min-h-[100px]"
-              />
+            <div className="p-4 bg-purple-500/5 rounded-2xl border border-purple-500/10">
+                {renderInput('vibe', 'Personality Matrix', 'Nurturing, playful, etc.', 'textarea')}
             </div>
           </div>
-        </div>
+          
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 pb-2 border-b border-white/5">
+                <Sparkles className="w-4 h-4 text-zinc-500" />
+                <h3 className="text-xs uppercase tracking-widest text-zinc-300 font-bold">Imaging Filters (Negative)</h3>
+            </div>
+            {renderInput('negativePrompt', 'Exclusion Parameters', 'Glasses, hats, jewelry, extra fingers...', 'textarea')}
+          </div>
+        </form>
 
         {/* Footer */}
-        <div className="p-8 border-t border-white/5 flex gap-4 shrink-0">
-          <button 
-            onClick={onClose} 
-            className="flex-1 py-4 rounded-2xl border border-white/10 text-zinc-400 hover:bg-white/5 transition-all"
-          >
-            Cancel
-          </button>
-          <button 
-            onClick={handleSubmit}
-            disabled={isSaving}
-            className="flex-1 py-4 bg-purple-600 hover:bg-purple-500 rounded-2xl font-bold tracking-widest text-sm flex items-center justify-center gap-2 disabled:opacity-70 transition-all"
-          >
-            {isSaving ? <Loader2 className="animate-spin w-5 h-5" /> : isNewBot ? <Sparkles className="w-5 h-5" /> : <Save className="w-5 h-5" />}
-            {isSaving ? 'Saving...' : isNewBot ? 'Initialize Neural Link' : 'Save Character'}
-          </button>
+        <div className="relative z-10 flex flex-col-reverse sm:flex-row justify-end gap-3 p-6 md:p-10 pt-4 md:pt-6 border-t border-white/5 bg-zinc-950">
+            <button 
+              type="button" 
+              onClick={onClose} 
+              disabled={isSaving}
+              className="w-full sm:w-auto px-8 py-3 rounded-xl border border-white/10 text-zinc-400 text-xs uppercase tracking-widest font-bold hover:bg-white/5 transition-all disabled:opacity-30"
+            >
+              Abort
+            </button>
+            <button 
+              onClick={() => handleSubmit()}
+              type="button" 
+              onPointerDown={(e) => e.preventDefault()} 
+              disabled={isSaving}
+              className="w-full sm:w-auto px-8 py-3 bg-purple-600 text-white text-xs uppercase tracking-[0.2em] font-bold rounded-xl flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(147,51,234,0.3)] hover:bg-purple-500 transition-all active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed"
+            >
+              {isSaving ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : isNewBot ? (
+                <Sparkles className="w-4 h-4" />
+              ) : (
+                <Save className="w-4 h-4" />
+              )}
+              {isSaving ? 'Processing...' : isNewBot ? 'Initialize Link' : 'Sync Protocols'}
+            </button>
         </div>
       </div>
     </div>
   );
 };
 
-export default BotCustomizationModal;
+export default
