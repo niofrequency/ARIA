@@ -359,7 +359,7 @@ const LORA_MAP: Record<string, string> = {
 };
 
 /**
- * GENERATE ARIA IMAGE
+ * GENERATE ARIA IMAGE - REFINED
  */
 export const generateAriaImage = async (
   contextPrompt: string | null,
@@ -377,29 +377,26 @@ export const generateAriaImage = async (
 
   const sceneLower = baseDescription.toLowerCase();
 
-  // ==================== MODEL DECISION ====================
+  // ==================== SMART MODEL DECISION ====================
   const hasFace = /face|eyes|lips|mouth|headshot|portrait|selfie|expression|looking at camera|smiling|eyes closed/i.test(sceneLower);
-  const isCloseupOrHalfBody = /closeup|half body|upper body|waist up|chest|shoulders|torso|medium shot/i.test(sceneLower);
-  
+  const isIntimateCloseup = /pussy|ass|butt|rear|boobs|tits|nipples|clit|vulva|anus|feet|toes|armpit|extreme closeup.*(body|lower|intimate)/i.test(sceneLower);
+
   let useQwen = false;
-  if (hasFace) {
-    useQwen = true;                    // Face visible → Qwen
-  } else if (isCloseupOrHalfBody) {
-    useQwen = false;                   // No face + close/half body → Biglust
+  if (isIntimateCloseup) {
+    useQwen = false;                    // Force Biglust for faceless intimate shots
+  } else if (hasFace || sceneLower.includes("selfie")) {
+    useQwen = true;                     // Face or selfie → Qwen
+  } else if (/closeup|half body|upper body|waist up|chest|shoulders/i.test(sceneLower)) {
+    useQwen = false;                    // Body closeups without face → Biglust
   } else {
-    // Default fallback: use Qwen if we have an avatar, else Biglust
-    useQwen = !!character.avatarImage;
+    useQwen = !!character.avatarImage;  // Default: Qwen if we have reference
   }
   
-  console.log(`🎯 Model Decision: ${useQwen ? 'Qwen (Face)' : 'Biglust (No Face)'}`);
+  console.log(`🎯 Model Decision → ${useQwen ? '🔵 Qwen (Face)' : '🔴 Biglust (Body/No Face)'}`);
 
   // --- 1. SITUATIONAL ANALYSIS ---
-  const isFaceFocus = /face|eyes|lips|mouth|headshot|portrait|expression|facial/i.test(sceneLower) || 
-                      (sceneLower.includes("closeup") && !/ass|butt|rear|chest|boobs|tits|legs|feet|pussy|armpit|underarm|navel/i.test(sceneLower));
-
-  const isUpperBody = /upper body|waist up|chest up|bust shot|shoulders|arms|torso|midriff/i.test(sceneLower);
-  const isLowerBody = /lower body|thighs|legs|feet|waist down|ass|butt|rear|backside|behind|hips|crotch/i.test(sceneLower);
-  const isPartFocus = /hands|fingers|feet|toes|skin texture|extreme closeup|armpit|underarm|navel|nails|details/i.test(sceneLower);
+  const isFaceFocus = hasFace || (sceneLower.includes("closeup") && !isIntimateCloseup);
+  const isLowerBody = /lower body|thighs|legs|feet|waist down|ass|butt|rear|backside|behind|hips|crotch|pussy/i.test(sceneLower);
   const isHorizontal = /landscape|horizontal|wide shot|panoramic/i.test(sceneLower);
 
   const imgWidth = isHorizontal ? 1500 : 1024;
@@ -482,7 +479,7 @@ export const generateAriaImage = async (
     if ((s.includes("frontview") || s.includes("backview") || s.includes("sideview") || s.includes("profile") || s.includes("from above") || s.includes("from below") || s.includes("high angle") || s.includes("low angle") || s.includes("overhead") || s.includes("birdseye") || s.includes("wormseye")) && 
         (t.includes("front") || t.includes("back") || t.includes("side") || t.includes("rear") || t.includes("profile") || t.includes("bottom view") || t.includes("top view"))) return true;
 
-    if (!isFaceFocus && !isUpperBody && !isPartFocus && !isLowerBody) {
+    if (!isFaceFocus && !isUpperBody && !isIntimateCloseup && !isLowerBody) {
         const safeTagRegex = /petite|curvy|thick|slim|skinny|tall|short|slender|thin|athletic|fit|toned|muscular|chubby|voluptuous|freckles|pale|tan|dark|skin|bosom|bust|breast|hips|ass|butt|hairy|armpit/i;
         
         if (safeTagRegex.test(t)) return true;
@@ -499,14 +496,14 @@ export const generateAriaImage = async (
 
   if (isFaceFocus && isLowerBody) {
     situationalTags = [
-      `wide medium shot of ${botIdentity} showing both face and lower body`,
+      `medium shot showing face and lower body of ${botIdentity}`,
       character.ethnicity,
       faceTags,
       hairTags,
       bodyTags
     ];
   } 
-  else if (isFaceFocus && !isLowerBody) {
+  else if (isFaceFocus) {
     situationalTags = [
       `extreme closeup portrait of ${botIdentity}`,
       character.ethnicity,
@@ -515,26 +512,10 @@ export const generateAriaImage = async (
       bodyTags
     ];
   } 
-  else if (isLowerBody) {
+  else if (isLowerBody || isIntimateCloseup) {
     situationalTags = [
-      `detailed focused shot of ${botIdentity} from the lower body and rear perspective`,
+      `detailed faceless closeup on lower body`,
       character.ethnicity,
-      bodyTags
-    ];
-  } 
-  else if (isPartFocus) {
-    situationalTags = [
-      `macro detailed focus on ${character.name}'s body part`,
-      character.ethnicity,
-      bodyTags
-    ];
-  } 
-  else if (isUpperBody) {
-    situationalTags = [
-      `waist-up shot of ${botIdentity}`,
-      character.ethnicity,
-      faceTags,
-      hairTags,
       bodyTags
     ];
   } 
@@ -585,6 +566,7 @@ export const generateAriaImage = async (
 
   // BRANCH A: Custom Identity Drop Workflow (Qwen FaceID / Image2Image)
   if (useQwen && character.avatarImage) {
+    console.log("🧠 Using Qwen FaceID Workflow");
     const runpodModel = character.runpodModel || "Qwen-Rapid-AIO-NSFW-v23.safetensors";
     
     // Merge Profile LoRAs with UI-selected LoRAs
@@ -689,6 +671,7 @@ export const generateAriaImage = async (
 
   } else {
     // BRANCH B: Standard Biglust Text-to-Image Workflow
+    console.log("🧬 Using Biglust Text-to-Image");
     if (activeLoraFile) console.log(`🧬 Active LoRA: ${activeLoraFile}.safetensors (Weight: ${activeWeight})`);
     
     const fusedDescription = `(${baseDescription}:1.3)`; 
