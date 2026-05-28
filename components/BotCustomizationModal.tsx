@@ -2,13 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { CharacterProfile } from '../types';
 import { X, Save, Sparkles, Cpu, Fingerprint, Activity, Loader2, Plus, Heart, Camera, Box } from 'lucide-react';
 
-interface BotCustomizationModalProps {
-  character: CharacterProfile;
-  onSave: (updatedCharacter: CharacterProfile) => void;
-  onClose: () => void;
-  isNewBot?: boolean;
-}
-
 // Extended CharacterProfile
 export interface ExtendedCharacterProfile extends CharacterProfile {
   bodyType?: string;
@@ -17,6 +10,15 @@ export interface ExtendedCharacterProfile extends CharacterProfile {
   favoriteLoras?: string[];
   nsfwSpecialties?: string[];
   aestheticStyle?: string;
+}
+
+interface BotCustomizationModalProps {
+  // ✅ FIX: Accept either base profile or extended profile
+  character: CharacterProfile | ExtendedCharacterProfile;
+  // ✅ FIX: Explicitly emit the extended profile on save
+  onSave: (updatedCharacter: ExtendedCharacterProfile) => void;
+  onClose: () => void;
+  isNewBot?: boolean;
 }
 
 const BODY_TYPES = ['Petite', 'Slim', 'Athletic', 'Curvy', 'Thick', 'Plus-size', 'Hourglass', 'Random'];
@@ -41,15 +43,19 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({
   isNewBot = false 
 }) => {
 
+  // ✅ FIX: Safely cast to ExtendedCharacterProfile to prevent TypeScript crashes
+  const extChar = character as ExtendedCharacterProfile;
+
   const [formData, setFormData] = useState<ExtendedCharacterProfile>({
     ...character,
     hair: Array.isArray(character.hair) ? character.hair : [],
     face: Array.isArray(character.face) ? character.face : [],
     body: Array.isArray(character.body) ? character.body : [],
-    preferredAngles: Array.isArray(character.preferredAngles) ? character.preferredAngles : [],
-    preferredShotTypes: Array.isArray(character.preferredShotTypes) ? character.preferredShotTypes : [],
-    favoriteLoras: Array.isArray(character.favoriteLoras) ? character.favoriteLoras : [],
-    nsfwSpecialties: Array.isArray(character.nsfwSpecialties) ? character.nsfwSpecialties : [],
+    preferredAngles: Array.isArray(extChar.preferredAngles) ? extChar.preferredAngles : [],
+    preferredShotTypes: Array.isArray(extChar.preferredShotTypes) ? extChar.preferredShotTypes : [],
+    favoriteLoras: Array.isArray(extChar.favoriteLoras) ? extChar.favoriteLoras : [],
+    nsfwSpecialties: Array.isArray(extChar.nsfwSpecialties) ? extChar.nsfwSpecialties : [],
+    bodyType: extChar.bodyType || 'Random',
   });
 
   const [tagInputs, setTagInputs] = useState({ hair: '', face: '', body: '' });
@@ -157,13 +163,14 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({
   );
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 backdrop-blur-sm p-2" onClick={onClose}>
+    // ✅ FIX: Bumped z-index to z-[9999] to prevent it from hiding behind the sidebar or main chat area
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/95 backdrop-blur-sm p-2" onClick={onClose}>
       <div 
-        className="relative w-full max-w-2xl max-h-[92dvh] bg-zinc-950 border border-white/10 rounded-3xl overflow-hidden" 
+        className="relative w-full max-w-2xl max-h-[92dvh] bg-zinc-950 border border-white/10 rounded-3xl overflow-hidden flex flex-col" 
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="p-8 pb-6 border-b border-white/5">
+        <div className="p-8 pb-6 border-b border-white/5 shrink-0">
           <div className="flex items-center gap-3 mb-2">
             <Cpu className="w-5 h-5 text-purple-500" />
             <span className="uppercase tracking-[0.4em] text-xs text-purple-500 font-bold">Qwen AIO NSFW Profile</span>
@@ -173,7 +180,7 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({
           </h2>
         </div>
 
-        <div className="overflow-y-auto p-8 space-y-10 custom-scrollbar max-h-[calc(92dvh-180px)]">
+        <div className="overflow-y-auto p-8 space-y-10 custom-scrollbar flex-1">
           
           {/* Core Identity */}
           <div className="space-y-6">
@@ -373,7 +380,7 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="p-8 border-t border-white/5 flex gap-4">
+        <div className="p-8 border-t border-white/5 flex gap-4 shrink-0">
           <button 
             onClick={onClose} 
             className="flex-1 py-4 rounded-2xl border border-white/10 text-zinc-400 hover:bg-white/5 transition-all"
