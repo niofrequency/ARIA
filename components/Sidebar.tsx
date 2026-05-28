@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { Bot, Conversation } from '../types';
-import { Plus, LogOut, X, Trash, Cpu, ShieldCheck, PanelLeftClose, Search } from 'lucide-react';
+import { Plus, LogOut, X, Trash, Cpu, ShieldCheck, PanelLeftClose, Search, MessageSquarePlus } from 'lucide-react';
 
 // ==========================================
 // PERFORMANCE UPGRADE: Memoized Bot Item
@@ -174,15 +174,14 @@ return (
           </div>
         </div>
 
-        {/* New Interface Button */}
+        {/* Manifest Construct Button */}
         <div className="relative z-10 p-4 pb-2">
           <button
             onClick={() => handleMobileAction(onNewBot)}
-            className="group w-full flex items-center justify-center gap-2 bg-white/[0.03] border border-white/10 text-white font-bold py-3.5 px-5 rounded-2xl
-              hover:bg-white/10 hover:border-purple-500/50 transition-all duration-300 active:scale-95 shadow-xl"
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-purple-600/10 hover:bg-purple-600/20 border border-purple-500/20 text-purple-400 text-xs uppercase tracking-widest font-bold rounded-xl transition-all active:scale-95 group shadow-xl"
           >
-            <Plus className="w-4 h-4 text-purple-500" />
-            <span className="uppercase tracking-[0.2em] text-[10px]">New Interface</span>
+            <MessageSquarePlus className="w-4 h-4 group-hover:rotate-90 transition-transform" />
+            <span className="uppercase tracking-[0.2em] text-[10px]">Manifest Construct</span>
           </button>
         </div>
 
