@@ -37,11 +37,7 @@ const defaultNewBotCharacter: ExtendedCharacterProfile = {
   negativePrompt: 'blurry, lowres, extra limbs, bad anatomy, watermark, text.',
   
   // Safe Fallbacks for Extended Profile
-  bodyType: 'Random',
-  preferredAngles: [],
-  preferredShotTypes: [],
   favoriteLoras: [],
-  nsfwSpecialties: [],
 };
 
 const ChatDashboard: React.FC<ChatDashboardProps> = ({ 
