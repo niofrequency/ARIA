@@ -181,7 +181,7 @@ return (
             className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-purple-600/10 hover:bg-purple-600/20 border border-purple-500/20 text-purple-400 text-xs uppercase tracking-widest font-bold rounded-xl transition-all active:scale-95 group shadow-xl"
           >
             <MessageSquarePlus className="w-4 h-4 group-hover:rotate-90 transition-transform" />
-            <span className="uppercase tracking-[0.2em] text-[10px]">Manifest Construct</span>
+            <span className="uppercase tracking-[0.2em] text-[10px]">NEW COMPANION</span>
           </button>
         </div>
 
