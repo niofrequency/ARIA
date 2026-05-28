@@ -4,31 +4,24 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
  * ARIA NEURAL IMAGE PROXY (RunPod Serverless)
  * Logic:
  * 1. GET: Polls the status of a specific Job ID from RunPod.
- * 2. POST: Dispatches a ComfyUI workflow (BigLust.safetensors) to the worker.
- * 3. Environment: Handles both local (VITE_) and production (standard) keys.
+ * 2. POST: Dispatches a ComfyUI workflow (supports Identity Images & Text-to-Image).
  */
 
-// Configuration: Checking local dev and production keys
-const API_KEY = process.env.RUNPOD_API_KEY || process.env.RUNPOD_API_KEY;
+const API_KEY = process.env.RUNPOD_API_KEY;
 const ENDPOINT_ID = process.env.RUNPOD_ENDPOINT_ID || "4to1a6ym21ucum";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // 1. CORS CONFIGURATION
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
-  // Handle preflight request
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
+  if (req.method === 'OPTIONS') return res.status(200).end();
 
   // 2. ENVIRONMENT VALIDATION
   if (!API_KEY) {
     console.error("❌ Neural Backend Error: Missing RUNPOD_API_KEY");
-    return res.status(500).json({ 
-      error: 'Server configuration error: Missing Imaging Protocol credentials.' 
-    });
+    return res.status(500).json({ error: 'Server configuration error.' });
   }
 
   // --- GET: POLL NEURAL STATUS ---
@@ -73,7 +66,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // --- POST: DISPATCH IMAGE JOB ---
   if (req.method === 'POST') {
     try {
-      const { workflow } = req.body;
+      // 1. Extract workflow AND images from the request body
+      const { workflow, images } = req.body;
       
       if (!workflow) {
         return res.status(400).json({ error: 'Neural Workflow (ComfyUI) is required.' });
@@ -81,9 +75,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       console.log(`🎨 Dispatching Imaging Workflow to Endpoint: ${ENDPOINT_ID}`);
 
-      // ✅ ADD THESE LOGS HERE
-      // Node "6" is the standard Positive Prompt node in your ComfyUI workflow
-      const positivePrompt = workflow["6"]?.inputs?.text;
+      // 2. Prepare the payload for RunPod
+      // We must merge the workflow and the image data into one 'input' object
+      const runpodInput: any = { workflow };
+
+      // If images exist (e.g., input_image.png), add them as keys to the input object
+      if (images && Array.isArray(images)) {
+        images.forEach((img: any) => {
+          // The key (img.name) must match exactly what the "LoadImage" node expects
+          runpodInput[img.name] = img.image; 
+        });
+      }
+
+      // ✅ ADDED LOGS FOR PROMPT DEBUGGING
+      const positivePrompt = workflow["6"]?.inputs?.text || workflow["111"]?.inputs?.prompt;
       console.log("\n🔍 --- FINAL PROMPT SENT TO RUNPOD ---");
       console.log(positivePrompt); 
       console.log("----------------------------------------\n");
@@ -95,9 +100,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           "Authorization": `Bearer ${API_KEY}`
         },
         body: JSON.stringify({ 
-          input: { 
-            workflow 
-          } 
+          input: runpodInput 
         })
       });
 
