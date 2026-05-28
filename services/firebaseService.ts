@@ -187,15 +187,21 @@ export const saveBotToFirestore = async (userId: string, bot: Bot): Promise<void
   try {
     const botToSave = JSON.parse(JSON.stringify(bot));
 
-    // ✅ If the user dropped a new avatar (base64 data), upload it to Storage first
+    // ✅ Upload Avatar safely and catch Storage rule errors
     if (
       botToSave.characterProfile && 
       botToSave.characterProfile.avatarImage && 
       botToSave.characterProfile.avatarImage.startsWith('data:image')
     ) {
       console.log(`Uploading new identity image for bot ${bot.id}...`);
-      const avatarUrl = await uploadAvatarToStorage(userId, bot.id, botToSave.characterProfile.avatarImage);
-      botToSave.characterProfile.avatarImage = avatarUrl; // Replace base64 with URL
+      try {
+        const avatarUrl = await uploadAvatarToStorage(userId, bot.id, botToSave.characterProfile.avatarImage);
+        botToSave.characterProfile.avatarImage = avatarUrl; // Replace base64 with URL
+      } catch (uploadError: any) {
+        console.error("❌ Avatar upload blocked by Firebase Rules:", uploadError.message);
+        // Wipe the giant base64 string so Firestore doesn't crash from a 1MB payload limit
+        botToSave.characterProfile.avatarImage = null;
+      }
     }
 
     await db.collection(USERS_COLLECTION)
