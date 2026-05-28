@@ -1,10 +1,10 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 /**
- * ARIA BRAIN PROXY (xAI Grok-3)
+ * ARIA BRAIN PROXY (xAI Grok)
  * Logic:
  * 1. Secures the XAI_API_KEY on the server side.
- * 2. Proxies the "Brain" dialogue to Grok-3.
+ * 2. Proxies the "Brain" dialogue to Grok.
  * 3. INTELLIGENT PARSING: Detects [[VISUAL]] tags server-side to flag the frontend.
  */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -33,13 +33,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Invalid message protocol. Expected array.' });
     }
 
-    // ... inside api/chat.ts
+    // ✅ CRITICAL FIX: Sanitize the messages array
+    // xAI will throw a 400 Bad Request if ANY message has an empty string ("") for content.
+    const sanitizedMessages = messages
+      .filter(msg => msg && typeof msg.content === 'string' && msg.content.trim() !== '')
+      .map(msg => ({
+        role: msg.role,
+        content: msg.content.trim()
+      }));
 
-    console.log(`🧠 Proxying request to xAI: ${model || "grok-3"}`);
+    if (sanitizedMessages.length === 0) {
+      return res.status(400).json({ error: 'Message payload is empty after sanitization.' });
+    }
+
+    const targetModel = model || "grok-3"; // Note: Ensure your API tier supports the literal string "grok-3"
+    console.log(`🧠 Proxying request to xAI: ${targetModel}`);
     
-    // ADD THIS LINE TO SEE THE FULL CONVERSATION IN YOUR VERCEL LOGS:
-    console.log("📤 Payload sent to Grok:", JSON.stringify(messages, null, 2)); 
-
     // 3. EXECUTE NEURAL REQUEST
     const response = await fetch("https://api.x.ai/v1/chat/completions", {
       method: "POST",
@@ -48,20 +57,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         "Authorization": `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        messages,
-        model: model || "grok-3", 
+        messages: sanitizedMessages, // Send the cleaned array
+        model: targetModel, 
         temperature: temperature || 0.85, 
-        max_tokens: 1000,       // Increased to ensure Visual Tags fit
+        max_tokens: 1000,       
         stream: false,
-        frequency_penalty: 1.1, // Adjusted for slightly more natural flow
+        frequency_penalty: 1.1, 
         presence_penalty: 0.6
       })
     });
 
     // 4. ERROR HANDLING
     if (!response.ok) {
+      // ✅ We capture the EXACT error xAI returns so you can see it in Vercel
       const errText = await response.text();
       console.error(`❌ xAI API Rejected Request: ${response.status}`, errText);
+      console.error("📦 Payload that failed:", JSON.stringify(sanitizedMessages, null, 2));
+      
       return res.status(response.status).json({ 
         error: `Neural Link Error: ${response.status}`,
         details: errText 
@@ -72,8 +84,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const content = data.choices[0]?.message?.content || "";
 
     // 5. SMART AWARENESS DETECTION
-    // We scan the text here to see if Aria generated a visual tag.
-    // This allows the frontend to instantly trigger the awareness loop.
     const visualRegex = /\[\[VISUAL:\s*(.*?)\s*\]\]/i;
     const visualMatch = content.match(visualRegex);
 
