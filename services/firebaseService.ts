@@ -160,6 +160,8 @@ export const getUserData = async (userId: string): Promise<UserData | null> => {
       data.character.hair = Array.isArray(data.character.hair) ? data.character.hair : [];
       data.character.face = Array.isArray(data.character.face) ? data.character.face : [];
       data.character.body = Array.isArray(data.character.body) ? data.character.body : [];
+      data.character.activeRunpodLoras = Array.isArray(data.character.activeRunpodLoras) ? data.character.activeRunpodLoras : [];
+      data.character.favoriteLoras = Array.isArray(data.character.favoriteLoras) ? data.character.favoriteLoras : [];
     }
 
     return { uid: userId, ...data };
@@ -199,7 +201,6 @@ export const saveBotToFirestore = async (userId: string, bot: Bot): Promise<void
         botToSave.characterProfile.avatarImage = avatarUrl; // Replace base64 with URL
       } catch (uploadError: any) {
         console.error("❌ Avatar upload blocked by Firebase Rules:", uploadError.message);
-        // Wipe the giant base64 string so Firestore doesn't crash from a 1MB payload limit
         botToSave.characterProfile.avatarImage = null;
       }
     }
@@ -228,6 +229,9 @@ export const loadBotsFromFirestore = async (userId: string): Promise<Bot[]> => {
         data.characterProfile.hair = Array.isArray(data.characterProfile.hair) ? data.characterProfile.hair : [];
         data.characterProfile.face = Array.isArray(data.characterProfile.face) ? data.characterProfile.face : [];
         data.characterProfile.body = Array.isArray(data.characterProfile.body) ? data.characterProfile.body : [];
+        // ✅ Ensure arrays load properly so UI maps don't crash
+        data.characterProfile.activeRunpodLoras = Array.isArray(data.characterProfile.activeRunpodLoras) ? data.characterProfile.activeRunpodLoras : [];
+        data.characterProfile.favoriteLoras = Array.isArray(data.characterProfile.favoriteLoras) ? data.characterProfile.favoriteLoras : [];
       }
       return data;
     });
@@ -239,17 +243,14 @@ export const loadBotsFromFirestore = async (userId: string): Promise<Bot[]> => {
 
 /**
  * --- DELETE BOT (TOTAL WIPEOUT) ---
- * Deletes Bot Profile + Media + Memories + Chat History
  */
 export const deleteBotFromFirestore = async (userId: string, botId: string): Promise<void> => {
   try {
     console.log(`🗑️ Terminating Bot: ${botId}...`);
     
-    // 1. Delete Media (Images/Videos in Chat Storage)
     const mediaPath = `chat_media/${userId}/${botId}`;
     await deleteStorageFolder(mediaPath);
 
-    // 2. Delete Avatar Image from Storage
     try {
       const avatarRef = storage.ref().child(`avatars/${userId}/${botId}_avatar.png`);
       await avatarRef.delete();
@@ -258,12 +259,10 @@ export const deleteBotFromFirestore = async (userId: string, botId: string): Pro
       // Silently ignore if avatar doesn't exist
     }
 
-    // 3. Delete Sub-Collections (Memories & Conversations)
     const botPath = `${USERS_COLLECTION}/${userId}/bots/${botId}`;
     await deleteCollection(`${botPath}/memories`);
     await deleteCollection(`${botPath}/conversations`);
 
-    // 4. Delete the Bot Profile itself
     await db.collection(USERS_COLLECTION)
       .doc(userId)
       .collection('bots')
@@ -277,9 +276,6 @@ export const deleteBotFromFirestore = async (userId: string, botId: string): Pro
   }
 };
 
-/**
- * --- NESTED CONVERSATION PERSISTENCE ---
- */
 export const saveConversationToFirestore = async (userId: string, botId: string, conversation: Conversation): Promise<void> => {
   if (!userId || !botId || !conversation.id) {
     console.error("❌ Save aborted: Incomplete identifiers");
@@ -334,9 +330,6 @@ export const loadConversationsFromFirestore = async (userId: string, botId: stri
   }
 };
 
-/**
- * --- ANALYTICS & UTILS ---
- */
 export const saveCharacterProfile = async (userId: string, character: CharacterProfile): Promise<void> => {
     const profileToSave = JSON.parse(JSON.stringify(character));
     await db.collection(USERS_COLLECTION).doc(userId).update({ character: profileToSave });
@@ -346,10 +339,6 @@ export const incrementFreeImageCount = async (userId: string, currentCount: numb
     const newCount = (currentCount || 0) + 1;
     await db.collection(USERS_COLLECTION).doc(userId).update({ freeImagesUsed: newCount });
 };
-
-/**
- * --- LONG-TERM MEMORY (FIREBASE EDITION) ---
- */
 
 // 1. SAVE A MEMORY
 export const saveMemoryToFirestore = async (userId: string, botId: string, text: string) => {
