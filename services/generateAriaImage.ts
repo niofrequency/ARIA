@@ -367,17 +367,33 @@ export const generateAriaImage = async (
   character: any 
 ): Promise<string | null> => {
 
-  const rawCombined = `${userPrompt} ${contextPrompt || ""}`;
-  const baseDescription = rawCombined.trim();
+  const rawCombined = `${userPrompt} ${contextPrompt || ""}`.trim();
+  const baseDescription = rawCombined;
 
   if (!baseDescription) {
     console.warn("No prompt description available for image generation");
     return null;
   }
 
-  // --- 1. SITUATIONAL ANALYSIS ---
   const sceneLower = baseDescription.toLowerCase();
-    
+
+  // ==================== MODEL DECISION ====================
+  const hasFace = /face|eyes|lips|mouth|headshot|portrait|selfie|expression|looking at camera|smiling|eyes closed/i.test(sceneLower);
+  const isCloseupOrHalfBody = /closeup|half body|upper body|waist up|chest|shoulders|torso|medium shot/i.test(sceneLower);
+  
+  let useQwen = false;
+  if (hasFace) {
+    useQwen = true;                    // Face visible → Qwen
+  } else if (isCloseupOrHalfBody) {
+    useQwen = false;                   // No face + close/half body → Biglust
+  } else {
+    // Default fallback: use Qwen if we have an avatar, else Biglust
+    useQwen = !!character.avatarImage;
+  }
+  
+  console.log(`🎯 Model Decision: ${useQwen ? 'Qwen (Face)' : 'Biglust (No Face)'}`);
+
+  // --- 1. SITUATIONAL ANALYSIS ---
   const isFaceFocus = /face|eyes|lips|mouth|headshot|portrait|expression|facial/i.test(sceneLower) || 
                       (sceneLower.includes("closeup") && !/ass|butt|rear|chest|boobs|tits|legs|feet|pussy|armpit|underarm|navel/i.test(sceneLower));
 
@@ -559,7 +575,7 @@ export const generateAriaImage = async (
   }
 
   const seed = Math.floor(Math.random() * 1_000_000_000);
-     
+      
   console.log(`🚀 Dispatching Neural Sync: ${character.name}`);
   console.log(`🛡️ Safety Mode: ${bypassSafety ? "OFF (Bypass Active)" : "ON (Forcing Clothes)"}`);
 
@@ -568,7 +584,7 @@ export const generateAriaImage = async (
   let imagesPayload: any = undefined;
 
   // BRANCH A: Custom Identity Drop Workflow (Qwen FaceID / Image2Image)
-  if (character.avatarImage) {
+  if (useQwen && character.avatarImage) {
     const runpodModel = character.runpodModel || "Qwen-Rapid-AIO-NSFW-v23.safetensors";
     
     // Merge Profile LoRAs with UI-selected LoRAs
