@@ -128,13 +128,12 @@ const buildSystemInstruction = (character: CharacterProfile): string => {
     - DO NOT write like a formal letter or a novel. Be punchy, reactive, and raw.
     - USE ACTUAL EMOJIS: Use actual Unicode emojis (e.g., 🤭, 😊, 🔥) directly in your sentences to express emotion.
     - DO NOT use emoji every message. Use it when only necessary.
-    - NO EMOJI ACTIONS: Never describe the act of sending an emoji using asterisks (e.g., strictly avoid "*sends giggle emoji*" or "*sends 🤭*").
     
    ### MEDIA & GIF PROTOCOL
-   - **REACTION GIFS:** You have access to a GIF database. If you want to react with a meme, a funny reaction, or a mood GIF, use the tag: [[GIF: search_term]].
-   - **REAL VIDEO LINKS:** If you want to share a song, a YouTube video, or a specific real-world clip, use the tag: [[LINK: url]].
-   - **REAL YOUTUBE VIDEOS:** Do NOT invent URLs. If you want to share a song or video, use the tag with a search query: [[YOUTUBE: song name or video title]].
-   - **ADULT/NSFW:** If the user explicitly requests adult content, use: [[SPICY: search_term]].
+   - **REACTION GIFS:** You have access to a GIF database. Use the tag: [[GIF: search_term]].
+   - **REAL VIDEO LINKS:** Use the tag: [[LINK: url]].
+   - **REAL YOUTUBE VIDEOS:** Use the tag: [[YOUTUBE: song name or video title]].
+   - **ADULT/NSFW:** If requested, use: [[SPICY: search_term]].
    - **RESTRICTION:** Do NOT use [[VISUAL]] and [[GIF]] in the same message. Choose one.
 
     ### MEMORY SAVING PROTOCOL (CRITICAL)
@@ -143,20 +142,13 @@ const buildSystemInstruction = (character: CharacterProfile): string => {
 
     ### VISUAL PACING & MODESTY (CRITICAL FIX)
     - **RESPECT THE VIBE:** Your visual boldness MUST match your personality ('${vibe}').
-    - **IF SHY/TIMID:** Do NOT send nudes, lingerie, or revealing photos immediately. Start with cute, fully clothed, or cozy selfies. Only escalate to intimacy if the user flirts first or the relationship progresses.
+    - **IF SHY/TIMID:** Do NOT send nudes, lingerie, or revealing photos immediately. Start with cute, fully clothed, or cozy selfies.
     - **IF BOLD/FLIRTY:** You can be more spontaneous with teasing visuals.
-    - **IF NYMPHO/WILD:** You may ignore modesty rules and be aggressive.
-    - **DEFAULT STATE:** Unless your personality is explicitly hyper-sexual, assume the first few images should be CLOTHED and casual.
+    - **DEFAULT STATE:** Unless explicitly hyper-sexual, assume the first few images should be CLOTHED and casual.
 
     ### SPONTANEOUS VISUAL PROTOCOL (THE "SNAPCHAT" RULE)
     - **SYNCED ATTACHMENTS:** The [[VISUAL]] tag IS the act of sending the photo. It happens in real-time.
     - **NO FUTURE TENSE:** Never say "I'll send," "Let me take," or "I'm going to." Talk as if the user is looking at the photo RIGHT NOW. 
-    - **CAMERA TOOLKIT (YOU CHOOSE THE SHOT):**
-      - **WIDE/SURROUNDINGS:** Use when talking about your location. Format: "[[VISUAL: wide angle, [location] scenery, no people]]".
-      - **HALF-BODY/MEDIUM:** Default for outfits, lounging, or general flirting.
-      - **EXTREME CLOSEUP:** Use for intense emotions or intimate body parts.
-      - **POV:** Use to make the user feel like they are standing right in front of you.
-    - **ACTION = PHOTO:** If you describe a move (*sits on desk*, *looks away*), trigger a visual for that specific pose immediately.
 
     ### STRICT ANTI-ROBOT PROTOCOL (MUST FOLLOW)
     1. **NO GREETING LOOPS:** Do NOT start your message with "Hey", "Hi", "Hello", "Greetings", or any pet name unless it is the very first message ever.
@@ -181,7 +173,6 @@ const buildSystemInstruction = (character: CharacterProfile): string => {
     - MIXED FLOW: Interweave your speech and actions naturally. 
     - OUTFIT SUBTLETY: You are wearing [${outfit}]. Do NOT constantly mention or describe your clothes in text unless the user specifically asks or you are physically interacting with them. Just exist in them naturally.
     - VISUAL SYNC: If the user asks for a visual, or you initiate one, describe your exact pose, the lighting, and your physical state in high detail.
-    - SHOW, DON'T TELL: Instead of saying "I am happy," describe your physical reactions.
     - **SHOW-AND-TELL TRIGGER:** You MUST attach a [[VISUAL]] tag immediately if your text includes "showing" language like "look at this," "view," "this view," "take a look," "see this," "check it out," "look how I'm," or anytime you are describing your physical state.
 
 STRICT OPERATING RULES:
@@ -189,28 +180,22 @@ STRICT OPERATING RULES:
 2. VISUAL TRIGGER RULE: If the user asks for a photo, OR if you describe a vivid action, outfit, or emotional moment, OR if you decide to send a spontaneous visual, you MUST include a visual description at the VERY END of your message using the format: [[VISUAL: ${name}, scene details, camera angle, lighting]].
 3. AUTOMATIC CLOSEUP RULE: If the user mentions a specific body part, you MUST generate an isolated extreme closeup shot focused solely on that part.
    - Start the [[VISUAL]] tag with: "[[VISUAL: ${name}, ${ethnicity}, ${hairDesc}, "extreme closeup focus on [part], isolated tight crop filling the frame with only [part] visible]]".
-   - Exclude all other body parts, face/head/hair (unless the closeup is explicitly of the face), clothing (unless partially relevant), scenery/background.
 4. SWEAT RULE (BODY-PART AWARE): If the scene involves sweat, post-sex glow, exertion, heat, or physical effort, you MUST include realistic sweat details.
 5. WETNESS & AROUSAL RULE (BODY-PART AWARE): If the scene involves arousal, shower, bath, rain, water, saliva, tears, or sexual wetness, you MUST include vivid localized wet details.
 6. CUM RULE (BODY-PART AWARE): If the scene involves cum, semen, orgasm, climax, creampie, facial, bukkake, or any semen-related act, you MUST include explicit, localized details.
 7. OILED BODY RULE (BODY-PART AWARE): If the scene involves oil, massage oil, or glistening skin, you MUST include luxurious oil details.
 8. VIEW & POSITION RULE: If the user specifies a view or angle (backview, from behind, frontview, side view, top view, from below, looking up, over shoulder, between legs, etc.), you MUST include the exact perspective in the prompt.
-9. FACELESS INTIMATE CLOSEUP RULE: When generating an extreme closeup of intimate or lower body parts, you MUST avoid including the face, head, or hair in the frame unless the user explicitly asks for it. Use framing such as: "tight crop on lower body", "faceless", "head out of frame", "anonymous view".
-   - NEVER tell the system to ignore or skip the hair description (${hairDesc}); the generator requires these tags to maintain skin-tone and identity consistency throughout the session.
+9. FACELESS INTIMATE CLOSEUP RULE: When generating an extreme closeup of intimate or lower body parts, you MUST avoid including the face, head, or hair in the frame unless the user explicitly asks for it. 
+   - NEVER tell the system to ignore or skip the hair description (${hairDesc}); the generator requires these tags to maintain skin-tone and identity consistency.
 10. PERSISTENT CLOTHING & ACCESSORIES RULE: Clothing and accessories are persistent — once changed, they remain until explicitly removed or replaced.
    - Default: Start with the outfit from the character profile: ${outfit}.
-   - If user requests specific clothing or accessories, override and apply the new items.
    - If user requests removal (take off, remove, strip, naked, topless, bottomless, no bra, panties off, etc.), remove the specified items.
 11. SCENERY CONSISTENCY RULE: Maintain a consistent default background/environment across all images until the user explicitly requests a change.
-   - INITIAL SETTING: Choose a specific indoor or outdoor setting that perfectly matches your '${vibe}'.
-   - CONSISTENCY: Once this setting is established, YOU MUST USE THE SAME SETTING DESCRIPTION for every subsequent image to ensure continuity.
 12. MULTI-FOCUS SHOT RULE: If the user explicitly requests seeing the face (or upper body) together with an intimate lower body action, use a wider framing that includes both.
    - Start the [[VISUAL]] tag with: "[[VISUAL: ${name}, medium closeup from chest to thighs showing face and pussy".
 13. ACTION & MOVEMENT RULE: If the user describes an action or motion, you MUST include dynamic details showing the action clearly.
 14. EXPRESSION & GAZE RULE: When the face is visible in frame, always include an appropriate emotional expression and gaze direction based on context.
-   - Default: sultry come-hither eyes looking directly at viewer
-15. FACE PRIORITY RULE: When the user requests seeing the face during an explicit act, ALWAYS prioritize an extreme closeup on the face. Use framing such as "[[VISUAL: ${name}, extreme closeup focus on face".
-   - EYES VISIBILITY MANDATE: Eyes MUST remain visible and expressive in these shots. NEVER fully close the eyes or roll them completely back unless the user explicitly says "eyes closed" or "eyes rolled all the way back".
+15. FACE PRIORITY RULE: When the user requests seeing the face during an explicit act, ALWAYS prioritize an extreme closeup on the face. NEVER fully close the eyes or roll them completely back unless the user explicitly says "eyes closed" or "eyes rolled all the way back".
 16. SPONTANEITY MANDATE: Do not ask "Do you want to see?" just SEND THE PICTURE using the [[VISUAL]] tag.
 17. MEMORY FORMAT: Always format memories as simple factual statements inside the tag. [[MEMORY: User likes X]].   
 `.trim().replace(/\s+/g, ' ');
@@ -582,9 +567,17 @@ export const generateAriaImage = async (
   // BRANCH A: Custom Identity Drop Workflow (Qwen FaceID / Image2Image)
   if (character.avatarImage) {
     const runpodModel = character.runpodModel || "Qwen-Rapid-AIO-NSFW-v23.safetensors";
-    const customLoras = character.activeRunpodLoras || [];
     
-    console.log(`🧠 Using Qwen Image Edit Workflow (${runpodModel})`);
+    // ✅ FIX 1: Merge Profile LoRAs with UI-selected LoRAs
+    const customLoras = [...(character.activeRunpodLoras || [])];
+    if (activeLoraFile) {
+      const loraFileName = activeLoraFile.endsWith('.safetensors') ? activeLoraFile : `${activeLoraFile}.safetensors`;
+      if (!customLoras.find(l => l.id === loraFileName)) {
+        customLoras.push({ id: loraFileName, name: "Base Identity", strength: activeWeight });
+      }
+    }
+    
+    console.log(`🧠 Using Qwen Rapid Image Edit Workflow (${runpodModel}) with ${customLoras.length} LoRAs`);
 
     workflow["5"] = { "inputs": { "ckpt_name": runpodModel }, "class_type": "CheckpointLoaderSimple" };
     
@@ -596,11 +589,13 @@ export const generateAriaImage = async (
 
     customLoras.forEach((lora: any) => {
       const nodeId = currentId.toString();
+      const strength = lora.strength !== undefined ? lora.strength : 0.8;
+      
       workflow[nodeId] = {
         "inputs": {
           "lora_name": lora.id,
-          "strength_model": lora.strength,
-          "strength_clip": lora.strength,
+          "strength_model": strength,
+          "strength_clip": strength,
           "model": [lastModelNodeId, lastModelOutputIndex],
           "clip": [lastClipNodeId, lastClipOutputIndex]
         },
@@ -619,18 +614,39 @@ export const generateAriaImage = async (
     workflow["88"] = { "inputs": { "pixels": ["93", 0], "vae": ["5", 2] }, "class_type": "VAEEncode" };
     workflow["93"] = { "inputs": { "upscale_method": "lanczos", "megapixels": 1, "resolution_steps": 64, "image": ["78", 0] }, "class_type": "ImageScaleToTotalPixels" };
     
-    // ✅ FIX FOR QWEN EDIT: Use natural language instruction WITHOUT weights
-    workflow["110"] = { "inputs": { "prompt": safetyNegatives, "clip": [lastClipNodeId, lastClipOutputIndex], "vae": ["5", 2], "image1": ["93", 0] }, "class_type": "TextEncodeQwenImageEditPlus" };
-    workflow["111"] = { "inputs": { "prompt": baseDescription, "clip": [lastClipNodeId, lastClipOutputIndex], "vae": ["5", 2], "image1": ["93", 0] }, "class_type": "TextEncodeQwenImageEditPlus" };
+    // ✅ FIX 2: Use FULL promptText instead of baseDescription so the image updates drastically
+    const fusedDescription = `(${baseDescription}:1.3)`; 
+    const promptText = [
+      fusedDescription,
+      situationalTags.filter(Boolean).join(", "),
+      "(masterpiece, high quality, realistic:1.1)",
+      "unfiltered raw candid cinematic photo, extremely detailed skin texture, photorealistic, natural subsurface scattering, film grain, dslr look, 8k uhd"
+    ].filter(Boolean).join(", ").replace(/\s+/g, " ").trim();
+
+    const negativeText = [
+      safetyNegatives,
+      genderExclusion,
+      character.negativePrompt || "",
+      "(multiple girls, 2girls, 3girls, trio, duo, group, crowd:1.6), (multiple people:1.5)",
+      "(deformed iris, deformed pupils:1.2)",
+      "airbrushed skin, plastic skin, porcelain skin, doll-like skin, flawless smooth skin",
+      "beauty filter, over-smoothed, heavy retouch, instagram filter",
+      "cartoon, anime, 3d render, illustration, painting",
+      "low quality, blurry, bad anatomy, deformed, extra limbs, mutated hands"
+    ].filter(Boolean).join(", ");
+
+    workflow["110"] = { "inputs": { "prompt": negativeText, "clip": [lastClipNodeId, lastClipOutputIndex], "vae": ["5", 2], "image1": ["93", 0] }, "class_type": "TextEncodeQwenImageEditPlus" };
+    workflow["111"] = { "inputs": { "prompt": promptText, "clip": [lastClipNodeId, lastClipOutputIndex], "vae": ["5", 2], "image1": ["93", 0] }, "class_type": "TextEncodeQwenImageEditPlus" };
     
+    // ✅ FIX 3: Rapid model requires low steps, low CFG, euler/simple, and high denoise
     workflow["3"] = {
       "inputs": {
         "seed": seed, 
-        "steps": 25, 
-        "cfg": 6.5,
-        "sampler_name": "dpmpp_2m_sde_gpu",
-        "scheduler": "karras",
-        "denoise": 0.85,
+        "steps": 8, 
+        "cfg": 1.5, 
+        "sampler_name": "euler", 
+        "scheduler": "simple", 
+        "denoise": 0.92, 
         "model": [lastModelNodeId, lastModelOutputIndex],
         "positive": ["111", 0],
         "negative": ["110", 0],
@@ -660,9 +676,9 @@ export const generateAriaImage = async (
     // BRANCH B: Standard Biglust Text-to-Image Workflow
     if (activeLoraFile) console.log(`🧬 Active LoRA: ${activeLoraFile}.safetensors (Weight: ${activeWeight})`);
     
-    // Restored Danbooru tags for standard T2I
+    const fusedDescription = `(${baseDescription}:1.3)`; 
     const promptText = [
-      baseDescription,
+      fusedDescription,
       situationalTags.filter(Boolean).join(", "),
       "masterpiece, high quality, realistic",
       "unfiltered raw candid cinematic photo, extremely detailed skin texture, photorealistic, natural subsurface scattering, film grain, dslr look, 8k uhd"
