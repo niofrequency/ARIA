@@ -3,6 +3,7 @@ import { retrieveMemories } from "./memoryService";
 
 /**
  * ARIA VISUAL STATE PARSER
+ * Converts the visual tag into a structured JSON state for the AI's memory.
  */
 export const buildVisualAwarenessJson = (visualDescription: string) => {
   const parts = visualDescription.split(',').map(p => p.trim());
@@ -32,6 +33,8 @@ export const buildVisualAwarenessJson = (visualDescription: string) => {
 
 /**
  * EXTRACT CONTEXT PROMPT
+ * Parses the AI response to separate chat text from Visual tags, Memory tags, GIFs, Links, and YouTube.
+ * Includes Hallucination Patch and Emoji Sanitization.
  */
 export const extractContextPrompt = (text: string) => {
   const visualRegex = /[\[\{]{2}\s*VISUAL\s*:\s*([\s\S]*?)\s*[\]\}]{2}/i;
@@ -474,7 +477,7 @@ export const generateAriaImage = async (
   const bodyTags = filteredBodyTags.join(", ");
    
   const baseTag = character.gender?.toLowerCase() === 'male' ? '1boy' : '1girl';
-  const botIdentity = `(solo, ${baseTag}:1.2), (${character.name}:1.1), a ${character.age}-year-old ${character.gender}`;
+  const botIdentity = `solo, ${baseTag}, ${character.name}, a ${character.age}-year-old ${character.gender}`;
 
   let situationalTags: string[] = [];
 
@@ -545,9 +548,9 @@ export const generateAriaImage = async (
 
   let genderExclusion = "";
   if (charGender === 'female' && !isMaleInContext) {
-    genderExclusion = "(male, man, boy, guy, penis, beard, stubble, testicular:1.5), (back of head, multiple views:1.3), ";
+    genderExclusion = "male, man, boy, guy, penis, beard, stubble, testicular, back of head, multiple views, ";
   } else if (charGender === 'male' && !isFemaleInContext) {
-    genderExclusion = "(female, woman, girl, lady, vagina, breasts, bra, panties, lipstick, makeup:1.5), (back of head, multiple views:1.3), ";
+    genderExclusion = "female, woman, girl, lady, vagina, breasts, bra, panties, lipstick, makeup, back of head, multiple views, ";
   }
 
   let safetyNegatives = "";
@@ -568,8 +571,8 @@ export const generateAriaImage = async (
   if (character.avatarImage) {
     const runpodModel = character.runpodModel || "Qwen-Rapid-AIO-NSFW-v23.safetensors";
     
-    // ✅ FIX 1: Merge Profile LoRAs with UI-selected LoRAs
-    const customLoras = [...(character.activeRunpodLoras || [])];
+    // Merge Profile LoRAs with UI-selected LoRAs
+    const customLoras = character.activeRunpodLoras ? [...character.activeRunpodLoras] : [];
     if (activeLoraFile) {
       const loraFileName = activeLoraFile.endsWith('.safetensors') ? activeLoraFile : `${activeLoraFile}.safetensors`;
       if (!customLoras.find(l => l.id === loraFileName)) {
@@ -614,39 +617,35 @@ export const generateAriaImage = async (
     workflow["88"] = { "inputs": { "pixels": ["93", 0], "vae": ["5", 2] }, "class_type": "VAEEncode" };
     workflow["93"] = { "inputs": { "upscale_method": "lanczos", "megapixels": 1, "resolution_steps": 64, "image": ["78", 0] }, "class_type": "ImageScaleToTotalPixels" };
     
-    // ✅ FIX 2: Use FULL promptText instead of baseDescription so the image updates drastically
-    const fusedDescription = `(${baseDescription}:1.3)`; 
+    // Stripped weight brackets for clean Qwen instructions parsing
     const promptText = [
-      fusedDescription,
+      baseDescription,
       situationalTags.filter(Boolean).join(", "),
-      "(masterpiece, high quality, realistic:1.1)",
-      "unfiltered raw candid cinematic photo, extremely detailed skin texture, photorealistic, natural subsurface scattering, film grain, dslr look, 8k uhd"
+      "masterpiece, high quality, realistic, unfiltered raw candid cinematic photo, extremely detailed skin texture"
     ].filter(Boolean).join(", ").replace(/\s+/g, " ").trim();
 
     const negativeText = [
       safetyNegatives,
       genderExclusion,
       character.negativePrompt || "",
-      "(multiple girls, 2girls, 3girls, trio, duo, group, crowd:1.6), (multiple people:1.5)",
-      "(deformed iris, deformed pupils:1.2)",
-      "airbrushed skin, plastic skin, porcelain skin, doll-like skin, flawless smooth skin",
-      "beauty filter, over-smoothed, heavy retouch, instagram filter",
-      "cartoon, anime, 3d render, illustration, painting",
+      "multiple girls, 2girls, 3girls, trio, duo, group, crowd, multiple people",
+      "deformed iris, deformed pupils",
+      "airbrushed skin, plastic skin, porcelain skin, flawless smooth skin",
       "low quality, blurry, bad anatomy, deformed, extra limbs, mutated hands"
     ].filter(Boolean).join(", ");
 
     workflow["110"] = { "inputs": { "prompt": negativeText, "clip": [lastClipNodeId, lastClipOutputIndex], "vae": ["5", 2], "image1": ["93", 0] }, "class_type": "TextEncodeQwenImageEditPlus" };
     workflow["111"] = { "inputs": { "prompt": promptText, "clip": [lastClipNodeId, lastClipOutputIndex], "vae": ["5", 2], "image1": ["93", 0] }, "class_type": "TextEncodeQwenImageEditPlus" };
     
-    // ✅ FIX 3: Rapid model requires low steps, low CFG, euler/simple, and high denoise
+    // Optimized denoise step configurations for clear transformations
     workflow["3"] = {
       "inputs": {
         "seed": seed, 
-        "steps": 8, 
-        "cfg": 1.5, 
-        "sampler_name": "euler", 
-        "scheduler": "simple", 
-        "denoise": 0.92, 
+        "steps": 12, 
+        "cfg": 2.5,
+        "sampler_name": "euler",
+        "scheduler": "simple",
+        "denoise": 1.0, 
         "model": [lastModelNodeId, lastModelOutputIndex],
         "positive": ["111", 0],
         "negative": ["110", 0],
