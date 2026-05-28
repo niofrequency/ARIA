@@ -49,7 +49,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const targetModel = model || "grok-4.3-latest"; // Note: Ensure your API tier supports the literal string "grok-3"
     console.log(`🧠 Proxying request to xAI: ${targetModel}`);
     
-    // 3. EXECUTE NEURAL REQUEST
+// 3. EXECUTE NEURAL REQUEST
     const response = await fetch("https://api.x.ai/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -57,13 +57,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         "Authorization": `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        messages: sanitizedMessages, // Send the cleaned array
+        messages: sanitizedMessages, 
         model: targetModel, 
         temperature: temperature || 0.85, 
         max_tokens: 1000,       
-        stream: false,
-        frequency_penalty: 1.1, 
-        presence_penalty: 0.6
+        stream: false
+        // ❌ REMOVED frequency_penalty and presence_penalty
       })
     });
 
