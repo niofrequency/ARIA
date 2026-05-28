@@ -22,7 +22,7 @@ interface ChatDashboardProps {
 
 /**
  * DEFAULT NEW BOT TEMPLATE
- * Updated for Extended Profile with new fields
+ * Updated for the Tagging System & Extended Fields
  */
 const defaultNewBotCharacter: ExtendedCharacterProfile = {
   name: 'New Companion',
@@ -36,10 +36,10 @@ const defaultNewBotCharacter: ExtendedCharacterProfile = {
   ethnicity: 'Latina', 
   negativePrompt: 'blurry, lowres, extra limbs, bad anatomy, watermark, text.',
   
-  // New Extended Fields
-  bodyType: 'Curvy',
-  preferredAngles: ['Eye-level'],
-  preferredShotTypes: ['Medium shot'],
+  // Safe Fallbacks for Extended Profile
+  bodyType: 'Random',
+  preferredAngles: [],
+  preferredShotTypes: [],
   favoriteLoras: [],
   nsfwSpecialties: [],
 };
@@ -72,7 +72,7 @@ const ChatDashboard: React.FC<ChatDashboardProps> = ({
         const loadedBots = await loadBotsFromFirestore(userData.uid);
         const loadedConvsMap = new Map<string, Conversation[]>();
         
-        // Enhanced normalization for new extended fields
+        // Ensure legacy bots with string specs are normalized to arrays to prevent crashes
         const normalizedBots = loadedBots.map(bot => ({
           ...bot,
           characterProfile: {
@@ -80,11 +80,7 @@ const ChatDashboard: React.FC<ChatDashboardProps> = ({
             hair: Array.isArray(bot.characterProfile.hair) ? bot.characterProfile.hair : [],
             face: Array.isArray(bot.characterProfile.face) ? bot.characterProfile.face : [],
             body: Array.isArray(bot.characterProfile.body) ? bot.characterProfile.body : [],
-            preferredAngles: Array.isArray((bot.characterProfile as ExtendedCharacterProfile).preferredAngles) ? (bot.characterProfile as ExtendedCharacterProfile).preferredAngles : [],
-            preferredShotTypes: Array.isArray((bot.characterProfile as ExtendedCharacterProfile).preferredShotTypes) ? (bot.characterProfile as ExtendedCharacterProfile).preferredShotTypes : [],
-            favoriteLoras: Array.isArray((bot.characterProfile as ExtendedCharacterProfile).favoriteLoras) ? (bot.characterProfile as ExtendedCharacterProfile).favoriteLoras : [],
-            nsfwSpecialties: Array.isArray((bot.characterProfile as ExtendedCharacterProfile).nsfwSpecialties) ? (bot.characterProfile as ExtendedCharacterProfile).nsfwSpecialties : [],
-          } as CharacterProfile
+          }
         }));
 
         for (const bot of normalizedBots) {
@@ -231,9 +227,9 @@ const ChatDashboard: React.FC<ChatDashboardProps> = ({
     const newBot: Bot = {
       id: newBotId,
       name: newBotName,
-      personality: defaultNewBotCharacter.vibe || '',
+      personality: defaultNewBotCharacter.vibe,
       avatarColor: 'bg-purple-600',
-      characterProfile: { ...defaultNewBotCharacter, name: newBotName } as CharacterProfile,
+      characterProfile: { ...defaultNewBotCharacter, name: newBotName },
       lastMessagePreview: 'Initialize Link...',
       lastActivity: Date.now(),
     };
@@ -271,58 +267,32 @@ const ChatDashboard: React.FC<ChatDashboardProps> = ({
 
   const handleDeleteBot = async (botId: string) => {
     if (!userData?.uid) return;
-    
     try {
       await deleteBotFromFirestore(userData.uid, botId);
-      
-      const updatedBots = bots.filter(b => b.id !== botId);
-      setBots(updatedBots);
-      
+      setBots(prev => prev.filter(b => b.id !== botId));
       setConversations(prev => {
         const next = new Map(prev);
         next.delete(botId);
         return next;
       });
-
       if (selectedBotId === botId) {
-        if (updatedBots.length > 0) {
-          const nextBot = updatedBots[0];
-          setSelectedBotId(nextBot.id);
-          localStorage.setItem('aria_last_active_bot', nextBot.id);
-          
-          const botConvs = conversations.get(nextBot.id) || [];
-          if (botConvs.length > 0) {
-            setCurrentConversationId(botConvs[0].id);
-          } else {
-            handleNewConversation(nextBot.id, true);
-          }
-        } else {
-          setSelectedBotId('');
-          setCurrentConversationId(null);
-          localStorage.removeItem('aria_last_active_bot');
-          handleNewBot(); 
-        }
+        setSelectedBotId('');
+        setCurrentConversationId(null);
+        localStorage.removeItem('aria_last_active_bot');
       }
     } catch (err) {
-      console.error("❌ Delete failed:", err);
+      console.error("Delete failed:", err);
     }
   };
 
-  const handleSaveBotCustomization = async (botId: string, updated: ExtendedCharacterProfile) => {
+  // ✅ SAFELY CAST THE INCOMING DATA TO ExtendedCharacterProfile
+  const handleSaveBotCustomization = async (botId: string, updated: ExtendedCharacterProfile | CharacterProfile) => {
     if (!userData?.uid) return;
     const selected = bots.find(b => b.id === botId);
     if (!selected) return;
-    
-    const updatedBot: Bot = { 
-      ...selected, 
-      name: updated.name || selected.name, 
-      personality: updated.vibe || selected.personality, 
-      characterProfile: updated as CharacterProfile // Safely cast extended profile to satisfy Bot interface
-    };
-    
+    const updatedBot = { ...selected, name: updated.name, personality: updated.vibe, characterProfile: updated };
     await saveBotToFirestore(userData.uid, updatedBot);
     setBots(prev => prev.map(b => b.id === botId ? updatedBot : b));
-    
     if (isBotBeingCustomizedInitial) {
         setIsBotBeingCustomizedInitial(false);
         handleNewConversation(botId, true);
@@ -335,72 +305,57 @@ const ChatDashboard: React.FC<ChatDashboardProps> = ({
   const currentMessages = currentBotConversations.find(c => c.id === currentConversationId)?.messages || [];
 
   return (
-    <>
-      <LoadingScreen isReady={isInitialLoadComplete} />
-
-      <div className={`flex h-[100dvh] ${theme === 'dark' ? 'bg-zinc-950' : 'bg-zinc-50'} text-zinc-100 overflow-hidden`}>
-        <Sidebar
-          bots={bots}
-          selectedBotId={selectedBotId}
-          onSelectBot={handleSelectBot}
-          onNewBot={handleNewBot}
-          conversations={currentBotConversations}
-          onSelectConversation={setCurrentConversationId}
-          onDeleteConversation={() => {}} 
-          onDeleteBot={handleDeleteBot}
-          onSignOut={onSignOut}
-          theme={theme}
-          onToggleTheme={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
-          isMobileSidebarOpen={isMobileSidebarOpen}
-          onCloseMobileSidebar={() => setIsMobileSidebarOpen(false)}
+    <div className={`flex h-[100dvh] ${theme === 'dark' ? 'bg-zinc-950' : 'bg-zinc-50'} text-zinc-100 overflow-hidden`}>
+      <Sidebar
+        bots={bots}
+        selectedBotId={selectedBotId}
+        onSelectBot={handleSelectBot}
+        onNewBot={handleNewBot}
+        conversations={currentBotConversations}
+        onSelectConversation={setCurrentConversationId}
+        onDeleteConversation={() => {}} // Implementation for conv delete can be added
+        onDeleteBot={handleDeleteBot}
+        onSignOut={onSignOut}
+        theme={theme}
+        onToggleTheme={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
+        isMobileSidebarOpen={isMobileSidebarOpen}
+        onCloseMobileSidebar={() => setIsMobileSidebarOpen(false)}
+        isDesktopSidebarOpen={isDesktopSidebarOpen}
+        onToggleDesktopSidebar={() => setIsDesktopSidebarOpen(prev => !prev)}
+      />
+      
+      {selectedBot && (
+        <MainChatArea
+          character={selectedBot.characterProfile}
+          botId={selectedBot.id}
+          messages={currentMessages}
+          userData={userData}
+          onImageGenerated={onImageGenerated}
+          onSendMessage={handleSendMessage}
+          onUpdateMessage={handleUpdateMessage}
+          onToggleMobileSidebar={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
+          onToggleDesktopSidebar={() => setIsDesktopSidebarOpen(!isDesktopSidebarOpen)}
           isDesktopSidebarOpen={isDesktopSidebarOpen}
-          onToggleDesktopSidebar={() => setIsDesktopSidebarOpen(prev => !prev)}
+          isLoadingResponse={isLoadingResponse}
+          onOpenBotCustomization={setShowCustomizationModalForBotId}
+          setIsLoading={setIsLoadingResponse}
         />
-        
-        <main 
-          className={`flex-1 flex flex-col h-full transition-all duration-300 ease-in-out ${
-            isDesktopSidebarOpen ? 'lg:ml-[280px]' : 'lg:ml-0'
-          }`}
-        >
-          {selectedBot ? (
-            <MainChatArea
-              character={selectedBot.characterProfile}
-              botId={selectedBot.id}
-              messages={currentMessages}
-              userData={userData}
-              onImageGenerated={onImageGenerated}
-              onSendMessage={handleSendMessage}
-              onUpdateMessage={handleUpdateMessage}
-              onToggleMobileSidebar={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
-              onToggleDesktopSidebar={() => setIsDesktopSidebarOpen(!isDesktopSidebarOpen)}
-              isDesktopSidebarOpen={isDesktopSidebarOpen}
-              isLoadingResponse={isLoadingResponse}
-              onOpenBotCustomization={setShowCustomizationModalForBotId}
-              setIsLoading={setIsLoadingResponse}
-            />
-          ) : (
-            <div className="flex-1 flex flex-col items-center justify-center bg-zinc-950 text-zinc-500">
-              <img src="/img/ARIA-LOGO.PNG" alt="Aria" className="w-12 h-12 opacity-20 mb-4 grayscale" />
-              <h1 className="tracking-widest uppercase text-[10px] font-bold">Awaiting Neural Link</h1>
-            </div>
-          )}
-        </main>
+      )}
 
-        {showCustomizationModalForBotId && (
-          <BotCustomizationModal
-            character={bots.find(b => b.id === showCustomizationModalForBotId)?.characterProfile || defaultNewBotCharacter}
-            onSave={(u) => handleSaveBotCustomization(showCustomizationModalForBotId, u)}
-            onClose={() => { 
-              const wasInitial = isBotBeingCustomizedInitial;
-              setShowCustomizationModalForBotId(null); 
-              setIsBotBeingCustomizedInitial(false);
-              if(wasInitial) handleDeleteBot(showCustomizationModalForBotId!); 
-            }}
-            isNewBot={isBotBeingCustomizedInitial}
-          />
-        )}
-      </div>
-    </>
+      {showCustomizationModalForBotId && (
+        <BotCustomizationModal
+          character={bots.find(b => b.id === showCustomizationModalForBotId)?.characterProfile || defaultNewBotCharacter}
+          onSave={(u) => handleSaveBotCustomization(showCustomizationModalForBotId, u as ExtendedCharacterProfile)}
+          onClose={() => { 
+            const wasInitial = isBotBeingCustomizedInitial;
+            setShowCustomizationModalForBotId(null); 
+            setIsBotBeingCustomizedInitial(false);
+            if(wasInitial) handleDeleteBot(showCustomizationModalForBotId); 
+          }}
+          isNewBot={isBotBeingCustomizedInitial}
+        />
+      )}
+    </div>
   );
 };
 
