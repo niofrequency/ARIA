@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { CharacterProfile } from '../types';
 import { generateAriaImage } from '../services/ariaService';
-import { Sparkles, Cpu, Fingerprint, Activity, Loader2, Plus, Box, Camera, Upload, Server, ArrowRight, ArrowLeft, CheckCircle2, Menu } from 'lucide-react';
+import { Sparkles, Cpu, Fingerprint, Activity, Loader2, Plus, Box, Camera, Upload, Server, ArrowRight, ArrowLeft, CheckCircle2, Menu, PanelLeft, X } from 'lucide-react';
 
 interface CompanionCreationModalProps {
   onSave: (newCharacter: CharacterProfile) => void;
   onClose: () => void;
   isMandatory?: boolean;
-  onToggleSidebar?: () => void; // <-- Added Prop
+  onToggleMobileSidebar: () => void;
+  onToggleDesktopSidebar: () => void;
+  isDesktopSidebarOpen: boolean;
 }
 
 const RUNPOD_MODELS = [
@@ -84,7 +86,14 @@ const LORA_OPTIONS = [
 
 const TOTAL_STEPS = 10;
 
-const CompanionCreationModal: React.FC<CompanionCreationModalProps> = ({ onSave, onClose, isMandatory = false, onToggleSidebar }) => {
+const CompanionCreationModal: React.FC<CompanionCreationModalProps> = ({ 
+  onSave, 
+  onClose, 
+  isMandatory = false,
+  onToggleMobileSidebar,
+  onToggleDesktopSidebar,
+  isDesktopSidebarOpen
+}) => {
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState<Partial<CharacterProfile>>({
     name: '',
@@ -586,27 +595,48 @@ const CompanionCreationModal: React.FC<CompanionCreationModalProps> = ({ onSave,
   return (
     <div className="relative w-full h-full bg-zinc-950 flex flex-col overflow-hidden animate-in fade-in duration-500">
         
+        {/* NEW STICKY HEADER MATCHING MAIN CHAT AREA */}
+        <header 
+          className={`fixed top-0 left-0 right-0 z-40 px-6 py-4 border-b border-white/5 bg-zinc-950/80 backdrop-blur-xl flex items-center justify-between transition-transform duration-300 ease-in-out
+            ${isDesktopSidebarOpen ? 'lg:left-[280px]' : 'lg:left-0'}
+          `}
+        >
+          <div className="flex items-center gap-4">
+            <button onClick={onToggleMobileSidebar} className="lg:hidden p-2 text-zinc-400 hover:text-white bg-white/5 rounded-xl transition-all">
+              <Menu className="w-5 h-5" />
+            </button>
+            
+            {!isDesktopSidebarOpen && (
+              <button onClick={onToggleDesktopSidebar} className="hidden lg:block p-2 text-zinc-400 hover:text-white bg-white/5 rounded-xl transition-all">
+                <PanelLeft className="w-5 h-5" />
+              </button>
+            )}
+            
+            <div>
+              <h1 className="text-sm font-black text-white tracking-wide uppercase">Synthesis Laboratory</h1>
+              <div className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse"></span>
+                <span className="text-[10px] text-purple-400 uppercase tracking-widest font-bold font-mono">Matrix Configuration</span>
+              </div>
+            </div>
+          </div>
+          
+          {!isMandatory && (
+            <button onClick={onClose} className="p-2.5 bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10 rounded-xl transition-all">
+              <X className="w-5 h-5" />
+            </button>
+          )}
+        </header>
+
         {/* Full Page Cinematic Backgrounds */}
         <div className="absolute inset-0 z-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: 'linear-gradient(#a855f7 1px, transparent 1px), linear-gradient(90deg, #a855f7 1px, transparent 1px)', backgroundSize: '40px 40px' }}></div>
         <div className="absolute top-[-20%] right-[-10%] w-[800px] h-[800px] bg-purple-600/10 rounded-full blur-[150px] z-0 pointer-events-none" />
         <div className="absolute bottom-[-20%] left-[-10%] w-[600px] h-[600px] bg-blue-600/5 rounded-full blur-[120px] z-0 pointer-events-none" />
 
-        <div className="relative z-10 w-full max-w-5xl mx-auto flex flex-col h-full">
+        <div className="relative z-10 w-full max-w-5xl mx-auto flex flex-col h-full pt-20">
             
             {/* Progress Matrix Header */}
-            <div className="flex flex-col pt-8 md:pt-10 px-6 md:px-8 shrink-0">
-              <div className="flex items-center gap-3 mb-8">
-                  {onToggleSidebar && !isMandatory && (
-                    <button
-                      onClick={onToggleSidebar}
-                      className="md:hidden p-2 bg-zinc-900 border border-white/10 hover:bg-white/10 rounded-xl text-zinc-400 hover:text-white transition-all shadow-md mr-1"
-                    >
-                      <Menu className="w-5 h-5" />
-                    </button>
-                  )}
-                  <Cpu className="w-6 h-6 text-purple-400 animate-pulse hidden sm:block" />
-                  <span className="text-xs sm:text-sm uppercase tracking-[0.4em] text-purple-400 font-bold">Synthesis Laboratory</span>
-              </div>
+            <div className="flex flex-col pt-8 px-8 shrink-0">
               
               <div className="w-full bg-zinc-900 h-2 rounded-full overflow-hidden">
                 <div 
