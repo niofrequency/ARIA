@@ -215,6 +215,11 @@ const ChatDashboard: React.FC<ChatDashboardProps> = ({
 
   const handleCreateNewCompanion = async (newCharacter: CharacterProfile) => {
     if (!userData?.uid) return;
+    
+    // 1. Instantly close all modals so UI responds immediately
+    setIsCreationModalOpen(false);
+    setIsDefaultModalOpen(false);
+    
     const newBotId = generateUniqueId('bot');
     const newBotName = newCharacter.name || `Companion ${bots.length + 1}`;
     
@@ -228,13 +233,15 @@ const ChatDashboard: React.FC<ChatDashboardProps> = ({
       lastActivity: Date.now(),
     };
 
-    await saveBotToFirestore(userData.uid, newBot);
+    // 2. Optimistic Update: Set state instantly so the useEffect doesn't trigger the modal again
     setBots(prev => [...prev, newBot]);
     setSelectedBotId(newBotId);
     localStorage.setItem('aria_last_active_bot', newBotId);
     setConversations(prev => new Map(prev).set(newBotId, []));
     
-    setIsCreationModalOpen(false);
+    // 3. Save to database in the background
+    saveBotToFirestore(userData.uid, newBot).catch(err => console.error("Save failed:", err));
+    
     handleNewConversation(newBotId, true);
   };
 
@@ -339,7 +346,6 @@ const ChatDashboard: React.FC<ChatDashboardProps> = ({
         <DefaultCompanionsModal
           isMandatory={bots.length === 0}
           onSelectPreset={(preset) => {
-            setIsDefaultModalOpen(false);
             handleCreateNewCompanion(preset);
           }}
           onSelectCustom={() => {
