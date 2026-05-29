@@ -54,10 +54,10 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
                         className="relative w-36 h-36 md:w-48 md:h-48 object-contain drop-shadow-[0_0_30px_rgba(147,51,234,0.3)]"
                     />
                 </div>
-
+text-xl font-light tracking-[0.5em] text-white uppercase
                 {/* Heading */}
                 <div className={`text-center transition-all duration-700 delay-75 ${isExiting ? 'translate-y-10 opacity-0 blur-md' : 'translate-y-0 opacity-100 blur-0'}`}>
-                    <h1 className="text-5xl font-extralight text-white tracking-[0.2em] flex items-center justify-center">
+                    <h1 className="text-5xl font-light tracking-[0.5em] text-white uppercase flex items-center justify-center">
                         ARIA 
 
                     </h1>
