@@ -332,6 +332,7 @@ const ChatDashboard: React.FC<ChatDashboardProps> = ({
         onToggleTheme={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
         isMobileSidebarOpen={isMobileSidebarOpen}
         onCloseMobileSidebar={() => setIsMobileSidebarOpen(false)}
+        onToggleMobileSidebar={() => setIsMobileSidebarOpen(prev => !prev)} // Added for mobile floating button
         isDesktopSidebarOpen={isDesktopSidebarOpen}
         onToggleDesktopSidebar={() => setIsDesktopSidebarOpen(prev => !prev)}
         activeView={activeView as any} // Pass the state so Sidebar can highlight the active tab
@@ -349,6 +350,7 @@ const ChatDashboard: React.FC<ChatDashboardProps> = ({
               onSelectPreset={(preset) => handleCreateNewCompanion(preset)}
               onSelectCustom={() => setActiveView('create')}
               onClose={() => setActiveView('chat')}
+              onToggleSidebar={() => setIsMobileSidebarOpen(true)} // Support mobile sidebar toggle
             />
           </div>
         )}
@@ -360,6 +362,7 @@ const ChatDashboard: React.FC<ChatDashboardProps> = ({
               isMandatory={bots.length === 0}
               onSave={handleCreateNewCompanion}
               onClose={() => setActiveView(bots.length > 0 ? 'chat' : 'discover')}
+              onToggleSidebar={() => setIsMobileSidebarOpen(true)} // Support mobile sidebar toggle (Make sure to add this prop to CompanionCreationModal if you haven't yet)
             />
           </div>
         )}
