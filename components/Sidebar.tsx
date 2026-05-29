@@ -153,7 +153,7 @@ return (
               <img src="/img/ARIA-LOGO.PNG" alt="Logo" className="relative w-10 h-10 object-contain" />
             </div>
             <div>
-              <span className="text-xl font-light text-white tracking-widest uppercase">ARIA </span>
+              <span className="text-xl font-light tracking-[0.5em] text-white tracking-widest uppercase">ARIA </span>
             </div>
           </div>
           
