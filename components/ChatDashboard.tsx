@@ -332,6 +332,7 @@ const ChatDashboard: React.FC<ChatDashboardProps> = ({
         onToggleTheme={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
         isMobileSidebarOpen={isMobileSidebarOpen}
         onCloseMobileSidebar={() => setIsMobileSidebarOpen(false)}
+        onToggleMobileSidebar={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
         isDesktopSidebarOpen={isDesktopSidebarOpen}
         onToggleDesktopSidebar={() => setIsDesktopSidebarOpen(prev => !prev)}
         activeView={activeView as any} // Pass the state so Sidebar can highlight the active tab
@@ -349,6 +350,9 @@ const ChatDashboard: React.FC<ChatDashboardProps> = ({
               onSelectPreset={(preset) => handleCreateNewCompanion(preset)}
               onSelectCustom={() => setActiveView('create')}
               onClose={() => setActiveView('chat')}
+              onToggleMobileSidebar={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
+              onToggleDesktopSidebar={() => setIsDesktopSidebarOpen(prev => !prev)}
+              isDesktopSidebarOpen={isDesktopSidebarOpen}
             />
           </div>
         )}
@@ -360,6 +364,9 @@ const ChatDashboard: React.FC<ChatDashboardProps> = ({
               isMandatory={bots.length === 0}
               onSave={handleCreateNewCompanion}
               onClose={() => setActiveView(bots.length > 0 ? 'chat' : 'discover')}
+              onToggleMobileSidebar={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
+              onToggleDesktopSidebar={() => setIsDesktopSidebarOpen(prev => !prev)}
+              isDesktopSidebarOpen={isDesktopSidebarOpen}
             />
           </div>
         )}
