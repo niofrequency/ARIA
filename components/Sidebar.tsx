@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { Bot, Conversation } from '../types';
-import { LogOut, X, Trash, Cpu, ShieldCheck, PanelLeftClose, Search, Compass, MessageSquare, Sparkles } from 'lucide-react';
+import { LogOut, X, Trash, Cpu, ShieldCheck, PanelLeftClose, Search, Compass, MessageSquare, Sparkles, Menu } from 'lucide-react';
 
 export type ViewState = 'discover' | 'create' | 'chat';
 
@@ -70,6 +70,7 @@ interface SidebarProps {
   onToggleTheme: () => void;
   isMobileSidebarOpen: boolean;
   onCloseMobileSidebar: () => void;
+  onToggleMobileSidebar?: () => void; // Support for mobile floating button
   isDesktopSidebarOpen: boolean;
   onToggleDesktopSidebar: () => void;
   activeView: ViewState;
@@ -84,6 +85,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   onSignOut,
   isMobileSidebarOpen,
   onCloseMobileSidebar,
+  onToggleMobileSidebar,
   isDesktopSidebarOpen,
   onToggleDesktopSidebar,
   activeView,
@@ -120,6 +122,20 @@ const Sidebar: React.FC<SidebarProps> = ({
 
 return (
     <>
+      {/* Floating Mobile Toggle Button (Visible when sidebar is closed) */}
+      {onToggleMobileSidebar && (
+        <button
+          onClick={onToggleMobileSidebar}
+          className={`lg:hidden fixed top-4 left-4 z-[80] p-2.5 bg-zinc-900/90 backdrop-blur-md border border-white/10 hover:bg-white/10 rounded-xl text-zinc-400 hover:text-white transition-all shadow-xl ${isMobileSidebarOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+      )}
+
+      {/* Desktop Layout Spacer (Pushes main content naturally) */}
+      <div className={`hidden lg:block shrink-0 transition-all duration-300 ease-in-out ${isDesktopSidebarOpen ? 'w-[280px]' : 'w-0'}`} />
+
+      {/* Mobile Backdrop */}
       <div
         className={`fixed inset-0 bg-black/80 backdrop-blur-sm z-[90] lg:hidden transition-opacity duration-300 ${
           isMobileSidebarOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
@@ -190,32 +206,36 @@ return (
           </button>
         </nav>
 
-        {/* NEURAL PROFILES */}
-        <section className="relative z-10 flex-1 px-4 overflow-hidden flex flex-col mt-4">
-          <div className="flex items-center justify-between mb-3 px-2">
-            <h3 className="text-[10px] uppercase tracking-[0.3em] text-zinc-500 font-bold flex items-center gap-2">
-               <Cpu className="w-3 h-3" /> My AI
-            </h3>
-          </div>
+        {/* NEURAL PROFILES (Only visible when actively chatting) */}
+        {activeView === 'chat' ? (
+          <section className="relative z-10 flex-1 px-4 overflow-hidden flex flex-col mt-4">
+            <div className="flex items-center justify-between mb-3 px-2">
+              <h3 className="text-[10px] uppercase tracking-[0.3em] text-zinc-500 font-bold flex items-center gap-2">
+                 <Cpu className="w-3 h-3" /> My AI
+              </h3>
+            </div>
 
-          <div className="space-y-2 overflow-y-auto custom-scrollbar flex-1 pr-1 pb-4">
-            {filteredBots.length === 0 ? (
-              <div className="text-center py-10 px-4 border border-dashed border-white/5 rounded-2xl">
-                <p className="text-zinc-600 text-[10px] uppercase tracking-widest font-medium">No Links Established</p>
-              </div>
-            ) : (
-              filteredBots.map((bot) => (
-                <MemoizedBotItem 
-                  key={bot.id} 
-                  bot={bot} 
-                  isSelected={activeView === 'chat' && selectedBotId === bot.id}
-                  onSelect={handleSelectInteraction}
-                  onDelete={handleDeleteInteraction}
-                />
-              ))
-            )}
-          </div>
-        </section>
+            <div className="space-y-2 overflow-y-auto custom-scrollbar flex-1 pr-1 pb-4">
+              {filteredBots.length === 0 ? (
+                <div className="text-center py-10 px-4 border border-dashed border-white/5 rounded-2xl">
+                  <p className="text-zinc-600 text-[10px] uppercase tracking-widest font-medium">No Links Established</p>
+                </div>
+              ) : (
+                filteredBots.map((bot) => (
+                  <MemoizedBotItem 
+                    key={bot.id} 
+                    bot={bot} 
+                    isSelected={activeView === 'chat' && selectedBotId === bot.id}
+                    onSelect={handleSelectInteraction}
+                    onDelete={handleDeleteInteraction}
+                  />
+                ))
+              )}
+            </div>
+          </section>
+        ) : (
+          <div className="flex-1" /> // Maintains spacing when history is hidden
+        )}
 
         {/* Bottom Actions Area */}
         <div className="relative z-10 p-4 mt-auto border-t border-white/5 bg-zinc-950/80 backdrop-blur-xl">
