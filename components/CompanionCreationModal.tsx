@@ -54,13 +54,13 @@ const CompanionCreationModal: React.FC<CompanionCreationModalProps> = ({ onSave,
   const [forgeError, setForgeError] = useState<string | null>(null);
   const [tagInputs, setTagInputs] = useState({ hair: '', face: '', body: '' });
 
-  // Prevent background scrolling and handle escape key based on isMandatory
+  // Prevent background scrolling, allow escape key to always go back/close
   useEffect(() => {
     const originalStyle = window.getComputedStyle(document.body).overflow;
     document.body.style.overflow = 'hidden';
 
     const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !isMandatory) onClose();
+      if (e.key === 'Escape') onClose();
     };
     window.addEventListener('keydown', handleEsc);
     
@@ -68,7 +68,7 @@ const CompanionCreationModal: React.FC<CompanionCreationModalProps> = ({ onSave,
       document.body.style.overflow = originalStyle;
       window.removeEventListener('keydown', handleEsc);
     };
-  }, [onClose, isMandatory]);
+  }, [onClose]);
 
   // Handle generic input changes
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -545,7 +545,7 @@ const CompanionCreationModal: React.FC<CompanionCreationModalProps> = ({ onSave,
   return (
     <div 
       className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 backdrop-blur-md p-2 sm:p-4 animate-in fade-in duration-300" 
-      onClick={() => { if (!isMandatory) onClose(); }}
+      onClick={() => { /* Require explicit button click to close */ }}
     >
       <div className="relative w-full max-w-4xl h-[85dvh] flex flex-col bg-zinc-950 border border-purple-500/20 rounded-[2rem] shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
         
@@ -561,11 +561,15 @@ const CompanionCreationModal: React.FC<CompanionCreationModalProps> = ({ onSave,
                 <Cpu className="w-5 h-5 text-purple-400 animate-pulse" />
                 <span className="text-[10px] uppercase tracking-[0.4em] text-purple-400 font-bold">Synthesis Laboratory</span>
             </div>
-            {!isMandatory && (
-              <button onClick={onClose} disabled={isSaving || isForging} className="p-2 text-zinc-500 hover:text-white rounded-full hover:bg-white/5 transition-all disabled:opacity-30">
-                <X className="w-6 h-6" />
-              </button>
-            )}
+            
+            <button 
+              onClick={onClose} 
+              disabled={isSaving || isForging} 
+              className="p-2 text-zinc-500 hover:text-white rounded-full hover:bg-white/5 transition-all disabled:opacity-30"
+              title={isMandatory ? "Back to Archive" : "Abort Process"}
+            >
+              <X className="w-6 h-6" />
+            </button>
           </div>
           
           <div className="w-full bg-zinc-900 h-1.5 rounded-full overflow-hidden">
@@ -582,23 +586,23 @@ const CompanionCreationModal: React.FC<CompanionCreationModalProps> = ({ onSave,
           </div>
         </div>
         
-        {/* Main Content Area (Scrollable if needed, but designed to center) */}
+        {/* Main Content Area */}
         <div className="relative z-10 flex-1 overflow-y-auto px-6 md:px-12 py-6 custom-scrollbar flex flex-col justify-center">
           {renderStep()}
         </div>
 
         {/* Footer Navigation */}
-        <div className="relative z-10 flex justify-between items-center p-6 md:p-8 shrink-0 bg-zinc-950/80 backdrop-blur-xl border-t border-white/5">
-            {!isMandatory ? (
-              <button 
-                type="button" 
-                onClick={onClose} 
-                disabled={isSaving || isForging}
-                className="px-6 py-3 text-zinc-500 text-xs uppercase tracking-widest font-bold hover:text-zinc-300 transition-all disabled:opacity-30 hidden sm:block"
-              >
-                Abort
-              </button>
-            ) : <div />}
+        <div className="relative z-10 flex flex-col-reverse sm:flex-row justify-between items-center p-6 md:p-8 shrink-0 bg-zinc-950/80 backdrop-blur-xl border-t border-white/5 gap-3 sm:gap-0">
+            
+            {/* Always visible Abort/Back button for everyone */}
+            <button 
+              type="button" 
+              onClick={onClose} 
+              disabled={isSaving || isForging}
+              className="w-full sm:w-auto px-6 py-3 text-zinc-500 text-xs uppercase tracking-widest font-bold hover:text-zinc-300 hover:bg-white/5 rounded-xl transition-all disabled:opacity-30 text-center"
+            >
+              {isMandatory ? "Back to Archive" : "Abort Process"}
+            </button>
 
             <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
               {currentStep > 1 && (
