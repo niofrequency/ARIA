@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { Bot, Conversation } from '../types';
-import { LogOut, X, Trash, Cpu, ShieldCheck, PanelLeftClose, Search, Compass, MessageSquare, Sparkles } from 'lucide-react';
+import { LogOut, X, Trash, Cpu, ShieldCheck, PanelLeftClose, Search, Compass, MessageSquare, Sparkles, Menu } from 'lucide-react';
 
 export type ViewState = 'discover' | 'create' | 'chat';
 
@@ -70,6 +70,7 @@ interface SidebarProps {
   onToggleTheme: () => void;
   isMobileSidebarOpen: boolean;
   onCloseMobileSidebar: () => void;
+  onToggleMobileSidebar?: () => void; // Added for mobile floating button
   isDesktopSidebarOpen: boolean;
   onToggleDesktopSidebar: () => void;
   activeView: ViewState;
@@ -84,6 +85,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   onSignOut,
   isMobileSidebarOpen,
   onCloseMobileSidebar,
+  onToggleMobileSidebar,
   isDesktopSidebarOpen,
   onToggleDesktopSidebar,
   activeView,
@@ -120,6 +122,20 @@ const Sidebar: React.FC<SidebarProps> = ({
 
 return (
     <>
+      {/* Floating Mobile Toggle Button (Visible when sidebar is closed) */}
+      {onToggleMobileSidebar && (
+        <button
+          onClick={onToggleMobileSidebar}
+          className={`lg:hidden fixed top-4 left-4 z-[80] p-2.5 bg-zinc-900/90 backdrop-blur-md border border-white/10 hover:bg-white/10 rounded-xl text-zinc-400 hover:text-white transition-all shadow-xl ${isMobileSidebarOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+      )}
+
+      {/* Desktop Layout Spacer (Pushes main content naturally) */}
+      <div className={`hidden lg:block shrink-0 transition-all duration-300 ease-in-out ${isDesktopSidebarOpen ? 'w-[280px]' : 'w-0'}`} />
+
+      {/* Mobile Backdrop */}
       <div
         className={`fixed inset-0 bg-black/80 backdrop-blur-sm z-[90] lg:hidden transition-opacity duration-300 ${
           isMobileSidebarOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
@@ -128,6 +144,7 @@ return (
         aria-hidden="true"
       />
 
+      {/* Actual Sidebar Content */}
       <aside
         className={`fixed inset-y-0 left-0 w-[280px] bg-zinc-950 border-r border-white/5 flex flex-col z-[100] overflow-hidden  
           transition-transform duration-300 ease-in-out
