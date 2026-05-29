@@ -109,7 +109,7 @@ export const extractContextPrompt = (text: string) => {
     memoryText,
     gifSearchTerm,
     youtubeSearchTerm,
-    spicySearchTerm,
+    spicySearchTerm, // ✅ Return this new field
     externalLink
   };
 };
@@ -257,6 +257,7 @@ STRICT OPERATING RULES:
 
 /**
  * GENERATE AI RESPONSE
+ * Now with Long-Term Vector Memory Recall
  */
 export const generateAriaResponse = async (
   prompt: string,
@@ -407,6 +408,35 @@ const LORA_MAP: Record<string, string> = {
   "wild-beast": "wild-beast",
   "witchofoz": "witchofoz",
   "xochitl-v1": "xochitl-v1"
+};
+
+/**
+ * ==========================================
+ * NEW: VISION BRIDGE CAPTIONING LOGIC
+ * ==========================================
+ * This helper calls an endpoint to generate a text description
+ * of the character's reference image so Biglust can "see" it.
+ */
+const getVisualDescription = async (base64Image: string): Promise<string> => {
+  try {
+    if (!base64Image) return "";
+    
+    // You will need to create this endpoint (`/api/vision-caption`)
+    // It should use GPT-4o, Grok Vision, or LLaVA to return a short descriptive string.
+    const response = await fetch('/api/vision-caption', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: base64Image })
+    });
+    
+    if (!response.ok) return "";
+    
+    const data = await response.json();
+    return data.caption || "";
+  } catch (err) {
+    console.error("⚠️ Vision captioning failed:", err);
+    return "";
+  }
 };
 
 /**
@@ -710,7 +740,21 @@ export const generateAriaImage = async (
     console.log("🧬 Using Biglust Text-to-Image");
     if (activeLoraFile) console.log(`🧬 Active LoRA: ${activeLoraFile}.safetensors (Weight: ${activeWeight})`);
     
-    const fusedDescription = `(${baseDescription}:1.3)`; 
+    // ==========================================
+    // VISION BRIDGE INJECTION FOR BIGLUST
+    // ==========================================
+    let visualContext = "";
+    if (character.avatarImage) {
+      console.log("👁️ Extracting visual context from reference image for Biglust...");
+      visualContext = await getVisualDescription(character.avatarImage);
+      if (visualContext) {
+         console.log("👁️ Visual Context Extracted:", visualContext);
+      }
+    }
+
+    // Inject the visual context so Biglust "sees" the image details
+    const fusedDescription = `(${baseDescription}:1.3)${visualContext ? `, (${visualContext}:1.2)` : ''}`; 
+    
     const promptText = [
       fusedDescription,
       situationalTags.filter(Boolean).join(", "),
