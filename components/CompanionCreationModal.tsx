@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { CharacterProfile } from '../types';
 import { generateAriaImage } from '../services/ariaService';
-import { Sparkles, Cpu, Fingerprint, Activity, Loader2, Plus, Box, Camera, Upload, Server, ArrowRight, ArrowLeft, CheckCircle2, Menu, PanelLeft, X } from 'lucide-react';
+import { Sparkles, Cpu, Fingerprint, Activity, Loader2, Plus, Box, Camera, Upload, Server, ArrowRight, ArrowLeft, CheckCircle2, Menu, PanelLeft } from 'lucide-react';
 
 interface CompanionCreationModalProps {
   onSave: (newCharacter: CharacterProfile) => void;
@@ -620,12 +620,6 @@ const CompanionCreationModal: React.FC<CompanionCreationModalProps> = ({
               </div>
             </div>
           </div>
-          
-          {!isMandatory && (
-            <button onClick={onClose} className="p-2.5 bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10 rounded-xl transition-all">
-              <X className="w-5 h-5" />
-            </button>
-          )}
         </header>
 
         {/* Full Page Cinematic Backgrounds */}
