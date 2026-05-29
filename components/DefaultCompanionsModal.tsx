@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { CharacterProfile } from '../types';
-import { X, Sparkles, Cpu, ChevronRight, UserCircle2 } from 'lucide-react';
+import { X, Plus, UserCircle2, Cpu } from 'lucide-react';
 
 interface DefaultCompanionsModalProps {
   onSelectPreset: (character: CharacterProfile) => void;
@@ -9,10 +9,16 @@ interface DefaultCompanionsModalProps {
   isMandatory?: boolean;
 }
 
+// Extended locally to include 'shortTrait' for the UI pill
+interface PresetCompanion extends Partial<CharacterProfile> {
+  shortTrait: string;
+}
+
 // Pre-configured profiles utilizing your existing LoRAs
-const PRESET_COMPANIONS: Partial<CharacterProfile>[] = [
+const PRESET_COMPANIONS: PresetCompanion[] = [
   {
     name: 'Stephanie',
+    shortTrait: 'Sweet',
     gender: 'female',
     age: '23',
     ethnicity: 'Caucasian',
@@ -28,6 +34,7 @@ const PRESET_COMPANIONS: Partial<CharacterProfile>[] = [
   },
   {
     name: 'Chloe',
+    shortTrait: 'Sassy',
     gender: 'female',
     age: '22',
     ethnicity: 'Caucasian',
@@ -43,6 +50,7 @@ const PRESET_COMPANIONS: Partial<CharacterProfile>[] = [
   },
   {
     name: 'Katrina',
+    shortTrait: 'Dominant',
     gender: 'female',
     age: '26',
     ethnicity: 'Latina',
@@ -58,6 +66,7 @@ const PRESET_COMPANIONS: Partial<CharacterProfile>[] = [
   },
   {
     name: 'Lina',
+    shortTrait: 'Mystical',
     gender: 'female',
     age: '120',
     ethnicity: 'Fantasy Elf',
@@ -101,7 +110,7 @@ const DefaultCompanionsModal: React.FC<DefaultCompanionsModalProps> = ({
       onClick={() => { if (!isMandatory) onClose(); }}
     >
       <div 
-        className="relative w-full max-w-5xl h-[85dvh] flex flex-col bg-zinc-950 border border-purple-500/20 rounded-[2rem] shadow-2xl overflow-hidden" 
+        className="relative w-full max-w-6xl h-[90dvh] md:h-[85dvh] flex flex-col bg-zinc-950 border border-purple-500/20 rounded-[2rem] shadow-2xl overflow-hidden" 
         onClick={(e) => e.stopPropagation()}
       >
         {/* Background Effects */}
@@ -116,7 +125,7 @@ const DefaultCompanionsModal: React.FC<DefaultCompanionsModalProps> = ({
                 <span className="text-[10px] uppercase tracking-[0.4em] text-purple-400 font-bold">Neural Archive</span>
             </div>
             <h2 className="text-3xl font-light text-white tracking-tight">
-              Select <span className="font-semibold text-purple-400">Companion Construct</span>
+              Choose Your <span className="font-semibold text-purple-400">Companion</span>
             </h2>
           </div>
           {!isMandatory && (
@@ -126,48 +135,53 @@ const DefaultCompanionsModal: React.FC<DefaultCompanionsModalProps> = ({
           )}
         </div>
 
-        {/* Content */}
+        {/* Content: Grid Layout matching your screenshot */}
         <div className="relative z-10 flex-1 overflow-y-auto px-8 md:px-10 pb-10 custom-scrollbar">
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-            {/* Custom Forge Card */}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
+            
+            {/* 1. CREATE NEW CARD */}
             <button
               onClick={onSelectCustom}
-              className="group relative flex flex-col items-center justify-center p-8 bg-gradient-to-br from-purple-900/20 to-zinc-900/40 border border-purple-500/30 rounded-3xl hover:border-purple-400 hover:shadow-[0_0_30px_rgba(147,51,234,0.2)] transition-all duration-300 text-left overflow-hidden min-h-[200px]"
+              className="group relative flex flex-col items-center justify-center border-2 border-dashed border-purple-500/30 hover:border-purple-400 bg-purple-500/5 hover:bg-purple-500/10 rounded-3xl aspect-[3/4] transition-all duration-300 overflow-hidden"
             >
-              <div className="absolute inset-0 bg-purple-500/10 translate-y-full group-hover:translate-y-0 transition-transform duration-500 ease-out" />
-              <Sparkles className="w-12 h-12 text-purple-400 mb-4 group-hover:scale-110 transition-transform duration-300" />
-              <h3 className="text-xl font-bold text-white mb-2 relative z-10">Forge Custom Identity</h3>
-              <p className="text-sm text-zinc-400 text-center relative z-10">Build a completely unique companion from scratch using the Synthesis Laboratory.</p>
+              <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+              <Plus className="w-12 h-12 text-purple-400 mb-4 group-hover:scale-110 transition-transform duration-300" />
+              <span className="text-sm font-bold text-purple-300 tracking-widest uppercase relative z-10">Create New</span>
             </button>
 
-            {/* Default Companions Mapping */}
+            {/* 2. PRESET CARDS */}
             {PRESET_COMPANIONS.map((preset, idx) => (
               <button
                 key={idx}
                 onClick={() => onSelectPreset(preset as CharacterProfile)}
-                className="group flex items-start gap-4 p-6 bg-white/[0.02] border border-white/5 hover:border-purple-500/30 rounded-3xl hover:bg-white/[0.04] transition-all duration-300 text-left min-h-[200px]"
+                className="group relative flex flex-col rounded-3xl overflow-hidden border border-white/10 hover:border-purple-500/50 hover:shadow-[0_0_30px_rgba(147,51,234,0.2)] transition-all duration-300 aspect-[3/4] bg-zinc-900 text-left"
               >
-                <div className="w-16 h-16 rounded-2xl bg-zinc-800 border border-white/10 flex items-center justify-center shrink-0 group-hover:border-purple-500/50 transition-colors shadow-inner">
-                  <UserCircle2 className="w-8 h-8 text-zinc-500 group-hover:text-purple-400 transition-colors" />
+                {/* Image Area Placeholder */}
+                <div className="absolute inset-0 bg-zinc-800 flex items-center justify-center overflow-hidden">
+                  {preset.avatarImage ? (
+                    <img src={preset.avatarImage} alt={preset.name} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity duration-500 group-hover:scale-105" />
+                  ) : (
+                    <>
+                      <UserCircle2 className="w-20 h-20 text-zinc-700 group-hover:text-purple-900/50 transition-colors duration-500" />
+                      <span className="absolute top-1/2 left-1/2 -translate-x-1/2 mt-16 text-[10px] uppercase tracking-widest text-zinc-600 font-bold whitespace-nowrap">Image Placeholder</span>
+                    </>
+                  )}
                 </div>
-                <div className="flex-1">
-                  <div className="flex items-center justify-between mb-1">
-                    <h3 className="text-lg font-bold text-white group-hover:text-purple-300 transition-colors">{preset.name}</h3>
-                    <ChevronRight className="w-5 h-5 text-zinc-600 group-hover:text-purple-400 group-hover:translate-x-1 transition-all" />
+
+                {/* Bottom Overlay Info Bar */}
+                <div className="absolute bottom-0 left-0 right-0 p-5 bg-gradient-to-t from-black via-black/80 to-transparent flex items-end justify-between translate-y-0 transition-transform duration-300">
+                  <div>
+                    <h3 className="text-xl font-bold text-white drop-shadow-md group-hover:text-purple-300 transition-colors">{preset.name}</h3>
                   </div>
-                  <div className="flex flex-wrap gap-1.5 mb-3">
-                    <span className="px-2 py-0.5 bg-white/5 rounded-md text-[9px] uppercase tracking-widest text-zinc-400">{preset.ethnicity}</span>
-                    <span className="px-2 py-0.5 bg-white/5 rounded-md text-[9px] uppercase tracking-widest text-zinc-400">{preset.age} YRS</span>
+                  <div className="px-3 py-1.5 bg-purple-600/20 border border-purple-500/30 rounded-full backdrop-blur-md shadow-lg">
+                    <span className="text-[10px] uppercase tracking-widest text-purple-300 font-bold">{preset.shortTrait}</span>
                   </div>
-                  <p className="text-xs text-zinc-500 leading-relaxed line-clamp-3 group-hover:text-zinc-400 transition-colors">
-                    {preset.vibe}
-                  </p>
                 </div>
               </button>
             ))}
-          </div>
 
+          </div>
         </div>
       </div>
     </div>
