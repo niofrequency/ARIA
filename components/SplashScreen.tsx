@@ -59,9 +59,7 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
                 <div className={`text-center transition-all duration-700 delay-75 ${isExiting ? 'translate-y-10 opacity-0 blur-md' : 'translate-y-0 opacity-100 blur-0'}`}>
                     <h1 className="text-5xl font-extralight text-white tracking-[0.2em] flex items-center justify-center">
                         ARIA 
-                        <span className="relative ml-4">
-                            <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-purple-600 font-black tracking-normal">AI</span>
-                        </span>
+
                     </h1>
                 </div>
 
