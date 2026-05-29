@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
 import { CharacterProfile } from '../types';
-import { Plus, UserCircle2, Compass, Flame, Sparkles } from 'lucide-react';
+import { Plus, UserCircle2, Compass, Flame, Sparkles, Menu, PanelLeft } from 'lucide-react';
 
 interface DefaultCompanionsModalProps {
   onSelectPreset: (character: CharacterProfile) => void;
   onSelectCustom: () => void;
   onClose: () => void;
   isMandatory?: boolean;
+  onToggleMobileSidebar: () => void;
+  onToggleDesktopSidebar: () => void;
+  isDesktopSidebarOpen: boolean;
 }
 
 interface PresetCompanion extends Partial<CharacterProfile> {
@@ -158,7 +161,10 @@ const CATEGORIES = ["All", "Caucasian", "Latina", "Asian", "Blonde", "Brunette",
 
 const DefaultCompanionsModal: React.FC<DefaultCompanionsModalProps> = ({ 
   onSelectPreset, 
-  onSelectCustom 
+  onSelectCustom,
+  onToggleMobileSidebar,
+  onToggleDesktopSidebar,
+  isDesktopSidebarOpen
 }) => {
   const [activeCategory, setActiveCategory] = useState("All");
 
@@ -169,12 +175,39 @@ const DefaultCompanionsModal: React.FC<DefaultCompanionsModalProps> = ({
   return (
     <div className="relative w-full h-full bg-zinc-950 flex flex-col overflow-hidden animate-in fade-in duration-500">
       
+      {/* NEW STICKY HEADER MATCHING MAIN CHAT AREA */}
+      <header 
+        className={`fixed top-0 left-0 right-0 z-40 px-6 py-4 border-b border-white/5 bg-zinc-950/80 backdrop-blur-xl flex items-center justify-between transition-transform duration-300 ease-in-out
+          ${isDesktopSidebarOpen ? 'lg:left-[280px]' : 'lg:left-0'}
+        `}
+      >
+        <div className="flex items-center gap-4">
+          <button onClick={onToggleMobileSidebar} className="lg:hidden p-2 text-zinc-400 hover:text-white bg-white/5 rounded-xl transition-all">
+            <Menu className="w-5 h-5" />
+          </button>
+          
+          {!isDesktopSidebarOpen && (
+            <button onClick={onToggleDesktopSidebar} className="hidden lg:block p-2 text-zinc-400 hover:text-white bg-white/5 rounded-xl transition-all">
+              <PanelLeft className="w-5 h-5" />
+            </button>
+          )}
+          
+          <div>
+            <h1 className="text-sm font-black text-white tracking-wide uppercase">Discover</h1>
+            <div className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse"></span>
+              <span className="text-[10px] text-purple-400 uppercase tracking-widest font-bold font-mono">Neural Network</span>
+            </div>
+          </div>
+        </div>
+      </header>
+
       {/* Background Cinematic Effects */}
       <div className="absolute inset-0 z-0 opacity-[0.02] pointer-events-none" style={{ backgroundImage: 'linear-gradient(#a855f7 1px, transparent 1px), linear-gradient(90deg, #a855f7 1px, transparent 1px)', backgroundSize: '40px 40px' }}></div>
       <div className="absolute top-[-10%] right-[-5%] w-[600px] h-[600px] bg-purple-600/10 rounded-full blur-[120px] z-0 pointer-events-none" />
 
       {/* Main Scrollable Content */}
-      <div className="relative z-10 flex-1 overflow-y-auto custom-scrollbar">
+      <div className="relative z-10 flex-1 overflow-y-auto custom-scrollbar pt-24">
         <div className="w-full max-w-7xl mx-auto px-6 md:px-12 py-10">
           
           {/* Header Section */}
