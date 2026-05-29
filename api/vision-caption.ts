@@ -2,10 +2,6 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 /**
  * ARIA VISION PROXY (xAI Grok Vision)
- * Logic:
- * 1. Takes a base64 image from the frontend.
- * 2. Uses Grok-2-Vision to analyze the image.
- * 3. Returns a concise text description to feed into Biglust/RunPod.
  */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // 1. CORS CONFIGURATION
@@ -35,14 +31,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     console.log(`👁️ Proxying vision request to xAI: grok-2-vision-1212`);
 
-    // Extract base64 data and mime type if formatted as a data URL
-    const isDataUrl = image.includes('data:image');
-    let mimeType = 'image/jpeg';
-    let base64Data = image;
+    // ✅ FIX: Safely handle both standard URLs and Base64 Data URIs
+    let finalImageUrl = image;
+    
+    if (!image.startsWith('http')) {
+      const isDataUrl = image.includes('data:image');
+      let mimeType = 'image/jpeg';
+      let base64Data = image;
 
-    if (isDataUrl) {
-      mimeType = image.substring(5, image.indexOf(';'));
-      base64Data = image.split(',')[1];
+      if (isDataUrl) {
+        mimeType = image.substring(5, image.indexOf(';'));
+        base64Data = image.split(',')[1];
+      }
+      finalImageUrl = `data:${mimeType};base64,${base64Data}`;
     }
 
     // 3. EXECUTE VISION REQUEST
@@ -65,7 +66,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               {
                 type: "image_url",
                 image_url: {
-                  url: `data:${mimeType};base64,${base64Data}`,
+                  url: finalImageUrl,
                   detail: "high"
                 }
               }
