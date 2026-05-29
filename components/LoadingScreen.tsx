@@ -61,7 +61,7 @@ const LoadingScreen = ({ isReady }: { isReady: boolean }) => {
             />
           </div>
           <span className="text-xl font-light tracking-[0.5em] text-white uppercase">
-            Aria <span className="font-semibold text-purple-400">AI</span>
+            ARIA
           </span>
         </div>
 
