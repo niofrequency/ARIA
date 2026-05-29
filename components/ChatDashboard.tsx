@@ -15,6 +15,8 @@ import {
   uploadImageToStorage 
 } from '../services/firebaseService';
 
+export type ViewState = 'discover' | 'create' | 'chat';
+
 interface ChatDashboardProps {
   userData: UserData;
   onSignOut: () => void;
@@ -51,10 +53,9 @@ const ChatDashboard: React.FC<ChatDashboardProps> = ({
   const [isDesktopSidebarOpen, setIsDesktopSidebarOpen] = useState(true);
   const [isLoadingResponse, setIsLoadingResponse] = useState(false);
   
-  // Modal States
+  // View & Routing States
+  const [activeView, setActiveView] = useState<ViewState>('discover');
   const [showCustomizationModalForBotId, setShowCustomizationModalForBotId] = useState<string | null>(null);
-  const [isDefaultModalOpen, setIsDefaultModalOpen] = useState(false);
-  const [isCreationModalOpen, setIsCreationModalOpen] = useState(false);
   const [isInitialLoadComplete, setIsInitialLoadComplete] = useState(false);
 
   const generateUniqueId = (prefix: string) => `${prefix}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
@@ -98,6 +99,10 @@ const ChatDashboard: React.FC<ChatDashboardProps> = ({
           if (targetBotConvs && targetBotConvs.length > 0) {
             setCurrentConversationId(targetBotConvs[0].id);
           }
+          
+          setActiveView('chat'); // Go straight to chat if they have history
+        } else {
+          setActiveView('discover'); // Force discover page if new user
         }
       } catch (err) {
         console.error("Dashboard: History load error:", err);
@@ -108,21 +113,10 @@ const ChatDashboard: React.FC<ChatDashboardProps> = ({
     hydrateHistory();
   }, [userData?.uid]);
 
-  // AUTO-CREATE INITIAL BOT IF NONE EXIST
-  useEffect(() => {
-    if (isInitialLoadComplete && bots.length === 0 && !showCustomizationModalForBotId && !isCreationModalOpen && !isDefaultModalOpen) {
-      setIsDefaultModalOpen(true);
-    }
-  }, [isInitialLoadComplete, bots.length, showCustomizationModalForBotId, isCreationModalOpen, isDefaultModalOpen]);
-
   const handleSendMessage = useCallback(async (newMessage: Message) => {
     if (!selectedBotId || !currentConversationId || !userData?.uid) return;
 
-    if (newMessage.role === 'user') {
-        setIsLoadingResponse(true);
-    } else {
-        setIsLoadingResponse(false);
-    }
+    setIsLoadingResponse(newMessage.role === 'user');
 
     setConversations(prev => {
       const next = new Map(prev);
@@ -205,20 +199,12 @@ const ChatDashboard: React.FC<ChatDashboardProps> = ({
     } else {
       handleNewConversation(botId, true);
     }
-    setIsMobileSidebarOpen(false);
-  };
-
-  const handleNewBot = () => {
-    setIsDefaultModalOpen(true);
+    setActiveView('chat');
     setIsMobileSidebarOpen(false);
   };
 
   const handleCreateNewCompanion = async (newCharacter: CharacterProfile) => {
     if (!userData?.uid) return;
-    
-    // 1. Instantly close all modals so UI responds immediately
-    setIsCreationModalOpen(false);
-    setIsDefaultModalOpen(false);
     
     const newBotId = generateUniqueId('bot');
     const newBotName = newCharacter.name || `Companion ${bots.length + 1}`;
@@ -233,16 +219,15 @@ const ChatDashboard: React.FC<ChatDashboardProps> = ({
       lastActivity: Date.now(),
     };
 
-    // 2. Optimistic Update: Set state instantly so the useEffect doesn't trigger the modal again
     setBots(prev => [...prev, newBot]);
     setSelectedBotId(newBotId);
     localStorage.setItem('aria_last_active_bot', newBotId);
     setConversations(prev => new Map(prev).set(newBotId, []));
     
-    // 3. Save to database in the background
     saveBotToFirestore(userData.uid, newBot).catch(err => console.error("Save failed:", err));
     
     handleNewConversation(newBotId, true);
+    setActiveView('chat'); // Instantly drop into the chat view
   };
 
   const handleNewConversation = async (botId: string, skipInitialMessage = false) => {
@@ -282,6 +267,7 @@ const ChatDashboard: React.FC<ChatDashboardProps> = ({
         setSelectedBotId('');
         setCurrentConversationId(null);
         localStorage.removeItem('aria_last_active_bot');
+        if (bots.length <= 1) setActiveView('discover'); // Send to discover if no bots left
       }
     } catch (err) {
       console.error("Delete failed:", err);
@@ -303,16 +289,21 @@ const ChatDashboard: React.FC<ChatDashboardProps> = ({
   const currentBotConversations = conversations.get(selectedBotId) || [];
   const currentMessages = currentBotConversations.find(c => c.id === currentConversationId)?.messages || [];
 
+  if (!isInitialLoadComplete) {
+    return <LoadingScreen />;
+  }
+
   return (
-    <div className={`flex h-[100dvh] ${theme === 'dark' ? 'bg-zinc-950' : 'bg-zinc-50'} text-zinc-100 overflow-hidden`}>
+    <div className={`flex h-[100dvh] w-full ${theme === 'dark' ? 'bg-zinc-950' : 'bg-zinc-50'} text-zinc-100 overflow-hidden`}>
+      {/* Sidebar now manages the top-level navigation */}
       <Sidebar
         bots={bots}
         selectedBotId={selectedBotId}
         onSelectBot={handleSelectBot}
-        onNewBot={handleNewBot}
+        onNewBot={() => setActiveView('discover')} 
         conversations={currentBotConversations}
         onSelectConversation={setCurrentConversationId}
-        onDeleteConversation={() => {}} // Implementation for conv delete can be added
+        onDeleteConversation={() => {}} 
         onDeleteBot={handleDeleteBot}
         onSignOut={onSignOut}
         theme={theme}
@@ -321,54 +312,57 @@ const ChatDashboard: React.FC<ChatDashboardProps> = ({
         onCloseMobileSidebar={() => setIsMobileSidebarOpen(false)}
         isDesktopSidebarOpen={isDesktopSidebarOpen}
         onToggleDesktopSidebar={() => setIsDesktopSidebarOpen(prev => !prev)}
+        activeView={activeView as any} // Pass the state so Sidebar can highlight the active tab
+        setActiveView={setActiveView as any} 
       />
       
-      {selectedBot && (
-        <MainChatArea
-          character={selectedBot.characterProfile}
-          botId={selectedBot.id}
-          messages={currentMessages}
-          userData={userData}
-          onImageGenerated={onImageGenerated}
-          onSendMessage={handleSendMessage}
-          onUpdateMessage={handleUpdateMessage}
-          onToggleMobileSidebar={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
-          onToggleDesktopSidebar={() => setIsDesktopSidebarOpen(!isDesktopSidebarOpen)}
-          isDesktopSidebarOpen={isDesktopSidebarOpen}
-          isLoadingResponse={isLoadingResponse}
-          onOpenBotCustomization={setShowCustomizationModalForBotId}
-          setIsLoading={setIsLoadingResponse}
-        />
-      )}
+      {/* Main View Area Router */}
+      <main className="flex-1 flex flex-col min-w-0 relative">
+        
+        {/* 1. DISCOVER VIEW */}
+        {activeView === 'discover' && (
+          <div className="absolute inset-0 z-10 bg-zinc-950">
+            <DefaultCompanionsModal
+              isMandatory={bots.length === 0}
+              onSelectPreset={(preset) => handleCreateNewCompanion(preset)}
+              onSelectCustom={() => setActiveView('create')}
+              onClose={() => setActiveView('chat')}
+            />
+          </div>
+        )}
 
-      {/* NEW DEFAULT / CATALOG MODAL */}
-      {isDefaultModalOpen && (
-        <DefaultCompanionsModal
-          isMandatory={bots.length === 0}
-          onSelectPreset={(preset) => {
-            handleCreateNewCompanion(preset);
-          }}
-          onSelectCustom={() => {
-            setIsDefaultModalOpen(false);
-            setIsCreationModalOpen(true);
-          }}
-          onClose={() => setIsDefaultModalOpen(false)}
-        />
-      )}
+        {/* 2. CREATE COMPANION VIEW */}
+        {activeView === 'create' && (
+          <div className="absolute inset-0 z-10 bg-zinc-950">
+            <CompanionCreationModal
+              isMandatory={bots.length === 0}
+              onSave={handleCreateNewCompanion}
+              onClose={() => setActiveView(bots.length > 0 ? 'chat' : 'discover')}
+            />
+          </div>
+        )}
 
-      {/* NEW COMPANION (LABORATORY) MODAL */}
-      {isCreationModalOpen && (
-        <CompanionCreationModal
-          isMandatory={bots.length === 0}
-          onSave={handleCreateNewCompanion}
-          onClose={() => {
-            setIsCreationModalOpen(false);
-            if (bots.length === 0) setIsDefaultModalOpen(true); // Return to catalog if empty
-          }}
-        />
-      )}
+        {/* 3. CHAT VIEW */}
+        {activeView === 'chat' && selectedBot && (
+          <MainChatArea
+            character={selectedBot.characterProfile}
+            botId={selectedBot.id}
+            messages={currentMessages}
+            userData={userData}
+            onImageGenerated={onImageGenerated}
+            onSendMessage={handleSendMessage}
+            onUpdateMessage={handleUpdateMessage}
+            onToggleMobileSidebar={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
+            onToggleDesktopSidebar={() => setIsDesktopSidebarOpen(!isDesktopSidebarOpen)}
+            isDesktopSidebarOpen={isDesktopSidebarOpen}
+            isLoadingResponse={isLoadingResponse}
+            onOpenBotCustomization={setShowCustomizationModalForBotId}
+            setIsLoading={setIsLoadingResponse}
+          />
+        )}
+      </main>
 
-      {/* EXISTING BOT SETTINGS MODAL */}
+      {/* Settings Modal stays as an overlay */}
       {showCustomizationModalForBotId && (
         <BotCustomizationModal
           character={bots.find(b => b.id === showCustomizationModalForBotId)?.characterProfile || defaultNewBotCharacter}
