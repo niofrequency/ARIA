@@ -1,6 +1,8 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { Bot, Conversation } from '../types';
-import { Plus, LogOut, X, Trash, Cpu, ShieldCheck, PanelLeftClose, Search, MessageSquarePlus } from 'lucide-react';
+import { LogOut, X, Trash, Cpu, ShieldCheck, PanelLeftClose, Search, Compass, MessageSquare, Sparkles, Crown } from 'lucide-react';
+
+export type ViewState = 'discover' | 'create' | 'chat';
 
 // ==========================================
 // PERFORMANCE UPGRADE: Memoized Bot Item
@@ -51,7 +53,6 @@ const MemoizedBotItem = React.memo(({ bot, isSelected, onSelect, onDelete }: Bot
     </div>
   );
 }, (prevProps, nextProps) => {
-  // Only re-render if selection state changes or bot data changes
   return prevProps.isSelected === nextProps.isSelected && prevProps.bot === nextProps.bot;
 });
 
@@ -72,6 +73,8 @@ interface SidebarProps {
   onCloseMobileSidebar: () => void;
   isDesktopSidebarOpen: boolean;
   onToggleDesktopSidebar: () => void;
+  activeView: ViewState;
+  setActiveView: (view: ViewState) => void;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -85,6 +88,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   onCloseMobileSidebar,
   isDesktopSidebarOpen,
   onToggleDesktopSidebar,
+  activeView,
+  setActiveView
 }) => {
   
   // UX UPGRADE: Search State
@@ -99,8 +104,11 @@ const Sidebar: React.FC<SidebarProps> = ({
   }, [onCloseMobileSidebar]);
 
   const handleSelectInteraction = useCallback((botId: string) => {
-    handleMobileAction(() => onSelectBot(botId));
-  }, [handleMobileAction, onSelectBot]);
+    handleMobileAction(() => {
+      onSelectBot(botId);
+      setActiveView('chat'); // Force view to chat when selecting a profile
+    });
+  }, [handleMobileAction, onSelectBot, setActiveView]);
 
   const handleDeleteInteraction = useCallback((botId: string, botName: string) => {
     if (window.confirm(`Terminate connection with ${botName}?`)) {
@@ -119,7 +127,7 @@ return (
     <>
       {/* Overlay for mobile sidebar */}
       <div
-        className={`fixed inset-0 bg-black/80 backdrop-blur-sm z-[90] lg:hidden transition-opacity duration-300 ${ // UPDATED: z-[90]
+        className={`fixed inset-0 bg-black/80 backdrop-blur-sm z-[90] lg:hidden transition-opacity duration-300 ${
           isMobileSidebarOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
         }`}
         onClick={onCloseMobileSidebar}
@@ -132,7 +140,7 @@ return (
           transition-transform duration-300 ease-in-out
           ${isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
           ${isDesktopSidebarOpen ? 'lg:translate-x-0' : 'lg:-translate-x-full'}
-        `} // UPDATED: z-[100] ensures it sits above the Chat Input
+        `}
       >
         {/* Tech Background for Sidebar */}
         <div className="absolute inset-0 z-0 opacity-10 pointer-events-none" 
@@ -152,7 +160,6 @@ return (
           </div>
           
           <div className="flex items-center gap-1">
-            {/* Desktop Fold Button */}
             <button 
               onClick={(e) => {
                 e.stopPropagation();
@@ -164,7 +171,6 @@ return (
               <PanelLeftClose className={`w-5 h-5 transition-transform duration-300 ${!isDesktopSidebarOpen ? 'rotate-180' : ''}`} />
             </button>
 
-            {/* Mobile Close Button */}
             <button 
               onClick={onCloseMobileSidebar} 
               className="lg:hidden p-2 text-zinc-500 hover:text-white"
@@ -174,41 +180,83 @@ return (
           </div>
         </div>
 
-        {/* Manifest Construct Button */}
-        <div className="relative z-10 p-4 pb-2">
-          <button
-            onClick={() => handleMobileAction(onNewBot)}
-            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-purple-600/10 hover:bg-purple-600/20 border border-purple-500/20 text-purple-400 text-xs uppercase tracking-widest font-bold rounded-xl transition-all active:scale-95 group shadow-xl"
+        {/* MAIN NAVIGATION (Candy.ai Style) */}
+        <nav className="relative z-10 flex flex-col gap-1.5 p-4 border-b border-white/5">
+          <button 
+            onClick={() => handleMobileAction(() => setActiveView('discover'))}
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${
+              activeView === 'discover' 
+                ? 'bg-white/10 text-white font-bold shadow-inner' 
+                : 'text-zinc-400 hover:bg-white/5 hover:text-white font-medium'
+            }`}
           >
-            <MessageSquarePlus className="w-4 h-4 group-hover:rotate-90 transition-transform" />
-            <span className="uppercase tracking-[0.2em] text-[10px]">NEW COMPANION</span>
+            <Compass className={`w-5 h-5 ${activeView === 'discover' ? 'text-purple-400' : ''}`} />
+            <span className="text-sm tracking-wide">Discover</span>
           </button>
-        </div>
 
-        {/* UX UPGRADE: Search Bar */}
-        <div className="relative z-10 px-4 pb-2">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
-            <input 
-              type="text" 
-              placeholder="SEARCH PROTOCOLS..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-black/40 border border-white/5 rounded-xl py-2.5 pl-9 pr-4 text-[10px] tracking-widest text-white placeholder-zinc-600 focus:outline-none focus:border-purple-500/50 transition-colors"
-            />
-          </div>
-        </div>
-
-        {/* My Companions Section */}
-        <section className="relative z-10 flex-1 px-4 overflow-hidden flex flex-col mt-2">
-          <div className="flex items-center justify-between mb-2 px-2">
-            <h3 className="text-[10px] uppercase tracking-[0.3em] text-zinc-500 font-bold flex items-center gap-2">
-               <Cpu className="w-3 h-3" /> Neural Profiles
-            </h3>
-            {searchQuery && (
-              <span className="text-[9px] text-zinc-600 font-medium tracking-wider">{filteredBots.length} MATCHES</span>
+          <button 
+            onClick={() => handleMobileAction(() => setActiveView('chat'))}
+            className={`flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-300 ${
+              activeView === 'chat' 
+                ? 'bg-white/10 text-white font-bold shadow-inner' 
+                : 'text-zinc-400 hover:bg-white/5 hover:text-white font-medium'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <MessageSquare className={`w-5 h-5 ${activeView === 'chat' ? 'text-purple-400' : ''}`} />
+              <span className="text-sm tracking-wide">Chat</span>
+            </div>
+            {bots.length > 0 && (
+              <span className="bg-purple-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                {bots.length}
+              </span>
             )}
+          </button>
+
+          <button 
+            onClick={() => handleMobileAction(() => setActiveView('create'))}
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${
+              activeView === 'create' 
+                ? 'bg-white/10 text-white font-bold shadow-inner' 
+                : 'text-zinc-400 hover:bg-white/5 hover:text-white font-medium'
+            }`}
+          >
+            <Sparkles className={`w-5 h-5 ${activeView === 'create' ? 'text-purple-400' : ''}`} />
+            <span className="text-sm tracking-wide">Create Character</span>
+          </button>
+
+          {/* Premium CTA (Matching Reference Image) */}
+          <button className="flex items-center justify-between px-4 py-3 mt-2 bg-gradient-to-r from-orange-500/10 to-pink-500/10 hover:from-orange-500/20 hover:to-pink-500/20 border border-orange-500/20 rounded-xl text-orange-200 transition-all group">
+            <div className="flex items-center gap-3">
+              <Crown className="w-5 h-5 text-orange-400 group-hover:scale-110 transition-transform" />
+              <span className="text-sm font-bold">Premium</span>
+            </div>
+            <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow-lg">
+              -70%
+            </span>
+          </button>
+        </nav>
+
+        {/* NEURAL PROFILES (Only clearly prominent when in Chat or if bots exist) */}
+        <section className="relative z-10 flex-1 px-4 overflow-hidden flex flex-col mt-4">
+          <div className="flex items-center justify-between mb-3 px-2">
+            <h3 className="text-[10px] uppercase tracking-[0.3em] text-zinc-500 font-bold flex items-center gap-2">
+               <Cpu className="w-3 h-3" /> My AI
+            </h3>
           </div>
+
+          {bots.length > 0 && (
+            <div className="relative mb-3">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+              <input 
+                type="text" 
+                placeholder="Search..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-black/40 border border-white/5 rounded-xl py-2.5 pl-9 pr-4 text-[11px] tracking-widest text-white placeholder-zinc-600 focus:outline-none focus:border-purple-500/50 transition-colors"
+              />
+            </div>
+          )}
 
           <div className="space-y-2 overflow-y-auto custom-scrollbar flex-1 pr-1 pb-4">
             {filteredBots.length === 0 ? (
@@ -222,7 +270,7 @@ return (
                 <MemoizedBotItem 
                   key={bot.id} 
                   bot={bot} 
-                  isSelected={selectedBotId === bot.id}
+                  isSelected={activeView === 'chat' && selectedBotId === bot.id}
                   onSelect={handleSelectInteraction}
                   onDelete={handleDeleteInteraction}
                 />
