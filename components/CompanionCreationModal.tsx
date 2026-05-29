@@ -15,6 +15,7 @@ const RUNPOD_MODELS = [
 ];
 
 const LORA_OPTIONS = [
+  // Core Image Adjustment LoRAs
   { id: "yarn_qwen.safetensors", name: "YARN" }, { id: "hmfemme_qwen.safetensors", name: "HMFEM" },  { id: "shavedpussyv1.safetensors", name: "PSY1" }, 
   { id: "hairypussyv5.safetensors", name: "HRYPSY5" },{ id: "hairypussyv6.safetensors", name: "HRYPSY6" },{ id: "hairypussyv7.safetensors", name: "HRYPSY7" },{ id: "hairypussyv8.safetensors", name: "HRYPSY8" },{ id: "hairypussyv9.safetensors", name: "HRYPSY9" },
   { id: "qwen4play.safetensors", name: "QWEN4PLAY" }, { id: "FemNde.safetensors", name: "FEMNUDE" },
@@ -24,7 +25,60 @@ const LORA_OPTIONS = [
   { id: "LIMABOG_PUSSY.safetensors", name: "LIMABOG_PUSSY" }, { id: "HARPY_BKAKKE.safetensors", name: "HARPY_BKAKKE" },
   { id: "IR_BJ.safetensors", name: "IR_BJ" }, { id: "JIB_SKIN.safetensors", name: "JIB_SKIN" },
   { id: "NRDX_LIGHTING.safetensors", name: "NRDX_LIGHTING" }, { id: "ALCAITIFF.safetensors", name: "ALCAITIFF" },
-  { id: "NATURALSKIN.safetensors", name: "NATURALSKIN" }
+  { id: "NATURALSKIN.safetensors", name: "NATURALSKIN" },
+
+  // Identity Map LoRAs synced from the generator engine
+  { id: "ACE_the_ELF.safetensors", name: "ACE the ELF" },
+  { id: "amai-liu.safetensors", name: "amai-liu" },
+  { id: "AMY_the_ELF.safetensors", name: "AMY the ELF" },
+  { id: "ariana-grande.safetensors", name: "ariana-grande" },
+  { id: "asmrvida.safetensors", name: "asmrvida" },
+  { id: "aubreyplaza-v1.safetensors", name: "aubrey plaza" },
+  { id: "baca-v1.safetensors", name: "baca-v1" },
+  { id: "brittanyspears-v1.safetensors", name: "brittany spears" },
+  { id: "bule-barbie.safetensors", name: "bule barbie" },
+  { id: "cheyenne-000009.safetensors", name: "cheyenne" },
+  { id: "chloe-cherry.safetensors", name: "chloe cherry" },
+  { id: "cum-on-your-face.safetensors", name: "cum on your mouth" },
+  { id: "debby-ryan.safetensors", name: "debby ryan" },
+  { id: "des.safetensors", name: "des210" },
+  { id: "dreamgurl.safetensors", name: "dreamgurl" },
+  { id: "dolores-umbridge.safetensors", name: "dolores umbridge" },
+  { id: "eva-the-elf.safetensors", name: "eva the elf" },
+  { id: "francescale.safetensors", name: "francescale" },
+  { id: "irina-spalko.safetensors", name: "irina spalko" },
+  { id: "ivyharper-v1.safetensors", name: "ivy harper" },
+  { id: "jennaortega-v1.safetensors", name: "jenna ortega" },
+  { id: "katrina-jade.safetensors", name: "katrina jade" },
+  { id: "kim-kardashian.safetensors", name: "kim kardashian" },
+  { id: "larkin-love.safetensors", name: "larkin love" },
+  { id: "leighbaker-v1.safetensors", name: "leigh baker" },
+  { id: "lia-marie.safetensors", name: "lia marie" },
+  { id: "LINA_the_ELF.safetensors", name: "LINA the ELF" },
+  { id: "maria-brazil.safetensors", name: "maria brazil" },
+  { id: "mercedes-santos.safetensors", name: "mercedes santos" },
+  { id: "morticia-addams.safetensors", name: "morticia addams" },
+  { id: "natasha-kaur.safetensors", name: "natasha kaur" },
+  { id: "naveen.safetensors", name: "naveen" },
+  { id: "pam-pink-000009.safetensors", name: "pam pink" },
+  { id: "poison-ivy.safetensors", name: "poison ivy" },
+  { id: "priyarai.safetensors", name: "priya rai" },
+  { id: "queenofhearts.safetensors", name: "queen of hearts" },
+  { id: "raven-v1.safetensors", name: "raven-v1" },
+  { id: "regina-evilqueen.safetensors", name: "regina evilqueen" },
+  { id: "rizzkallah.safetensors", name: "rizzkallah" },
+  { id: "shaghana-doyle.safetensors", name: "shaghana doyle" },
+  { id: "stephanie-og2.safetensors", name: "stephanie og2" },
+  { id: "stephanie-lvl2.safetensors", name: "stephanie lvl2" },
+  { id: "stephanie-og-000009.safetensors", name: "stephanie og" },
+  { id: "stephanie-proxy.safetensors", name: "stephanie proxy" },
+  { id: "stephanie-v1-000009.safetensors", name: "stephanie v1" },
+  { id: "theresa.safetensors", name: "theresa" },
+  { id: "tinkerbell.safetensors", name: "tinkerbell" },
+  { id: "velma-dinkle.safetensors", name: "velma dinkle" },
+  { id: "wild-beast.safetensors", name: "wild beast" },
+  { id: "witchofoz.safetensors", name: "witch of oz" },
+  { id: "xochitl-v1.safetensors", name: "xochitl gomez" }
 ];
 
 const TOTAL_STEPS = 10;
@@ -115,6 +169,7 @@ const CompanionCreationModal: React.FC<CompanionCreationModalProps> = ({ onSave,
       
       const identityPrompt = `Cinematic portrait of a ${formData.age || '24'} year old ${formData.ethnicity || 'person'} ${formData.gender || ''}, ${hairStr}, ${faceStr}, ${bodyStr}, outfit: ${formData.outfit || 'minimalist clothing'}, looking directly at camera, medium portrait studio shot, realistic lighting, 8k, highly detailed`;
       
+      // Auto-forge generates a brand new image, so we pass null for avatarImage
       const generatedUrl = await generateAriaImage(null, identityPrompt, { ...formData, avatarImage: null } as CharacterProfile);
       
       if (generatedUrl) {
