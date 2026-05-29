@@ -225,17 +225,7 @@ return (
             <span className="text-sm tracking-wide">Create Character</span>
           </button>
 
-          {/* Premium CTA (Matching Reference Image) */}
-          <button className="flex items-center justify-between px-4 py-3 mt-2 bg-gradient-to-r from-orange-500/10 to-pink-500/10 hover:from-orange-500/20 hover:to-pink-500/20 border border-orange-500/20 rounded-xl text-orange-200 transition-all group">
-            <div className="flex items-center gap-3">
-              <Crown className="w-5 h-5 text-orange-400 group-hover:scale-110 transition-transform" />
-              <span className="text-sm font-bold">Premium</span>
-            </div>
-            <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow-lg">
-              -70%
-            </span>
-          </button>
-        </nav>
+  
 
         {/* NEURAL PROFILES (Only clearly prominent when in Chat or if bots exist) */}
         <section className="relative z-10 flex-1 px-4 overflow-hidden flex flex-col mt-4">
