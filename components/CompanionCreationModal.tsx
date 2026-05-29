@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { CharacterProfile } from '../types';
 import { generateAriaImage } from '../services/ariaService';
-import { Sparkles, Cpu, Fingerprint, Activity, Loader2, Plus, Box, Camera, Upload, Server, ArrowRight, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { Sparkles, Cpu, Fingerprint, Activity, Loader2, Plus, Box, Camera, Upload, Server, ArrowRight, ArrowLeft, CheckCircle2, Menu } from 'lucide-react';
 
 interface CompanionCreationModalProps {
   onSave: (newCharacter: CharacterProfile) => void;
   onClose: () => void;
   isMandatory?: boolean;
+  onToggleSidebar?: () => void; // <-- Added Prop
 }
 
 const RUNPOD_MODELS = [
@@ -83,7 +84,7 @@ const LORA_OPTIONS = [
 
 const TOTAL_STEPS = 10;
 
-const CompanionCreationModal: React.FC<CompanionCreationModalProps> = ({ onSave, onClose, isMandatory = false }) => {
+const CompanionCreationModal: React.FC<CompanionCreationModalProps> = ({ onSave, onClose, isMandatory = false, onToggleSidebar }) => {
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState<Partial<CharacterProfile>>({
     name: '',
@@ -593,10 +594,18 @@ const CompanionCreationModal: React.FC<CompanionCreationModalProps> = ({ onSave,
         <div className="relative z-10 w-full max-w-5xl mx-auto flex flex-col h-full">
             
             {/* Progress Matrix Header */}
-            <div className="flex flex-col pt-10 px-8 shrink-0">
+            <div className="flex flex-col pt-8 md:pt-10 px-6 md:px-8 shrink-0">
               <div className="flex items-center gap-3 mb-8">
-                  <Cpu className="w-6 h-6 text-purple-400 animate-pulse" />
-                  <span className="text-xs uppercase tracking-[0.4em] text-purple-400 font-bold">Synthesis Laboratory</span>
+                  {onToggleSidebar && !isMandatory && (
+                    <button
+                      onClick={onToggleSidebar}
+                      className="md:hidden p-2 bg-zinc-900 border border-white/10 hover:bg-white/10 rounded-xl text-zinc-400 hover:text-white transition-all shadow-md mr-1"
+                    >
+                      <Menu className="w-5 h-5" />
+                    </button>
+                  )}
+                  <Cpu className="w-6 h-6 text-purple-400 animate-pulse hidden sm:block" />
+                  <span className="text-xs sm:text-sm uppercase tracking-[0.4em] text-purple-400 font-bold">Synthesis Laboratory</span>
               </div>
               
               <div className="w-full bg-zinc-900 h-2 rounded-full overflow-hidden">
