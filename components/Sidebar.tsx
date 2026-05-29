@@ -1,12 +1,11 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { Bot, Conversation } from '../types';
-import { LogOut, X, Trash, Cpu, ShieldCheck, PanelLeftClose, Search, Compass, MessageSquare, Sparkles, Crown } from 'lucide-react';
+import { LogOut, X, Trash, Cpu, ShieldCheck, PanelLeftClose, Search, Compass, MessageSquare, Sparkles } from 'lucide-react';
 
 export type ViewState = 'discover' | 'create' | 'chat';
 
 // ==========================================
 // PERFORMANCE UPGRADE: Memoized Bot Item
-// Prevents the entire list from re-rendering when selecting one bot
 // ==========================================
 interface BotItemProps {
   bot: Bot;
@@ -81,7 +80,6 @@ const Sidebar: React.FC<SidebarProps> = ({
   bots,
   selectedBotId,
   onSelectBot,
-  onNewBot,
   onDeleteBot,
   onSignOut,
   isMobileSidebarOpen,
@@ -92,13 +90,11 @@ const Sidebar: React.FC<SidebarProps> = ({
   setActiveView
 }) => {
   
-  // UX UPGRADE: Search State
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Memoized helpers to maintain stable references for React.memo
   const handleMobileAction = useCallback((action: () => void) => {
     action();
-    if (window.innerWidth < 1024) { // Check if on mobile/tablet
+    if (window.innerWidth < 1024) {
       onCloseMobileSidebar();
     }
   }, [onCloseMobileSidebar]);
@@ -106,7 +102,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   const handleSelectInteraction = useCallback((botId: string) => {
     handleMobileAction(() => {
       onSelectBot(botId);
-      setActiveView('chat'); // Force view to chat when selecting a profile
+      setActiveView('chat');
     });
   }, [handleMobileAction, onSelectBot, setActiveView]);
 
@@ -117,7 +113,6 @@ const Sidebar: React.FC<SidebarProps> = ({
     }
   }, [onCloseMobileSidebar, onDeleteBot]);
 
-  // Filter bots based on search
   const filteredBots = useMemo(() => {
     if (!searchQuery.trim()) return bots;
     return bots.filter(b => b.name.toLowerCase().includes(searchQuery.toLowerCase()));
@@ -125,7 +120,6 @@ const Sidebar: React.FC<SidebarProps> = ({
 
 return (
     <>
-      {/* Overlay for mobile sidebar */}
       <div
         className={`fixed inset-0 bg-black/80 backdrop-blur-sm z-[90] lg:hidden transition-opacity duration-300 ${
           isMobileSidebarOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
@@ -134,7 +128,6 @@ return (
         aria-hidden="true"
       />
 
-      {/* Sidebar */}
       <aside
         className={`fixed inset-y-0 left-0 w-[280px] bg-zinc-950 border-r border-white/5 flex flex-col z-[100] overflow-hidden  
           transition-transform duration-300 ease-in-out
@@ -142,7 +135,6 @@ return (
           ${isDesktopSidebarOpen ? 'lg:translate-x-0' : 'lg:-translate-x-full'}
         `}
       >
-        {/* Tech Background for Sidebar */}
         <div className="absolute inset-0 z-0 opacity-10 pointer-events-none" 
              style={{ backgroundImage: 'linear-gradient(#27272a 1px, transparent 1px), linear-gradient(90deg, #27272a 1px, transparent 1px)', backgroundSize: '30px 30px' }}>
         </div>
@@ -161,34 +153,19 @@ return (
           
           <div className="flex items-center gap-1">
             <button 
-              onClick={(e) => {
-                e.stopPropagation();
-                onToggleDesktopSidebar();
-              }} 
+              onClick={(e) => { e.stopPropagation(); onToggleDesktopSidebar(); }} 
               className="hidden lg:flex p-2 text-zinc-500 hover:text-white hover:bg-white/5 rounded-lg transition-all"
-              title={isDesktopSidebarOpen ? "Collapse Sidebar" : "Expand Sidebar"}
             >
               <PanelLeftClose className={`w-5 h-5 transition-transform duration-300 ${!isDesktopSidebarOpen ? 'rotate-180' : ''}`} />
-            </button>
-
-            <button 
-              onClick={onCloseMobileSidebar} 
-              className="lg:hidden p-2 text-zinc-500 hover:text-white"
-            >
-              <X className="w-5 h-5" />
             </button>
           </div>
         </div>
 
-        {/* MAIN NAVIGATION (Candy.ai Style) */}
+        {/* MAIN NAVIGATION */}
         <nav className="relative z-10 flex flex-col gap-1.5 p-4 border-b border-white/5">
           <button 
             onClick={() => handleMobileAction(() => setActiveView('discover'))}
-            className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${
-              activeView === 'discover' 
-                ? 'bg-white/10 text-white font-bold shadow-inner' 
-                : 'text-zinc-400 hover:bg-white/5 hover:text-white font-medium'
-            }`}
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${activeView === 'discover' ? 'bg-white/10 text-white font-bold shadow-inner' : 'text-zinc-400 hover:bg-white/5 hover:text-white font-medium'}`}
           >
             <Compass className={`w-5 h-5 ${activeView === 'discover' ? 'text-purple-400' : ''}`} />
             <span className="text-sm tracking-wide">Discover</span>
@@ -196,38 +173,24 @@ return (
 
           <button 
             onClick={() => handleMobileAction(() => setActiveView('chat'))}
-            className={`flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-300 ${
-              activeView === 'chat' 
-                ? 'bg-white/10 text-white font-bold shadow-inner' 
-                : 'text-zinc-400 hover:bg-white/5 hover:text-white font-medium'
-            }`}
+            className={`flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-300 ${activeView === 'chat' ? 'bg-white/10 text-white font-bold shadow-inner' : 'text-zinc-400 hover:bg-white/5 hover:text-white font-medium'}`}
           >
             <div className="flex items-center gap-3">
               <MessageSquare className={`w-5 h-5 ${activeView === 'chat' ? 'text-purple-400' : ''}`} />
               <span className="text-sm tracking-wide">Chat</span>
             </div>
-            {bots.length > 0 && (
-              <span className="bg-purple-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
-                {bots.length}
-              </span>
-            )}
           </button>
 
           <button 
             onClick={() => handleMobileAction(() => setActiveView('create'))}
-            className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${
-              activeView === 'create' 
-                ? 'bg-white/10 text-white font-bold shadow-inner' 
-                : 'text-zinc-400 hover:bg-white/5 hover:text-white font-medium'
-            }`}
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${activeView === 'create' ? 'bg-white/10 text-white font-bold shadow-inner' : 'text-zinc-400 hover:bg-white/5 hover:text-white font-medium'}`}
           >
             <Sparkles className={`w-5 h-5 ${activeView === 'create' ? 'text-purple-400' : ''}`} />
             <span className="text-sm tracking-wide">Create Character</span>
           </button>
+        </nav>
 
-  
-
-        {/* NEURAL PROFILES (Only clearly prominent when in Chat or if bots exist) */}
+        {/* NEURAL PROFILES */}
         <section className="relative z-10 flex-1 px-4 overflow-hidden flex flex-col mt-4">
           <div className="flex items-center justify-between mb-3 px-2">
             <h3 className="text-[10px] uppercase tracking-[0.3em] text-zinc-500 font-bold flex items-center gap-2">
@@ -235,25 +198,10 @@ return (
             </h3>
           </div>
 
-          {bots.length > 0 && (
-            <div className="relative mb-3">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
-              <input 
-                type="text" 
-                placeholder="Search..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-black/40 border border-white/5 rounded-xl py-2.5 pl-9 pr-4 text-[11px] tracking-widest text-white placeholder-zinc-600 focus:outline-none focus:border-purple-500/50 transition-colors"
-              />
-            </div>
-          )}
-
           <div className="space-y-2 overflow-y-auto custom-scrollbar flex-1 pr-1 pb-4">
             {filteredBots.length === 0 ? (
               <div className="text-center py-10 px-4 border border-dashed border-white/5 rounded-2xl">
-                <p className="text-zinc-600 text-[10px] uppercase tracking-widest font-medium">
-                  {searchQuery ? 'NO MATCHES FOUND' : 'NO LINKS ESTABLISHED'}
-                </p>
+                <p className="text-zinc-600 text-[10px] uppercase tracking-widest font-medium">No Links Established</p>
               </div>
             ) : (
               filteredBots.map((bot) => (
@@ -270,19 +218,15 @@ return (
         </section>
 
         {/* Bottom Actions Area */}
-        <div className="relative z-10 p-4 mt-auto space-y-2 border-t border-white/5 bg-zinc-950/80 backdrop-blur-xl">
-          {/* Logout Button */}
+        <div className="relative z-10 p-4 mt-auto border-t border-white/5 bg-zinc-950/80 backdrop-blur-xl">
           <button
             onClick={() => handleMobileAction(onSignOut)}
             className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-red-500/5 text-zinc-500 hover:text-red-400 transition-all group"
           >
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-transparent group-hover:bg-red-500/10 transition-all">
-               <LogOut className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-            </div>
+            <LogOut className="w-4 h-4 ml-2" />
             <span className="text-[10px] uppercase tracking-[0.3em] font-bold">Terminate Session</span>
           </button>
 
-          {/* Secure Branding */}
           <div className="pt-2 flex items-center justify-center gap-2 opacity-30">
              <ShieldCheck className="w-3 h-3 text-purple-500" />
              <span className="text-[8px] uppercase tracking-[0.2em] text-zinc-500">Secure Protocol v2.5</span>
