@@ -36,6 +36,9 @@ const defaultNewBotCharacter: CharacterProfile = {
   ethnicity: 'Latina', 
   negativePrompt: 'blurry, lowres, extra limbs, bad anatomy, watermark, text.',
   favoriteLoras: [],
+  runpodModel: 'Qwen-Rapid-AIO-NSFW-v23.safetensors',
+  activeRunpodLoras: [],
+  avatarImage: null
 };
 
 const ChatDashboard: React.FC<ChatDashboardProps> = ({ 
@@ -68,6 +71,7 @@ const ChatDashboard: React.FC<ChatDashboardProps> = ({
         const loadedBots = await loadBotsFromFirestore(userData.uid);
         const loadedConvsMap = new Map<string, Conversation[]>();
         
+        // Normalize loaded bots to ensure array properties and new fields exist
         const normalizedBots = loadedBots.map(bot => ({
           ...bot,
           characterProfile: {
@@ -75,6 +79,9 @@ const ChatDashboard: React.FC<ChatDashboardProps> = ({
             hair: Array.isArray(bot.characterProfile.hair) ? bot.characterProfile.hair : [],
             face: Array.isArray(bot.characterProfile.face) ? bot.characterProfile.face : [],
             body: Array.isArray(bot.characterProfile.body) ? bot.characterProfile.body : [],
+            favoriteLoras: Array.isArray(bot.characterProfile.favoriteLoras) ? bot.characterProfile.favoriteLoras : [],
+            activeRunpodLoras: Array.isArray(bot.characterProfile.activeRunpodLoras) ? bot.characterProfile.activeRunpodLoras : [],
+            runpodModel: bot.characterProfile.runpodModel || 'Qwen-Rapid-AIO-NSFW-v23.safetensors',
           }
         }));
 
@@ -279,7 +286,22 @@ const ChatDashboard: React.FC<ChatDashboardProps> = ({
     const selected = bots.find(b => b.id === botId);
     if (!selected) return;
     
-    const updatedBot = { ...selected, name: updated.name, personality: updated.vibe, characterProfile: updated };
+    // Explicitly merge updated traits to ensure nested arrays and LoRAs are saved correctly
+    const updatedBot = { 
+      ...selected, 
+      name: updated.name, 
+      personality: updated.vibe, 
+      characterProfile: {
+        ...updated,
+        hair: updated.hair || [],
+        face: updated.face || [],
+        body: updated.body || [],
+        activeRunpodLoras: updated.activeRunpodLoras || [],
+        favoriteLoras: updated.favoriteLoras || [],
+        runpodModel: updated.runpodModel || 'Qwen-Rapid-AIO-NSFW-v23.safetensors'
+      } 
+    };
+
     await saveBotToFirestore(userData.uid, updatedBot);
     setBots(prev => prev.map(b => b.id === botId ? updatedBot : b));
     setShowCustomizationModalForBotId(null);
