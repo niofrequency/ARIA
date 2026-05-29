@@ -4,6 +4,7 @@ import Sidebar from './Sidebar';
 import MainChatArea from './MainChatArea';
 import BotCustomizationModal from './BotCustomizationModal';
 import CompanionCreationModal from './CompanionCreationModal';
+import DefaultCompanionsModal from './DefaultCompanionsModal';
 import LoadingScreen from './LoadingScreen';
 import { 
   saveBotToFirestore, 
@@ -21,10 +22,6 @@ interface ChatDashboardProps {
   onVideoSynthesized: (botId: string, base64: string) => Promise<string>;
 }
 
-/**
- * DEFAULT NEW BOT TEMPLATE
- * Fallback used for edge cases.
- */
 const defaultNewBotCharacter: CharacterProfile = {
   name: 'New Companion',
   gender: 'female', 
@@ -56,6 +53,7 @@ const ChatDashboard: React.FC<ChatDashboardProps> = ({
   
   // Modal States
   const [showCustomizationModalForBotId, setShowCustomizationModalForBotId] = useState<string | null>(null);
+  const [isDefaultModalOpen, setIsDefaultModalOpen] = useState(false);
   const [isCreationModalOpen, setIsCreationModalOpen] = useState(false);
   const [isInitialLoadComplete, setIsInitialLoadComplete] = useState(false);
 
@@ -69,7 +67,6 @@ const ChatDashboard: React.FC<ChatDashboardProps> = ({
         const loadedBots = await loadBotsFromFirestore(userData.uid);
         const loadedConvsMap = new Map<string, Conversation[]>();
         
-        // Ensure legacy bots with string specs are normalized to arrays to prevent crashes
         const normalizedBots = loadedBots.map(bot => ({
           ...bot,
           characterProfile: {
@@ -113,14 +110,11 @@ const ChatDashboard: React.FC<ChatDashboardProps> = ({
 
   // AUTO-CREATE INITIAL BOT IF NONE EXIST
   useEffect(() => {
-    if (isInitialLoadComplete && bots.length === 0 && !showCustomizationModalForBotId && !isCreationModalOpen) {
-      setIsCreationModalOpen(true);
+    if (isInitialLoadComplete && bots.length === 0 && !showCustomizationModalForBotId && !isCreationModalOpen && !isDefaultModalOpen) {
+      setIsDefaultModalOpen(true);
     }
-  }, [isInitialLoadComplete, bots.length, showCustomizationModalForBotId, isCreationModalOpen]);
+  }, [isInitialLoadComplete, bots.length, showCustomizationModalForBotId, isCreationModalOpen, isDefaultModalOpen]);
 
-  /**
-   * HANDLE SEND MESSAGE
-   */
   const handleSendMessage = useCallback(async (newMessage: Message) => {
     if (!selectedBotId || !currentConversationId || !userData?.uid) return;
 
@@ -151,9 +145,6 @@ const ChatDashboard: React.FC<ChatDashboardProps> = ({
     });
   }, [selectedBotId, currentConversationId, userData?.uid]);
 
-  /**
-   * HANDLE UPDATE MESSAGE
-   */
   const handleUpdateMessage = useCallback(async (messageId: string, updates: Partial<Message>) => {
     if (!messageId || !selectedBotId || !currentConversationId || !userData?.uid) {
       setIsLoadingResponse(false);
@@ -218,7 +209,7 @@ const ChatDashboard: React.FC<ChatDashboardProps> = ({
   };
 
   const handleNewBot = () => {
-    setIsCreationModalOpen(true);
+    setIsDefaultModalOpen(true);
     setIsMobileSidebarOpen(false);
   };
 
@@ -343,12 +334,31 @@ const ChatDashboard: React.FC<ChatDashboardProps> = ({
         />
       )}
 
-      {/* NEW COMPANION MODAL */}
+      {/* NEW DEFAULT / CATALOG MODAL */}
+      {isDefaultModalOpen && (
+        <DefaultCompanionsModal
+          isMandatory={bots.length === 0}
+          onSelectPreset={(preset) => {
+            setIsDefaultModalOpen(false);
+            handleCreateNewCompanion(preset);
+          }}
+          onSelectCustom={() => {
+            setIsDefaultModalOpen(false);
+            setIsCreationModalOpen(true);
+          }}
+          onClose={() => setIsDefaultModalOpen(false)}
+        />
+      )}
+
+      {/* NEW COMPANION (LABORATORY) MODAL */}
       {isCreationModalOpen && (
         <CompanionCreationModal
           isMandatory={bots.length === 0}
           onSave={handleCreateNewCompanion}
-          onClose={() => setIsCreationModalOpen(false)}
+          onClose={() => {
+            setIsCreationModalOpen(false);
+            if (bots.length === 0) setIsDefaultModalOpen(true); // Return to catalog if empty
+          }}
         />
       )}
 
