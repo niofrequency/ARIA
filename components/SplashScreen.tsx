@@ -55,13 +55,12 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
                     />
                 </div>
 
-                {/* Heading */}
-                <div className={`text-center transition-all duration-700 delay-75 ${isExiting ? 'translate-y-10 opacity-0 blur-md' : 'translate-y-0 opacity-100 blur-0'}`}>
-                    <h1 className="text-5xl font-light tracking-[0.5em] text-white uppercase flex items-center justify-center">
-                        ARIA 
-
-                    </h1>
-                </div>
+    {/* Heading */}
+<div className={`text-center transition-all duration-700 delay-75 ${isExiting ? 'translate-y-10 opacity-0 blur-md' : 'translate-y-0 opacity-100 blur-0'}`}>
+    <h1 className="text-5xl font-light tracking-[0.5em] pl-[0.5em] text-white uppercase flex items-center justify-center">
+        ARIA 
+    </h1>
+</div>
 
                 {/* Tap Anywhere Hint */}
                 <div className={`mt-28 flex flex-col items-center gap-4 transition-all duration-500 ${isExiting ? 'opacity-0 translate-y-8' : 'opacity-100 translate-y-0'}`}>
