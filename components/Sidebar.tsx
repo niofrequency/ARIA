@@ -145,38 +145,28 @@ return (
              style={{ backgroundImage: 'linear-gradient(#27272a 1px, transparent 1px), linear-gradient(90deg, #27272a 1px, transparent 1px)', backgroundSize: '30px 30px' }}>
         </div>
 
-{/* Brand Header */}
-<div className="relative z-10 p-6 flex items-center justify-between border-b border-white/5 bg-zinc-900/20 backdrop-blur-md">
-  {/* Left Side: Logo & Name */}
-  <div className="flex items-center gap-3">
-    <div className="relative">
-      <div className="absolute -inset-1 bg-purple-600/30 rounded-full blur-sm animate-pulse"></div>
-      <img 
-        src="/img/ARIA-LOGO.PNG" 
-        alt="Logo" 
-        className="relative w-10 h-10 object-contain" 
-      />
-    </div>
-    <div>
-      <span className="text-xl font-light tracking-[0.5em] text-white uppercase">
-        ARIA
-      </span>
-    </div>
-  </div>
+     {/* Brand Header */}
+        <div className="relative z-10 p-6 flex items-center justify-between border-b border-white/5 bg-zinc-900/20 backdrop-blur-md">
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <div className="absolute -inset-1 bg-purple-600/30 rounded-full blur-sm animate-pulse"></div>
+              <img src="/img/ARIA-LOGO.PNG" alt="Logo" className="relative w-10 h-10 object-contain" />
+            </div>
+            <div>
+              <span className="text-xl font-light tracking-[0.5em] text-white tracking-widest uppercase">ARIA </span>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-1">
+            <button 
+              onClick={(e) => { e.stopPropagation(); onToggleDesktopSidebar(); }} 
+              className="hidden lg:flex p-2 text-zinc-500 hover:text-white hover:bg-white/5 rounded-lg transition-all"
+            >
+              <PanelLeftClose className={`w-5 h-5 transition-transform duration-300 ${!isDesktopSidebarOpen ? 'rotate-180' : ''}`} />
+            </button>
+          </div>
+        </div>
 
-  {/* Right Side: Sidebar Toggle */}
-  <div className="flex items-center gap-1">
-    <button 
-      onClick={(e) => { e.stopPropagation(); onToggleDesktopSidebar(); }} 
-      className="hidden lg:flex p-2 text-zinc-500 hover:text-white hover:bg-white/5 rounded-lg transition-all"
-      aria-label="Toggle Sidebar"
-    >
-      <PanelLeftClose 
-        className={`w-5 h-5 transition-transform duration-300 ${!isDesktopSidebarOpen ? 'rotate-180' : ''}`} 
-      />
-    </button>
-  </div>
-</div>
         {/* MAIN NAVIGATION */}
         <nav className="relative z-10 flex flex-col gap-1.5 p-4 border-b border-white/5">
           <button 
