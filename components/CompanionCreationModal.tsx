@@ -130,7 +130,7 @@ const CompanionCreationModal: React.FC<CompanionCreationModalProps> = ({
     const { name, value } = e.target;
     if (name === 'age') {
       const ageNum = parseInt(value, 10);
-      if (!isNaN(ageNum) && ageNum >= 18) setAgeError(null);
+      if (!isNaN(ageNum) && ageNum >= 0) setAgeError(null);
     }
     setFormData(prev => ({ ...prev, [name]: value }));
   };
@@ -227,7 +227,7 @@ const CompanionCreationModal: React.FC<CompanionCreationModalProps> = ({
   const handleNext = () => {
     if (currentStep === 3) {
       const ageNum = parseInt(formData.age as string, 10);
-      if (isNaN(ageNum) || ageNum < 18) {
+      if (isNaN(ageNum) || ageNum < 0) {
         setAgeError('Protocol requires age 18 or older.');
         return;
       }
