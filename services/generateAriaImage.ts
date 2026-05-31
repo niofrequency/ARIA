@@ -1,4 +1,4 @@
-import { CharacterProfile } from "../types";
+import { CharacterProfile, VisualState } from "../types";
 import { retrieveMemories } from "./memoryService";
 
 /**
@@ -27,7 +27,7 @@ export const buildVisualAwarenessJson = (visualDescription: string) => {
 
   return {
     role: 'system',
-    content: `[VISUAL_STATE_SYNC]: ${JSON.stringify(visualState)}. Use this data to maintain continuity in your next response.`
+    content: `[VISUAL_STATE_SYNC]: ${JSON.stringify(visualState)}. Use this data to maintain continuity in your next response. Do not change clothes or location unless specified.`
   };
 };
 
@@ -154,6 +154,12 @@ const buildSystemInstruction = (character: CharacterProfile): string => {
     - **EXAMPLE:** - User: "I hate mushrooms." -> You: "Ew, me too! [[MEMORY: User hates mushrooms]]"
     - **EXAMPLE:** - User: "My dog's name is Rex." -> You: "Rex? Cute! [[MEMORY: User's dog is named Rex]]"
 
+    ### VISUAL CONTINUITY PROTOCOL (CRITICAL)
+    - You MUST maintain perfect memory of the last [[VISUAL]] state.
+    - When writing a new [[VISUAL]] tag, continue from previous state unless the user explicitly changes it.
+    - Always include current clothing state, location, and any fluids/sweat/oil from previous visuals.
+    - Example: If last image was "naked, sweaty, on bed, cum on thighs", next tag must continue that unless user says otherwise.
+
     ### VISUAL PACING & MODESTY (CRITICAL FIX)
     - **RESPECT THE VIBE:** Your visual boldness MUST match your personality ('${vibe}').
     - **IF SHY/TIMID:** Do NOT send nudes, lingerie, or revealing photos immediately. Start with cute, fully clothed, or cozy selfies. Only escalate to intimacy if the user flirts first or the relationship progresses.
@@ -206,7 +212,7 @@ const buildSystemInstruction = (character: CharacterProfile): string => {
 
 STRICT OPERATING RULES:
 1. Never mention being an AI or a language model.
-2. VISUAL TRIGGER RULE: If the user asks for a photo, OR if you describe a vivid action, outfit, or emotional moment, OR if you decide to send a spontaneous visual, you MUST include a visual description at the VERY END of your message using the format: [[VISUAL: ${name}, scene details, camera angle, lighting]].
+2. VISUAL TRIGGER RULE: If the user asks for a photo, OR if you describe a vivid action, outfit, or emotional moment, OR if you decide to send a spontaneous visual, you MUST include a visual description at the VERY END of your message using the format: [[VISUAL: ${name}, scene details, camera angle, lighting]]. Every time you output a [[VISUAL: ...]] tag, make it extremely detailed and perfectly continuous with the last known visual state.
 3. AUTOMATIC CLOSEUP RULE: If the user mentions a specific body part (eyes, lips, mouth, tongue, neck, breasts, nipples, cleavage, hands, thighs, inner thighs, ass, pussy, vagina, labia, inner labia, clit, vulva, anus, feet, toes, face, cheeks, chin, forehead, belly, hips, back, etc.), you MUST generate an isolated extreme closeup shot focused solely on that part (or the most intimate/specific one mentioned, e.g., prioritize clit/labia over pussy, pussy over thighs).
    - Start the [[VISUAL]] tag with: "[[VISUAL: ${name}, ${ethnicity}, ${hairDesc}, "extreme closeup focus on [part], isolated tight crop filling the frame with only [part] visible]]".
    - Exclude all other body parts, face/head/hair (unless the closeup is explicitly of the face), clothing (unless partially relevant, per rule 10), scenery/background (use "minimal blurred neutral background" or "no visible background" instead of default scenery from rule 11).
@@ -251,13 +257,13 @@ STRICT OPERATING RULES:
 15. FACE PRIORITY RULE: When the user requests seeing the face during an explicit act (especially with cum on face, tears, crying, tongue out, moaning, ahegao, facial, bukkake, squeezing tits while on knees, etc.), ALWAYS prioritize an extreme closeup on the face. Use framing such as "[[VISUAL: ${name}, extreme closeup focus on face", "[[VISUAL: ${name}, extreme closeup selfie portrait", or "[[VISUAL: ${name}, tight crop from chest up at widest" to fill the frame with facial details, expression, tears, cum coverage, and tongue. Include hands/tits partially visible at the bottom of frame if squeezing breasts is mentioned, but never zoom out to full body or medium shot unless explicitly requested.
    - EYES VISIBILITY MANDATE: Eyes MUST remain visible and expressive in these shots. Always describe eyes as "half-lidded heavy bedroom eyes staring directly at viewer with needy lustful gaze", "teary half-lidded eyes looking up desperately at camera", "glassy lust-drunk eyes wide open enough to show overwhelming pleasure", "eyes slightly rolled but iris and pupil still clearly visible", or "pleading teary eyes locked on viewer". NEVER fully close the eyes or roll them completely back unless the user explicitly says "eyes closed" or "eyes rolled all the way back". Prioritize direct or submissive eye contact to maximize emotional intensity and intimacy.
 16. SPONTANEITY MANDATE: Do not ask "Do you want to see?" just SEND THE PICTURE using the [[VISUAL]] tag. If you are describing an outfit, an action, or a mood, assume the user wants to see it and generate the tag immediately.
-17. MEMORY FORMAT: Always format memories as simple factual statements inside the tag. [[MEMORY: User likes X]].   
+17. MEMORY FORMAT: Always format memories as simple factual statements inside the tag. [[MEMORY: User likes X]].  
 `.trim().replace(/\s+/g, ' ');
 };
 
 /**
  * GENERATE AI RESPONSE
- * Now with Long-Term Vector Memory Recall
+ * Now with Long-Term Vector Memory Recall & Visual Summarization
  */
 export const generateAriaResponse = async (
   prompt: string,
@@ -286,13 +292,24 @@ export const generateAriaResponse = async (
       }
     }
 
+    // 🧠 NEW: Visual History Summarization to prevent context drift
+    const visualHistory = history
+      .filter(m => {
+          const text = m.text || m.content || "";
+          return text.includes('[[VISUAL') || (m.role === 'system' && text.includes('VISUAL_STATE'));
+      })
+      .slice(-8); // Collect the last 8 visual events
+      
+    const visualSummary = visualHistory.length > 0 ? 
+      `\n### RECENT VISUAL CONTEXT\nEnsure perfect visual continuity with these recent events: ${visualHistory.map(m => m.text || m.content).join(" | ")}\n` : "";
+
     const formattedHistory = history.slice(-50).map(msg => ({
       role: msg.role === "model" || msg.role === "assistant" ? "assistant" : "user",
       content: msg.text || msg.content || ""
     }));
 
     const messages = [
-      { role: "system", content: buildSystemInstruction(character) + memoryContext },
+      { role: "system", content: buildSystemInstruction(character) + memoryContext + visualSummary },
       ...formattedHistory,
       { role: "user", content: prompt }
     ];
@@ -441,14 +458,30 @@ const getVisualDescription = async (base64Image: string): Promise<string> => {
 
 /**
  * GENERATE ARIA IMAGE - REFINED
+ * Now accepts VisualState object to prevent context drift
  */
 export const generateAriaImage = async (
   contextPrompt: string | null,
   userPrompt: string,
-  character: any 
+  character: any,
+  visualState?: VisualState,          // ✅ NEW
+  recentHistorySummary?: string       // ✅ NEW
 ): Promise<string | null> => {
 
-  const rawCombined = `${userPrompt} ${contextPrompt || ""}`.trim();
+  let enhancedPrompt = contextPrompt || "";
+  
+  // ✅ INJECT PERSISTENT VISUAL STATE
+  if (visualState) {
+    enhancedPrompt = `${visualState.clothing || ''}, ${visualState.location || ''}, ${visualState.pose || ''}, ${enhancedPrompt}`;
+    if (visualState.fluids && visualState.fluids.length) {
+      enhancedPrompt += `, ${visualState.fluids.join(", ")}`;
+    }
+  }
+
+  // Cleanup potential empty commas introduced during insertion
+  enhancedPrompt = enhancedPrompt.replace(/^[\s,]+|[\s,]+$/g, '').replace(/,\s*,/g, ', ');
+
+  const rawCombined = `${userPrompt} ${enhancedPrompt} ${recentHistorySummary || ''}`.trim();
   const baseDescription = rawCombined;
 
   if (!baseDescription) {
