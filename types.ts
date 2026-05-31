@@ -51,12 +51,24 @@ export interface Bot {
   lastActivity?: number; 
 }
 
+// ✅ NEW: Visual memory object to prevent context drift
+export interface VisualState {
+  lastVisualDescription: string;
+  clothing: string;
+  location: string;
+  pose: string;
+  fluids: string[]; // e.g., "sweaty", "tears", etc.
+  arousalLevel: number; // 0-10
+  timestamp: number;
+}
+
 export interface Conversation {
   id: string;
   botId?: string; 
   title: string;
   messages: Message[];
   timestamp: number; 
+  visualState?: VisualState; // ✅ Attached to conversation to maintain persistent session state
 }
 
 /**
