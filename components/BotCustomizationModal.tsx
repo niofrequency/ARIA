@@ -202,7 +202,7 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({ character
     if (isSaving) return;
 
     const ageNum = parseInt(formData.age as string, 10);
-    if (isNaN(ageNum) || ageNum < 18) {
+    if (isNaN(ageNum) || ageNum < 0) {
       setAgeError('Neural link requires age 18 or older.');
       return;
     }
