@@ -122,7 +122,7 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({ character
     
     if (name === 'age') {
       const ageNum = parseInt(value, 10);
-      if (!isNaN(ageNum) && ageNum >= 18) {
+      if (!isNaN(ageNum) && ageNum >= 0) {
         setAgeError(null);
       }
     }
