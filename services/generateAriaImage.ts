@@ -2,32 +2,82 @@ import { CharacterProfile, VisualState } from "../types";
 import { retrieveMemories } from "./memoryService";
 
 /**
- * ARIA VISUAL STATE PARSER
- * Converts the visual tag into a structured JSON state for the AI's memory.
+ * ARIA VISUAL STATE PARSER - IMPROVED
  */
-export const buildVisualAwarenessJson = (visualDescription: string) => {
-  const parts = visualDescription.split(',').map(p => p.trim());
+export const buildVisualAwarenessJson = (visualDescription: string): any => {
+  const desc = visualDescription.toLowerCase();
   
-  const visualState = {
-    scene_type: parts.includes('selfie') ? 'candid_selfie' : 'environmental_shot',
-    setting: {
-      environment: parts[3] || 'unknown',
-      time_of_day: parts.find(p => p.toLowerCase().includes('light')) || 'natural',
-      background_elements: [parts[3] || 'current setting']
-    },
-    subjects: [{
-      appearance: {
-        clothing: parts.find(p => p.toLowerCase().includes('wearing')) || 'current outfit',
-      },
-      pose: parts[2] || 'natural'
-    }],
-    lighting: parts.find(p => p.toLowerCase().includes('light')) || 'standard',
-    style: { photographic_style: 'smartphone_camera', mood: 'intimate' }
+  const clothingMatch = visualDescription.match(/wearing\s+([^,|]+)/i) ||
+                        visualDescription.match(/(naked|topless|bottomless|lingerie|bra|panties|dress|outfit)/i);
+  const locationMatch = visualDescription.match(/(bedroom|bathroom|kitchen|living room|balcony|hotel|shower|beach|office)/i);
+  const poseMatch = visualDescription.match(/(sitting|standing|lying|kneeling|bent over|legs spread|on all fours|selfie|looking at camera)/i);
+
+  const fluids: string[] = [];
+  if (desc.includes('sweat') || desc.includes('sweaty')) fluids.push('sweaty');
+  if (desc.includes('cum') || desc.includes('semen')) fluids.push('cum');
+  if (desc.includes('wet') || desc.includes('arousal') || desc.includes('dripping')) fluids.push('wet');
+  if (desc.includes('oil') || desc.includes('oiled')) fluids.push('oiled');
+
+  const visualState: Partial<VisualState> = {
+    lastVisualDescription: visualDescription,
+    clothing: clothingMatch ? clothingMatch[0] : 'current outfit',
+    location: locationMatch ? locationMatch[0] : 'indoor room',
+    pose: poseMatch ? poseMatch[0] : 'natural pose',
+    fluids,
+    arousalLevel: desc.includes('horny') || desc.includes('aroused') || desc.includes('pleasure') ? 8 : 4,
+    timestamp: Date.now()
   };
 
   return {
     role: 'system',
-    content: `[VISUAL_STATE_SYNC]: ${JSON.stringify(visualState)}. Use this data to maintain continuity in your next response. Do not change clothes or location unless specified.`
+    content: `[VISUAL_STATE_SYNC]: ${JSON.stringify(visualState, null, 2)}\nUse this to maintain perfect continuity in clothing, location, pose, and fluids for all future visuals.`
+  };
+};
+
+/**
+ * VISUAL STATE HELPER EXTRACTORS
+ */
+const extractClothing = (desc: string) => {
+  const match = desc.match(/wearing\s+([^,|]+)/i) || desc.match(/(naked|topless|bottomless|lingerie|bra|panties|dress|outfit)/i);
+  return match ? match[0] : null;
+};
+
+const extractLocation = (desc: string) => {
+  const match = desc.match(/(bedroom|bathroom|kitchen|living room|balcony|hotel|shower|beach|office)/i);
+  return match ? match[0] : null;
+};
+
+const extractPose = (desc: string) => {
+  const match = desc.match(/(sitting|standing|lying|kneeling|bent over|legs spread|on all fours|selfie|looking at camera)/i);
+  return match ? match[0] : null;
+};
+
+const mergeFluids = (current: string[], desc: string) => {
+  const fluids = new Set(current);
+  const lowerDesc = desc.toLowerCase();
+  if (lowerDesc.includes('sweat') || lowerDesc.includes('sweaty')) fluids.add('sweaty');
+  if (lowerDesc.includes('cum') || lowerDesc.includes('semen')) fluids.add('cum');
+  if (lowerDesc.includes('wet') || lowerDesc.includes('arousal') || lowerDesc.includes('dripping')) fluids.add('wet');
+  if (lowerDesc.includes('oil') || lowerDesc.includes('oiled')) fluids.add('oiled');
+  return Array.from(fluids);
+};
+
+const calculateArousal = (desc: string, current: number) => {
+  const lowerDesc = desc.toLowerCase();
+  if (lowerDesc.includes('horny') || lowerDesc.includes('aroused') || lowerDesc.includes('pleasure')) return Math.min(10, current + 2);
+  return current;
+};
+
+export const updateVisualState = (currentState: VisualState | undefined, newVisualDesc: string): VisualState => {
+  return {
+    ...(currentState || {} as VisualState),
+    lastVisualDescription: newVisualDesc,
+    clothing: extractClothing(newVisualDesc) || currentState?.clothing || 'casual outfit',
+    location: extractLocation(newVisualDesc) || currentState?.location || 'indoor room',
+    pose: extractPose(newVisualDesc) || currentState?.pose || 'standing',
+    fluids: mergeFluids(currentState?.fluids || [], newVisualDesc),
+    arousalLevel: calculateArousal(newVisualDesc, currentState?.arousalLevel || 3),
+    timestamp: Date.now()
   };
 };
 
@@ -478,10 +528,17 @@ export const generateAriaImage = async (
     }
   }
 
+  if (recentHistorySummary) {
+    enhancedPrompt += ` ${recentHistorySummary}`;
+  }
+
+  // Force continuity keywords
+  enhancedPrompt = `${character.name}, ${character.ethnicity}, ${enhancedPrompt}, consistent appearance, same girl`;
+
   // Cleanup potential empty commas introduced during insertion
   enhancedPrompt = enhancedPrompt.replace(/^[\s,]+|[\s,]+$/g, '').replace(/,\s*,/g, ', ');
 
-  const rawCombined = `${userPrompt} ${enhancedPrompt} ${recentHistorySummary || ''}`.trim();
+  const rawCombined = `${userPrompt} ${enhancedPrompt}`.trim();
   const baseDescription = rawCombined;
 
   if (!baseDescription) {
@@ -786,7 +843,7 @@ export const generateAriaImage = async (
     }
 
     // Inject the visual context so Biglust "sees" the image details
-    const fusedDescription = `(${baseDescription}:1.3)${visualContext ? `, (${visualContext}:1.2)` : ''}`; 
+    const fusedDescription = `(${visualState?.clothing || 'casual outfit'}:1.25), (${visualState?.location || 'indoor room'}:1.2), ${baseDescription}${visualContext ? `, (${visualContext}:1.2)` : ''}`; 
     
     const promptText = [
       fusedDescription,
