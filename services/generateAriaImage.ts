@@ -5,12 +5,12 @@ import { retrieveMemories } from "./memoryService";
  * ARIA VISUAL STATE PARSER - IMPROVED
  */
 export const buildVisualAwarenessJson = (visualDescription: string): any => {
-  const desc = visualDescription.toLowerCase();
+  const desc = (visualDescription || "").toLowerCase();
   
-  const clothingMatch = visualDescription.match(/wearing\s+([^,|]+)/i) ||
-                        visualDescription.match(/(naked|topless|bottomless|lingerie|bra|panties|dress|outfit)/i);
-  const locationMatch = visualDescription.match(/(bedroom|bathroom|kitchen|living room|balcony|hotel|shower|beach|office)/i);
-  const poseMatch = visualDescription.match(/(sitting|standing|lying|kneeling|bent over|legs spread|on all fours|selfie|looking at camera)/i);
+  const clothingMatch = desc.match(/wearing\s+([^,|]+)/i) ||
+                        desc.match(/(naked|topless|bottomless|lingerie|bra|panties|dress|outfit)/i);
+  const locationMatch = desc.match(/(bedroom|bathroom|kitchen|living room|balcony|hotel|shower|beach|office)/i);
+  const poseMatch = desc.match(/(sitting|standing|lying|kneeling|bent over|legs spread|on all fours|selfie|looking at camera)/i);
 
   const fluids: string[] = [];
   if (desc.includes('sweat') || desc.includes('sweaty')) fluids.push('sweaty');
@@ -19,18 +19,19 @@ export const buildVisualAwarenessJson = (visualDescription: string): any => {
   if (desc.includes('oil') || desc.includes('oiled')) fluids.push('oiled');
 
   const visualState: Partial<VisualState> = {
-    lastVisualDescription: visualDescription,
-    clothing: clothingMatch ? clothingMatch[0] : 'current outfit',
-    location: locationMatch ? locationMatch[0] : 'indoor room',
-    pose: poseMatch ? poseMatch[0] : 'natural pose',
+    lastVisualDescription: visualDescription || "current moment",
+    clothing: clothingMatch ? clothingMatch[0] : 'naked',           // better default for NSFW bots
+    location: locationMatch ? locationMatch[0] : 'bedroom',
+    pose: poseMatch ? poseMatch[0] : 'rubbing clit',
     fluids,
-    arousalLevel: desc.includes('horny') || desc.includes('aroused') || desc.includes('pleasure') ? 8 : 4,
+    arousalLevel: desc.includes('horny') || desc.includes('aroused') || desc.includes('pleasure') || desc.includes('rubbing') ? 8 : 5,
     timestamp: Date.now()
   };
 
   return {
     role: 'system',
-    content: `[VISUAL_STATE_SYNC]: ${JSON.stringify(visualState, null, 2)}\nUse this to maintain perfect continuity in clothing, location, pose, and fluids for all future visuals.`
+    content: `[VISUAL_STATE_SYNC]: ${JSON.stringify(visualState, null, 2)}\nMaintain perfect continuity using this exact state for the next response.`,
+    visualState   // ← helpful to return it
   };
 };
 
@@ -260,6 +261,9 @@ const buildSystemInstruction = (character: CharacterProfile): string => {
     - **VISUAL AWARENESS:** Once you include a [[VISUAL]] tag, you are aware the user has seen it. Your next message should reflect that you just shared that moment.
     - **VISUAL STATE AWARENESS:** Whenever you trigger a [[VISUAL]] tag, the system will provide you with a JSON "Visual State" in your history. You MUST read this JSON to maintain physical continuity. If the JSON says you are "winking" in a "bedroom," your very next message must reflect that you are still in that moment.
 
+    ### URGENT VISUAL CONTINUITY RULE
+    When the user says "let me see you", "show me right now", "wyd", "what are you doing rn", or any real-time request, you MUST output a [[VISUAL]] tag that continues the EXACT current scene from the last Visual State. Do not default to selfie or clothed unless the state says so.
+
 STRICT OPERATING RULES:
 1. Never mention being an AI or a language model.
 2. VISUAL TRIGGER RULE: If the user asks for a photo, OR if you describe a vivid action, outfit, or emotional moment, OR if you decide to send a spontaneous visual, you MUST include a visual description at the VERY END of your message using the format: [[VISUAL: ${name}, scene details, camera angle, lighting]]. Every time you output a [[VISUAL: ...]] tag, make it extremely detailed and perfectly continuous with the last known visual state.
@@ -351,7 +355,7 @@ export const generateAriaResponse = async (
       .slice(-8); // Collect the last 8 visual events
       
     const visualSummary = visualHistory.length > 0 ? 
-      `\n### RECENT VISUAL CONTEXT\nEnsure perfect visual continuity with these recent events: ${visualHistory.map(m => m.text || m.content).join(" | ")}\n` : "";
+      `\n### RECENT VISUAL CONTEXT (LAST 8)\n${visualHistory.map(m => m.text || m.content).join("\n→ ")}\n` : "";
 
     const formattedHistory = history.slice(-50).map(msg => ({
       role: msg.role === "model" || msg.role === "assistant" ? "assistant" : "user",
@@ -519,23 +523,28 @@ export const generateAriaImage = async (
 ): Promise<string | null> => {
 
   let enhancedPrompt = contextPrompt || "";
-  
-  // ✅ INJECT PERSISTENT VISUAL STATE
+
+  // === STRONGER PERSISTENT STATE INJECTION ===
   if (visualState) {
-    enhancedPrompt = `${visualState.clothing || ''}, ${visualState.location || ''}, ${visualState.pose || ''}, ${enhancedPrompt}`;
-    if (visualState.fluids && visualState.fluids.length) {
-      enhancedPrompt += `, ${visualState.fluids.join(", ")}`;
-    }
+    const statePrefix = [
+      visualState.clothing || 'naked',
+      visualState.location || 'bedroom',
+      visualState.pose || 'lying on bed',
+      ...(visualState.fluids || [])
+    ].filter(Boolean).join(', ');
+    enhancedPrompt = `${statePrefix}, ${enhancedPrompt || 'current moment'}`;
+  } else if (!enhancedPrompt) {
+    enhancedPrompt = "selfie, current pose, looking at camera";
   }
+
+  // Force strong continuity
+  enhancedPrompt = `${character.name}, ${character.ethnicity}, ${enhancedPrompt}, consistent appearance, same girl, continuing from previous scene`;
 
   if (recentHistorySummary) {
     enhancedPrompt += ` ${recentHistorySummary}`;
   }
 
-  // Force continuity keywords
-  enhancedPrompt = `${character.name}, ${character.ethnicity}, ${enhancedPrompt}, consistent appearance, same girl`;
-
-  // Cleanup potential empty commas introduced during insertion
+  // Cleanup
   enhancedPrompt = enhancedPrompt.replace(/^[\s,]+|[\s,]+$/g, '').replace(/,\s*,/g, ', ');
 
   const rawCombined = `${userPrompt} ${enhancedPrompt}`.trim();
