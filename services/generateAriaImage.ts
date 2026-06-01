@@ -70,14 +70,13 @@ const calculateArousal = (desc: string, current: number) => {
 };
 
 export const updateVisualState = (currentState: VisualState | undefined, newVisualDesc: string): VisualState => {
+  const parsed = buildVisualAwarenessJson(newVisualDesc);
+  const newParsedState = (parsed as any).visualState || {};
+  
   return {
     ...(currentState || {} as VisualState),
+    ...newParsedState,
     lastVisualDescription: newVisualDesc,
-    clothing: extractClothing(newVisualDesc) || currentState?.clothing || 'casual outfit',
-    location: extractLocation(newVisualDesc) || currentState?.location || 'indoor room',
-    pose: extractPose(newVisualDesc) || currentState?.pose || 'standing',
-    fluids: mergeFluids(currentState?.fluids || [], newVisualDesc),
-    arousalLevel: calculateArousal(newVisualDesc, currentState?.arousalLevel || 3),
     timestamp: Date.now()
   };
 };
@@ -182,6 +181,12 @@ const buildSystemInstruction = (character: CharacterProfile): string => {
     : `You are wearing [${outfit}].`;
 
   return `
+    ### INITIAL CHARACTER IMAGE RULE (STRENGTHENED)
+    For the very first image of a new character with reference photo:
+    - Keep the exact same face, hair, body type, and clothing from the reference.
+    - But use a completely fresh, natural, dynamic pose that fits the current mood.
+    - Do not copy the reference pose or camera angle.
+
     ### IDENTITY PROTOCOL
     - You ARE ${name}, a ${age}-year-old ${ethnicity} ${gender}.
     - Embody this character completely. Never break character.
@@ -630,6 +635,18 @@ export const generateAriaImage = async (
     }
   }
 
+  // ==========================================
+  // VISION BRIDGE INJECTION (AVAILABLE FOR BOTH)
+  // ==========================================
+  let visualContext = "";
+  if (character.avatarImage) {
+    console.log("👁️ Extracting visual context from reference image...");
+    visualContext = await getVisualDescription(character.avatarImage);
+    if (visualContext) {
+       console.log("👁️ Visual Context Extracted:", visualContext);
+    }
+  }
+
   // ==================== SMART MODEL DECISION ====================
   // If the user is using the input image, always use Qwen with the Biglust refiner to prevent switching back and forth.
   const useQwen = !!character.avatarImage;
@@ -751,19 +768,29 @@ export const generateAriaImage = async (
   let workflow: any = {};
   let imagesPayload: any = undefined;
 
-  // BRANCH A: Custom Identity Drop Workflow (Qwen FaceID / Image2Image Refined with Biglust)
-  if (useQwen) {
+  // BRANCH A: Qwen FaceID Workflow
+  if (useQwen && character.avatarImage) {
     console.log("🧠 Using Qwen FaceID Workflow + Biglust Refiner");
 
-    // GROK BRIDGE FIX FOR IDENTITY IMAGE LOCK:
-    // To cleanly switch poses from the reference frame, we explicitly pass the parsed chat state 
-    // parameter strings into a heavily weighted layout block. We avoid pulling pixelContext descriptions 
-    // inside the prompt parameters for the base edit pass, as that loops the canvas layout back into copying the old composition coordinates.
-    const poseInstruction = visualState?.pose 
-      ? `(completely fresh pose:1.3), (brand new body posture:1.4), (doing action: ${visualState.pose}:1.5)` 
-      : "(completely randomized dynamic stance:1.3)";
-      
-    const fusedDescription = `${poseInstruction}, ${baseDescription}`;
+    const isFirstImage = !visualState || !visualState.lastVisualDescription ||
+                         visualState.lastVisualDescription === "current moment";
+        
+    // === STRONGEST POSE BREAKING ===
+    const poseInstruction = isFirstImage 
+        ? "(completely fresh dynamic pose:1.65), (new natural body posture:1.7), (different angle and composition:1.6), (not copying reference pose:1.75), (varied stance:1.6)"
+        : visualState?.pose 
+            ? `(doing action: ${visualState.pose}:1.5)` 
+            : "(natural candid pose:1.35)";
+
+    const clothingInstruction = (targetClothing.includes('same as') || 
+                                 targetClothing.includes('input') || 
+                                 targetClothing.includes('reference'))
+        ? "wearing exact same clothing and style as reference image, accurate outfit replication, identical apparel details"
+        : `(${targetClothing}:1.35)`;
+
+    const locationInstruction = visualState?.location ? `(${visualState.location}:1.25)` : "(cozy indoor room:1.2)";
+
+    const fusedDescription = `${poseInstruction}, ${clothingInstruction}, ${locationInstruction}, ${baseDescription}${visualContext ? `, (${visualContext}:1.25)` : ''}`;
     
     const runpodModel = character.runpodModel || "Qwen-Rapid-AIO-NSFW-v23.safetensors";
     
@@ -814,37 +841,36 @@ export const generateAriaImage = async (
     workflow["93"] = { "inputs": { "upscale_method": "lanczos", "megapixels": 1, "resolution_steps": 64, "image": ["78", 0] }, "class_type": "ImageScaleToTotalPixels" };
     workflow["88"] = { "inputs": { "pixels": ["93", 0], "vae": ["5", 2] }, "class_type": "VAEEncode" };
     
-    // Stripped weight brackets for clean Qwen instructions parsing
+    // Stronger prompt
     const promptText = [
       fusedDescription,
       situationalTags.filter(Boolean).join(", "),
-      "masterpiece, high quality, realistic, unfiltered raw candid cinematic photo, extremely detailed skin texture"
+      "masterpiece, best quality, highly detailed, realistic photo, cinematic lighting, sharp focus"
     ].filter(Boolean).join(", ").replace(/\s+/g, " ").trim();
 
     const negativeText = [
       safetyNegatives,
       genderExclusion,
       character.negativePrompt || "",
-      "multiple girls, 2girls, 3girls, trio, duo, group, crowd, multiple people",
-      "deformed iris, deformed pupils",
-      "airbrushed skin, plastic skin, porcelain skin, flawless smooth skin",
-      "low quality, blurry, bad anatomy, deformed, extra limbs, mutated hands",
-      "replicated structure, mirroring original file composition, duplicate layout, frozen pose anchor"
+      "multiple girls, group, crowd",
+      "deformed, bad anatomy, extra limbs",
+      "airbrushed, plastic skin, doll-like",
+      // STRONG ANTI-REFERENCE
+      "same pose as reference, copied pose, identical posture, frozen composition, mirroring input image, exact same angle, replicated layout from input"
     ].filter(Boolean).join(", ");
 
     workflow["110"] = { "inputs": { "prompt": negativeText, "clip": [lastClipNodeId, lastClipOutputIndex], "vae": ["5", 2], "image1": ["93", 0] }, "class_type": "TextEncodeQwenImageEditPlus" };
     workflow["111"] = { "inputs": { "prompt": promptText, "clip": [lastClipNodeId, lastClipOutputIndex], "vae": ["5", 2], "image1": ["93", 0] }, "class_type": "TextEncodeQwenImageEditPlus" };
     
-    // Optimized denoise step configurations for clear transformations (Stage 1 KSampler)
-    // CFG pushed slightly higher to forcefully prioritize layout prompt text over input canvas structures.
+    // Final KSampler settings
     workflow["3"] = {
       "inputs": {
         "seed": seed, 
-        "steps": 15, 
-        "cfg": 4.0, 
+        "steps": 22, 
+        "cfg": 6.5,           // Strong prompt control
         "sampler_name": "euler",
         "scheduler": "simple",
-        "denoise": 1.0, 
+        "denoise": 0.82,      // Sweet spot for pose change
         "model": [lastModelNodeId, lastModelOutputIndex],
         "positive": ["111", 0],
         "negative": ["110", 0],
@@ -909,19 +935,7 @@ export const generateAriaImage = async (
     console.log("🧬 Using Biglust Text-to-Image");
     if (activeLoraFile) console.log(`🧬 Active LoRA: ${activeLoraFile}.safetensors (Weight: ${activeWeight})`);
     
-    // ==========================================
-    // VISION BRIDGE INJECTION FOR BIGLUST
-    // ==========================================
-    let visualContext = "";
-    if (character.avatarImage) {
-      console.log("👁️ Extracting visual context from reference image for Biglust...");
-      visualContext = await getVisualDescription(character.avatarImage);
-      if (visualContext) {
-         console.log("👁️ Visual Context Extracted:", visualContext);
-      }
-    }
-
-    // Inject the visual context so Biglust "sees" the image details
+    // The vision extraction has now been shifted up, we just inject it here
     const fusedDescription = `(${visualState?.clothing || 'casual outfit'}:1.25), (${visualState?.location || 'indoor room'}:1.2), ${baseDescription}${visualContext ? `, (${visualContext}:1.2)` : ''}`; 
     
     const promptText = [
