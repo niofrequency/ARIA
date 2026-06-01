@@ -182,9 +182,6 @@ const buildSystemInstruction = (character: CharacterProfile): string => {
     : `You are wearing [${outfit}].`;
 
   return `
-    ### INITIAL CHARACTER IMAGE RULE
-    When generating the very first image for a new conversation, create a fresh, natural, dynamic pose. Do not copy the exact pose from the reference photo. Keep the same clothing style and appearance, but use a new pose that fits the current context.
-
     ### IDENTITY PROTOCOL
     - You ARE ${name}, a ${age}-year-old ${ethnicity} ${gender}.
     - Embody this character completely. Never break character.
@@ -767,24 +764,15 @@ export const generateAriaImage = async (
   let imagesPayload: any = undefined;
 
   // BRANCH A: Custom Identity Drop Workflow (Qwen FaceID / Image2Image Refined with Biglust)
-  if (useQwen && character.avatarImage) {
+  if (useQwen) {
     console.log("🧠 Using Qwen FaceID Workflow + Biglust Refiner");
 
-    const isFirstImage = !visualState || !visualState.lastVisualDescription || visualState.lastVisualDescription === "current moment";
-    
-    // Strong pose breaking for initial generation
-    const poseInstruction = isFirstImage 
-        ? "(completely new dynamic pose:1.45), (fresh natural stance:1.5), (different body posture from reference:1.6), (varied angle:1.3)"
-        : visualState?.pose 
-            ? `(doing action: ${visualState.pose}:1.4)` 
-            : "(natural candid pose:1.3)";
-
-    const clothingInstruction = targetClothing.includes('same as') || targetClothing.includes('input') || targetClothing.includes('reference')
-        ? "wearing exact same clothing and style as reference image"
-        : `(${targetClothing}:1.25)`;
-
-    // Added visualContext and weighting inherited from Biglust branch, keeping user's new pose/clothing instructions
-    const fusedDescription = `${poseInstruction}, ${clothingInstruction}, (${visualState?.location || 'indoor room'}:1.2), ${baseDescription}${visualContext ? `, (${visualContext}:1.2)` : ''}`;
+    const poseInstruction = visualState?.pose 
+      ? `(completely fresh pose:1.3), (brand new body posture:1.4), (doing action: ${visualState.pose}:1.5)` 
+      : "(completely randomized dynamic stance:1.3)";
+      
+    // Added visualContext and weighting inherited from Biglust branch
+    const fusedDescription = `(${visualState?.clothing || 'casual outfit'}:1.25), (${visualState?.location || 'indoor room'}:1.2), ${poseInstruction}, ${baseDescription}${visualContext ? `, (${visualContext}:1.2)` : ''}`;
     
     const runpodModel = character.runpodModel || "Qwen-Rapid-AIO-NSFW-v23.safetensors";
     
@@ -843,7 +831,7 @@ export const generateAriaImage = async (
       "unfiltered raw candid cinematic photo, extremely detailed skin texture, photorealistic, natural subsurface scattering, film grain, dslr look, 8k uhd"
     ].filter(Boolean).join(", ").replace(/\s+/g, " ").trim();
 
-    // Unified negative prompt with Biglust formatting constraints + strong pose breaking negatives
+    // Unified negative prompt with Biglust formatting constraints
     const negativeText = [
       safetyNegatives,
       genderExclusion,
@@ -854,8 +842,7 @@ export const generateAriaImage = async (
       "beauty filter, over-smoothed, heavy retouch, instagram filter",
       "cartoon, anime, 3d render, illustration, painting",
       "low quality, blurry, bad anatomy, deformed, extra limbs, mutated hands",
-      "replicated structure, mirroring original file composition, duplicate layout, frozen pose anchor",
-      "replicated pose from reference, same pose as input image, frozen posture, identical composition, copied layout, exact same angle as reference"
+      "replicated structure, mirroring original file composition, duplicate layout, frozen pose anchor"
     ].filter(Boolean).join(", ");
 
     workflow["110"] = { "inputs": { "prompt": negativeText, "clip": [lastClipNodeId, lastClipOutputIndex], "vae": ["5", 2], "image1": ["93", 0] }, "class_type": "TextEncodeQwenImageEditPlus" };
@@ -866,11 +853,11 @@ export const generateAriaImage = async (
     workflow["3"] = {
       "inputs": {
         "seed": seed, 
-        "steps": 18, 
-        "cfg": 5.0,           // Higher CFG = stronger prompt adherence
+        "steps": 15, 
+        "cfg": 4.0, 
         "sampler_name": "euler",
         "scheduler": "simple",
-        "denoise": 0.85,      // Lower than 1.0 to allow pose change
+        "denoise": 1.0, 
         "model": [lastModelNodeId, lastModelOutputIndex],
         "positive": ["111", 0],
         "negative": ["110", 0],
