@@ -182,6 +182,9 @@ const buildSystemInstruction = (character: CharacterProfile): string => {
     : `You are wearing [${outfit}].`;
 
   return `
+    ### INITIAL CHARACTER IMAGE RULE
+    When generating the very first image for a new conversation, create a fresh, natural, dynamic pose. Do not copy the exact pose from the reference photo. Keep the same clothing style and appearance, but use a new pose that fits the current context.
+
     ### IDENTITY PROTOCOL
     - You ARE ${name}, a ${age}-year-old ${ethnicity} ${gender}.
     - Embody this character completely. Never break character.
@@ -630,6 +633,18 @@ export const generateAriaImage = async (
     }
   }
 
+  // ==========================================
+  // VISION BRIDGE INJECTION (AVAILABLE FOR BOTH)
+  // ==========================================
+  let visualContext = "";
+  if (character.avatarImage) {
+    console.log("👁️ Extracting visual context from reference image...");
+    visualContext = await getVisualDescription(character.avatarImage);
+    if (visualContext) {
+       console.log("👁️ Visual Context Extracted:", visualContext);
+    }
+  }
+
   // ==================== SMART MODEL DECISION ====================
   // If the user is using the input image, always use Qwen with the Biglust refiner to prevent switching back and forth.
   const useQwen = !!character.avatarImage;
@@ -752,18 +767,24 @@ export const generateAriaImage = async (
   let imagesPayload: any = undefined;
 
   // BRANCH A: Custom Identity Drop Workflow (Qwen FaceID / Image2Image Refined with Biglust)
-  if (useQwen) {
+  if (useQwen && character.avatarImage) {
     console.log("🧠 Using Qwen FaceID Workflow + Biglust Refiner");
 
-    // GROK BRIDGE FIX FOR IDENTITY IMAGE LOCK:
-    // To cleanly switch poses from the reference frame, we explicitly pass the parsed chat state 
-    // parameter strings into a heavily weighted layout block. We avoid pulling pixelContext descriptions 
-    // inside the prompt parameters for the base edit pass, as that loops the canvas layout back into copying the old composition coordinates.
-    const poseInstruction = visualState?.pose 
-      ? `(completely fresh pose:1.3), (brand new body posture:1.4), (doing action: ${visualState.pose}:1.5)` 
-      : "(completely randomized dynamic stance:1.3)";
-      
-    const fusedDescription = `${poseInstruction}, ${baseDescription}`;
+    const isFirstImage = !visualState || !visualState.lastVisualDescription || visualState.lastVisualDescription === "current moment";
+    
+    // Strong pose breaking for initial generation
+    const poseInstruction = isFirstImage 
+        ? "(completely new dynamic pose:1.45), (fresh natural stance:1.5), (different body posture from reference:1.6), (varied angle:1.3)"
+        : visualState?.pose 
+            ? `(doing action: ${visualState.pose}:1.4)` 
+            : "(natural candid pose:1.3)";
+
+    const clothingInstruction = targetClothing.includes('same as') || targetClothing.includes('input') || targetClothing.includes('reference')
+        ? "wearing exact same clothing and style as reference image"
+        : `(${targetClothing}:1.25)`;
+
+    // Added visualContext and weighting inherited from Biglust branch, keeping user's new pose/clothing instructions
+    const fusedDescription = `${poseInstruction}, ${clothingInstruction}, (${visualState?.location || 'indoor room'}:1.2), ${baseDescription}${visualContext ? `, (${visualContext}:1.2)` : ''}`;
     
     const runpodModel = character.runpodModel || "Qwen-Rapid-AIO-NSFW-v23.safetensors";
     
@@ -814,22 +835,27 @@ export const generateAriaImage = async (
     workflow["93"] = { "inputs": { "upscale_method": "lanczos", "megapixels": 1, "resolution_steps": 64, "image": ["78", 0] }, "class_type": "ImageScaleToTotalPixels" };
     workflow["88"] = { "inputs": { "pixels": ["93", 0], "vae": ["5", 2] }, "class_type": "VAEEncode" };
     
-    // Stripped weight brackets for clean Qwen instructions parsing
+    // Added aesthetic/photorealistic tags inherited from Biglust branch
     const promptText = [
       fusedDescription,
       situationalTags.filter(Boolean).join(", "),
-      "masterpiece, high quality, realistic, unfiltered raw candid cinematic photo, extremely detailed skin texture"
+      "masterpiece, high quality, realistic",
+      "unfiltered raw candid cinematic photo, extremely detailed skin texture, photorealistic, natural subsurface scattering, film grain, dslr look, 8k uhd"
     ].filter(Boolean).join(", ").replace(/\s+/g, " ").trim();
 
+    // Unified negative prompt with Biglust formatting constraints + strong pose breaking negatives
     const negativeText = [
       safetyNegatives,
       genderExclusion,
       character.negativePrompt || "",
-      "multiple girls, 2girls, 3girls, trio, duo, group, crowd, multiple people",
-      "deformed iris, deformed pupils",
-      "airbrushed skin, plastic skin, porcelain skin, flawless smooth skin",
+      "(multiple girls, 2girls, 3girls, trio, duo, group, crowd:1.6), (multiple people:1.5)",
+      "(deformed iris, deformed pupils:1.2)",
+      "airbrushed skin, plastic skin, porcelain skin, doll-like skin, flawless smooth skin",
+      "beauty filter, over-smoothed, heavy retouch, instagram filter",
+      "cartoon, anime, 3d render, illustration, painting",
       "low quality, blurry, bad anatomy, deformed, extra limbs, mutated hands",
-      "replicated structure, mirroring original file composition, duplicate layout, frozen pose anchor"
+      "replicated structure, mirroring original file composition, duplicate layout, frozen pose anchor",
+      "replicated pose from reference, same pose as input image, frozen posture, identical composition, copied layout, exact same angle as reference"
     ].filter(Boolean).join(", ");
 
     workflow["110"] = { "inputs": { "prompt": negativeText, "clip": [lastClipNodeId, lastClipOutputIndex], "vae": ["5", 2], "image1": ["93", 0] }, "class_type": "TextEncodeQwenImageEditPlus" };
@@ -840,11 +866,11 @@ export const generateAriaImage = async (
     workflow["3"] = {
       "inputs": {
         "seed": seed, 
-        "steps": 15, 
-        "cfg": 4.0, 
+        "steps": 18, 
+        "cfg": 5.0,           // Higher CFG = stronger prompt adherence
         "sampler_name": "euler",
         "scheduler": "simple",
-        "denoise": 1.0, 
+        "denoise": 0.85,      // Lower than 1.0 to allow pose change
         "model": [lastModelNodeId, lastModelOutputIndex],
         "positive": ["111", 0],
         "negative": ["110", 0],
@@ -909,19 +935,7 @@ export const generateAriaImage = async (
     console.log("🧬 Using Biglust Text-to-Image");
     if (activeLoraFile) console.log(`🧬 Active LoRA: ${activeLoraFile}.safetensors (Weight: ${activeWeight})`);
     
-    // ==========================================
-    // VISION BRIDGE INJECTION FOR BIGLUST
-    // ==========================================
-    let visualContext = "";
-    if (character.avatarImage) {
-      console.log("👁️ Extracting visual context from reference image for Biglust...");
-      visualContext = await getVisualDescription(character.avatarImage);
-      if (visualContext) {
-         console.log("👁️ Visual Context Extracted:", visualContext);
-      }
-    }
-
-    // Inject the visual context so Biglust "sees" the image details
+    // The vision extraction has now been shifted up, we just inject it here
     const fusedDescription = `(${visualState?.clothing || 'casual outfit'}:1.25), (${visualState?.location || 'indoor room'}:1.2), ${baseDescription}${visualContext ? `, (${visualContext}:1.2)` : ''}`; 
     
     const promptText = [
