@@ -15,8 +15,8 @@ interface BotCustomizationModalProps {
 }
 
 const RUNPOD_MODELS = [
-  { id: "Qwen-Rapid-AIO-NSFW-v23.safetensors", name: "Qwen AIO (Rapid-v23)" },
-  { id: "Qwen-Rapid-AIO-NSFW-v19.safetensors", name: "Qwen AIO (Rapid-v19)" }
+  { id: "Qwen-Rapid-AIO-NSFW-v23.safetensors", name: "Qwen AIO + BigLust Refiner (v23)" },
+  { id: "Qwen-Rapid-AIO-NSFW-v19.safetensors", name: "Qwen AIO + BigLust Refiner (v19)" }
 ];
 
 const LORA_OPTIONS = [
