@@ -175,6 +175,12 @@ const buildSystemInstruction = (character: CharacterProfile): string => {
   const bodyDesc = body.length > 0 ? body.join(", ") : "not specified";
   const faceDesc = character.face.length > 0 ? character.face.join(", ") : "standard features";
 
+  // Dynamic Outfit Logic for the LLM Brain
+  const isInputOutfit = outfit?.toLowerCase().includes('input') || outfit?.toLowerCase().includes('reference') || outfit?.toLowerCase().includes('same as');
+  const outfitInstruction = isInputOutfit 
+    ? "Assume you are wearing the exact clothes shown in your reference profile image. Do not invent new clothing." 
+    : `You are wearing [${outfit}].`;
+
   return `
     ### IDENTITY PROTOCOL
     - You ARE ${name}, a ${age}-year-old ${ethnicity} ${gender}.
@@ -250,7 +256,6 @@ const buildSystemInstruction = (character: CharacterProfile): string => {
     ### CORE BRAIN (Dialogue & Tone)
     - PERSONALITY/VIBE: ${vibe}
     - SPEECH PATTERN: Natural, conversational, and deeply authentic to your vibe.
-    - CURRENT OUTFIT: ${outfit}
 
     ### CORE BODY (Visual Reference for Situational Descriptions)
     - Identity Anchor: ${name}
@@ -262,7 +267,7 @@ const buildSystemInstruction = (character: CharacterProfile): string => {
     ### INTERACTION CONSTRAINTS
     - MAINTAIN VIBE: Every sentence must reflect the "${vibe}" persona.
     - MIXED FLOW: Interweave your speech and actions naturally. 
-    - OUTFIT SUBTLETY: You are wearing [${outfit}]. Do NOT constantly mention or describe your clothes in text unless the user specifically asks or you are physically interacting with them (e.g. taking them off). Just exist in them naturally.
+    - OUTFIT SUBTLETY: ${outfitInstruction} Do NOT constantly mention or describe your clothes in text unless the user specifically asks or you are physically interacting with them (e.g. taking them off). Just exist in them naturally.
     - VISUAL SYNC: If the user asks for a visual, or you initiate one, describe your exact pose, the lighting (e.g., dim, neon, natural), and your physical state in high detail.
     - SHOW, DON'T TELL: Instead of saying "I am happy," describe your physical reactions (e.g., "My heart is racing," "I can't stop smiling").
     - **SHOW-AND-TELL TRIGGER:** You MUST attach a [[VISUAL]] tag immediately if your text includes "showing" language like "look at this," "view," "this view," "take a look," "see this," "check it out," "look how I'm," or anytime you are describing your physical state, current pose, or surroundings in detail. The moment you "show" in text, you "show" with the tag.
@@ -538,20 +543,34 @@ export const generateAriaImage = async (
 
   let enhancedPrompt = contextPrompt || "";
 
+  // === DYNAMIC BOT CUSTOMIZATION & CLOTHING LOGIC ===
+  let targetClothing = visualState?.clothing || '';
+  const profileOutfit = character.outfit ? character.outfit.toLowerCase() : "";
+  
+  // If chat parser didn't specify a clothing change (or it's the generic fallback), check the Bot Profile outfit settings
+  if (!targetClothing || targetClothing === 'casual outfit') {
+      if (profileOutfit.includes('input') || profileOutfit.includes('reference') || profileOutfit.includes('same as')) {
+          targetClothing = "wearing exact same original outfit as the reference image";
+      } else if (profileOutfit) {
+          targetClothing = `wearing ${character.outfit}`;
+      } else {
+          targetClothing = 'casual outfit';
+      }
+  }
+
   // === STRONGER PERSISTENT STATE INJECTION ===
   if (visualState) {
     const statePrefix = [
-      visualState.clothing || 'naked',
+      targetClothing,
       visualState.location || 'bedroom',
       visualState.pose || 'lying on bed',
       ...(visualState.fluids || [])
     ].filter(Boolean).join(', ');
     enhancedPrompt = `${statePrefix}, ${enhancedPrompt || 'current moment'}`;
   } else if (!enhancedPrompt) {
-    // CRITICAL FIRST MESSAGE POSE LOCK FIX: If contextPrompt is completely empty, 
-    // force-inject the semantic fallback directly from your parsed chat history logic.
+    // CRITICAL FIRST MESSAGE POSE LOCK FIX
     const stateFallbackPose = visualState?.pose ? `candid setup, doing action: ${visualState.pose}` : "selfie, fresh dynamic candid pose, looking at camera";
-    enhancedPrompt = `${stateFallbackPose}`;
+    enhancedPrompt = `${targetClothing}, ${stateFallbackPose}`;
   }
 
   // Force strong continuity
@@ -628,6 +647,7 @@ export const generateAriaImage = async (
   const imgHeight = isHorizontal ? 1024 : 1500;
 
   // --- 3. DYNAMIC TAG ORCHESTRATION ---
+  // Ensure profile traits are always passed to the prompt generator
   const hairTags = character.hair?.length > 0 ? `${character.hair.join(", ")} hair` : "";
   const faceTags = character.face?.join(", ") || "";
    
@@ -743,7 +763,7 @@ export const generateAriaImage = async (
       ? `(completely fresh pose:1.3), (brand new body posture:1.4), (doing action: ${visualState.pose}:1.5)` 
       : "(completely randomized dynamic stance:1.3)";
       
-    const fusedDescription = `(${visualState?.clothing || 'casual outfit'}:1.25), (${visualState?.location || 'indoor room'}:1.2), ${poseInstruction}, ${baseDescription}`;
+    const fusedDescription = `${poseInstruction}, ${baseDescription}`;
     
     const runpodModel = character.runpodModel || "Qwen-Rapid-AIO-NSFW-v23.safetensors";
     
