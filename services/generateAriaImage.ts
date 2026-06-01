@@ -866,11 +866,11 @@ export const generateAriaImage = async (
     workflow["3"] = {
       "inputs": {
         "seed": seed, 
-        "steps": 25, 
-        "cfg": 8.0,           // High CFG to force text over image condition
+        "steps": 22, 
+        "cfg": 6.5,           // Strong prompt control
         "sampler_name": "euler",
         "scheduler": "simple",
-        "denoise": 1.0,       // CRITICAL: Must be 1.0 to allow complete pose replacement
+        "denoise": 0.82,      // Sweet spot for pose change
         "model": [lastModelNodeId, lastModelOutputIndex],
         "positive": ["111", 0],
         "negative": ["110", 0],
