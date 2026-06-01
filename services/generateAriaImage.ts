@@ -852,7 +852,7 @@ export const generateAriaImage = async (
     workflow["3"] = {
       "inputs": {
         "seed": seed, 
-        "steps": 15, 
+        "steps": 5, 
         "cfg": 6.0, 
         "sampler_name": "euler",
         "scheduler": "simple",
