@@ -731,6 +731,23 @@ export const generateAriaImage = async (
   // BRANCH A: Custom Identity Drop Workflow (Qwen FaceID / Image2Image Refined with Biglust)
   if (useQwen) {
     console.log("🧠 Using Qwen FaceID Workflow + Biglust Refiner");
+
+    // ==========================================
+    // VISION BRIDGE INJECTION FOR QWEN
+    // ==========================================
+    let visualContext = "";
+    if (character.avatarImage) {
+      console.log("👁️ Extracting visual context from reference image for Qwen Bridge...");
+      visualContext = await getVisualDescription(character.avatarImage);
+      if (visualContext) {
+         console.log("👁️ Visual Context Extracted:", visualContext);
+      }
+    }
+
+    // FUSE CHAT STATE + VISION CONTEXT TO FORCE POSE OVERRIDE
+    const poseInstruction = visualState?.pose ? `(doing: ${visualState.pose}:1.3)` : "";
+    const fusedDescription = `(${visualState?.clothing || 'casual outfit'}:1.25), (${visualState?.location || 'indoor room'}:1.2), ${poseInstruction}, ${baseDescription}${visualContext ? `, (${visualContext}:1.1)` : ''}`;
+    
     const runpodModel = character.runpodModel || "Qwen-Rapid-AIO-NSFW-v23.safetensors";
     
     // Merge Profile LoRAs with UI-selected LoRAs
@@ -782,7 +799,7 @@ export const generateAriaImage = async (
     
     // Stripped weight brackets for clean Qwen instructions parsing
     const promptText = [
-      baseDescription,
+      fusedDescription,
       situationalTags.filter(Boolean).join(", "),
       "masterpiece, high quality, realistic, unfiltered raw candid cinematic photo, extremely detailed skin texture"
     ].filter(Boolean).join(", ").replace(/\s+/g, " ").trim();
@@ -805,7 +822,7 @@ export const generateAriaImage = async (
       "inputs": {
         "seed": seed, 
         "steps": 12, 
-        "cfg": 2.5,
+        "cfg": 3.0, 
         "sampler_name": "euler",
         "scheduler": "simple",
         "denoise": 1.0, 
