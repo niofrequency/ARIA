@@ -70,14 +70,13 @@ const calculateArousal = (desc: string, current: number) => {
 };
 
 export const updateVisualState = (currentState: VisualState | undefined, newVisualDesc: string): VisualState => {
+  const parsed = buildVisualAwarenessJson(newVisualDesc);
+  const newParsedState = (parsed as any).visualState || {};
+  
   return {
     ...(currentState || {} as VisualState),
+    ...newParsedState,
     lastVisualDescription: newVisualDesc,
-    clothing: extractClothing(newVisualDesc) || currentState?.clothing || 'casual outfit',
-    location: extractLocation(newVisualDesc) || currentState?.location || 'indoor room',
-    pose: extractPose(newVisualDesc) || currentState?.pose || 'standing',
-    fluids: mergeFluids(currentState?.fluids || [], newVisualDesc),
-    arousalLevel: calculateArousal(newVisualDesc, currentState?.arousalLevel || 3),
     timestamp: Date.now()
   };
 };
@@ -182,6 +181,12 @@ const buildSystemInstruction = (character: CharacterProfile): string => {
     : `You are wearing [${outfit}].`;
 
   return `
+    ### INITIAL CHARACTER IMAGE RULE (STRENGTHENED)
+    For the very first image of a new character with reference photo:
+    - Keep the exact same face, hair, body type, and clothing from the reference.
+    - But use a completely fresh, natural, dynamic pose that fits the current mood.
+    - Do not copy the reference pose or camera angle.
+
     ### IDENTITY PROTOCOL
     - You ARE ${name}, a ${age}-year-old ${ethnicity} ${gender}.
     - Embody this character completely. Never break character.
@@ -763,19 +768,29 @@ export const generateAriaImage = async (
   let workflow: any = {};
   let imagesPayload: any = undefined;
 
-  // BRANCH A: Custom Identity Drop Workflow (Qwen FaceID / Image2Image Refined with Biglust)
-  if (useQwen) {
+  // BRANCH A: Qwen FaceID Workflow
+  if (useQwen && character.avatarImage) {
     console.log("🧠 Using Qwen FaceID Workflow + Biglust Refiner");
 
-    // FUSE CHAT STATE + VISION CONTEXT TO FORCE POSE OVERRIDE
-    // In order to overcome Qwen's static structural lock on the input canvas, we push heavily
-    // weighted directives that aggressively decouple the output generation from the reference posture.
-    const poseInstruction = visualState?.pose 
-      ? `(action: ${visualState.pose}:1.5), (new pose:1.4), (change body position:1.4), (ignore original pose:1.4)` 
-      : "(dynamic movement:1.3)";
-      
-    // Apply styling tags directly to prompt base to ensure high fidelity
-    const fusedDescription = `(${visualState?.clothing || 'casual outfit'}:1.25), (${visualState?.location || 'indoor room'}:1.2), ${poseInstruction}, ${baseDescription}${visualContext ? `, (${visualContext}:1.1)` : ''}`;
+    const isFirstImage = !visualState || !visualState.lastVisualDescription ||
+                         visualState.lastVisualDescription === "current moment";
+        
+    // === STRONGEST POSE BREAKING ===
+    const poseInstruction = isFirstImage 
+        ? "(completely fresh dynamic pose:1.65), (new natural body posture:1.7), (different angle and composition:1.6), (not copying reference pose:1.75), (varied stance:1.6)"
+        : visualState?.pose 
+            ? `(doing action: ${visualState.pose}:1.5)` 
+            : "(natural candid pose:1.35)";
+
+    const clothingInstruction = (targetClothing.includes('same as') || 
+                                 targetClothing.includes('input') || 
+                                 targetClothing.includes('reference'))
+        ? "wearing exact same clothing and style as reference image, accurate outfit replication, identical apparel details"
+        : `(${targetClothing}:1.35)`;
+
+    const locationInstruction = visualState?.location ? `(${visualState.location}:1.25)` : "(cozy indoor room:1.2)";
+
+    const fusedDescription = `${poseInstruction}, ${clothingInstruction}, ${locationInstruction}, ${baseDescription}${visualContext ? `, (${visualContext}:1.25)` : ''}`;
     
     const runpodModel = character.runpodModel || "Qwen-Rapid-AIO-NSFW-v23.safetensors";
     
@@ -826,37 +841,36 @@ export const generateAriaImage = async (
     workflow["93"] = { "inputs": { "upscale_method": "lanczos", "megapixels": 1, "resolution_steps": 64, "image": ["78", 0] }, "class_type": "ImageScaleToTotalPixels" };
     workflow["88"] = { "inputs": { "pixels": ["93", 0], "vae": ["5", 2] }, "class_type": "VAEEncode" };
     
-    // Stripped down prompt instructions to give greater priority to action overrides
+    // Stronger prompt
     const promptText = [
       fusedDescription,
       situationalTags.filter(Boolean).join(", "),
-      "masterpiece, high quality, realistic, cinematic photo, detailed skin"
+      "masterpiece, best quality, highly detailed, realistic photo, cinematic lighting, sharp focus"
     ].filter(Boolean).join(", ").replace(/\s+/g, " ").trim();
 
-    // The negative prompt now intensely targets the input structure
     const negativeText = [
       safetyNegatives,
       genderExclusion,
       character.negativePrompt || "",
-      "multiple girls, 2girls, 3girls, trio, duo, group, crowd, multiple people",
-      "deformed iris, deformed pupils",
-      "airbrushed skin, plastic skin, porcelain skin, flawless smooth skin",
-      "low quality, blurry, bad anatomy, deformed, extra limbs, mutated hands",
-      "(copying input pose:1.5), (static composition:1.4), (same pose as reference image:1.5)"
+      "multiple girls, group, crowd",
+      "deformed, bad anatomy, extra limbs",
+      "airbrushed, plastic skin, doll-like",
+      // STRONG ANTI-REFERENCE
+      "same pose as reference, copied pose, identical posture, frozen composition, mirroring input image, exact same angle, replicated layout from input"
     ].filter(Boolean).join(", ");
 
     workflow["110"] = { "inputs": { "prompt": negativeText, "clip": [lastClipNodeId, lastClipOutputIndex], "vae": ["5", 2], "image1": ["93", 0] }, "class_type": "TextEncodeQwenImageEditPlus" };
     workflow["111"] = { "inputs": { "prompt": promptText, "clip": [lastClipNodeId, lastClipOutputIndex], "vae": ["5", 2], "image1": ["93", 0] }, "class_type": "TextEncodeQwenImageEditPlus" };
     
-    // Stage 1 KSampler configured explicitly to shift structure 
+    // Final KSampler settings
     workflow["3"] = {
       "inputs": {
         "seed": seed, 
-        "steps": 5, 
-        "cfg": 6.0, 
+        "steps": 25, 
+        "cfg": 8.0,           // High CFG to force text over image condition
         "sampler_name": "euler",
         "scheduler": "simple",
-        "denoise": 1.0, 
+        "denoise": 1.0,       // CRITICAL: Must be 1.0 to allow complete pose replacement
         "model": [lastModelNodeId, lastModelOutputIndex],
         "positive": ["111", 0],
         "negative": ["110", 0],
@@ -884,7 +898,7 @@ export const generateAriaImage = async (
         "cfg": 2.5, 
         "sampler_name": "euler", 
         "scheduler": "simple", 
-        "denoise": 0.25, 
+        "denoise": 0.15, 
         "model": ["100", 0],
         "positive": ["202", 0],
         "negative": ["203", 0],
@@ -992,7 +1006,7 @@ export const generateAriaImage = async (
 
   try {
     const payload = imagesPayload ? { workflow, images: imagesPayload } : { workflow };
-    console.log("📤 Sending full RunPod payload:", JSON.stringify(payload, null, 2));
+    
     const runResponse = await fetch('/api/generate', {
       method: "POST",
       headers: { "Content-Type": "application/json" },
