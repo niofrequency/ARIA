@@ -993,7 +993,7 @@ export const generateAriaImage = async (
 
   try {
     const payload = imagesPayload ? { workflow, images: imagesPayload } : { workflow };
-    
+    console.log("📤 Sending full RunPod payload:", JSON.stringify(payload, null, 2));
     const runResponse = await fetch('/api/generate', {
       method: "POST",
       headers: { "Content-Type": "application/json" },
