@@ -854,7 +854,7 @@ export const generateAriaImage = async (
       "inputs": {
         "seed": seed, 
         "steps": 15, 
-        "cfg": 4.0, 
+        "cfg": 6.0, 
         "sampler_name": "euler",
         "scheduler": "simple",
         "denoise": 1.0, 
@@ -929,6 +929,7 @@ export const generateAriaImage = async (
       fusedDescription,
       situationalTags.filter(Boolean).join(", "),
       "masterpiece, high quality, realistic",
+      "(dynamic body structure:1.4), (change of pose:1.4), (action-oriented composition:1.3), masterpiece, high quality, realistic"
       "unfiltered raw candid cinematic photo, extremely detailed skin texture, photorealistic, natural subsurface scattering, film grain, dslr look, 8k uhd"
     ].filter(Boolean).join(", ").replace(/\s+/g, " ").trim();
 
@@ -942,6 +943,7 @@ export const generateAriaImage = async (
       "beauty filter, over-smoothed, heavy retouch, instagram filter",
       "cartoon, anime, 3d render, illustration, painting",
       "low quality, blurry, bad anatomy, deformed, extra limbs, mutated hands"
+      "(dynamic body structure:1.4), (change of pose:1.4), (action-oriented composition:1.3), masterpiece, high quality, realistic"
     ].filter(Boolean).join(", ");
 
     workflow = {
