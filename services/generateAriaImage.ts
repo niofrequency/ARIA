@@ -767,12 +767,15 @@ export const generateAriaImage = async (
   if (useQwen) {
     console.log("🧠 Using Qwen FaceID Workflow + Biglust Refiner");
 
+    // FUSE CHAT STATE + VISION CONTEXT TO FORCE POSE OVERRIDE
+    // In order to overcome Qwen's static structural lock on the input canvas, we push heavily
+    // weighted directives that aggressively decouple the output generation from the reference posture.
     const poseInstruction = visualState?.pose 
-      ? `(completely fresh pose:1.3), (brand new body posture:1.4), (doing action: ${visualState.pose}:1.5)` 
-      : "(completely randomized dynamic stance:1.3)";
+      ? `(action: ${visualState.pose}:1.5), (new pose:1.4), (change body position:1.4), (ignore original pose:1.4)` 
+      : "(dynamic movement:1.3)";
       
-    // Added visualContext and weighting inherited from Biglust branch
-    const fusedDescription = `(${visualState?.clothing || 'casual outfit'}:1.25), (${visualState?.location || 'indoor room'}:1.2), ${poseInstruction}, ${baseDescription}${visualContext ? `, (${visualContext}:1.2)` : ''}`;
+    // Apply styling tags directly to prompt base to ensure high fidelity
+    const fusedDescription = `(${visualState?.clothing || 'casual outfit'}:1.25), (${visualState?.location || 'indoor room'}:1.2), ${poseInstruction}, ${baseDescription}${visualContext ? `, (${visualContext}:1.1)` : ''}`;
     
     const runpodModel = character.runpodModel || "Qwen-Rapid-AIO-NSFW-v23.safetensors";
     
@@ -823,33 +826,29 @@ export const generateAriaImage = async (
     workflow["93"] = { "inputs": { "upscale_method": "lanczos", "megapixels": 1, "resolution_steps": 64, "image": ["78", 0] }, "class_type": "ImageScaleToTotalPixels" };
     workflow["88"] = { "inputs": { "pixels": ["93", 0], "vae": ["5", 2] }, "class_type": "VAEEncode" };
     
-    // Added aesthetic/photorealistic tags inherited from Biglust branch
+    // Stripped down prompt instructions to give greater priority to action overrides
     const promptText = [
       fusedDescription,
       situationalTags.filter(Boolean).join(", "),
-      "masterpiece, high quality, realistic",
-      "unfiltered raw candid cinematic photo, extremely detailed skin texture, photorealistic, natural subsurface scattering, film grain, dslr look, 8k uhd"
+      "masterpiece, high quality, realistic, cinematic photo, detailed skin"
     ].filter(Boolean).join(", ").replace(/\s+/g, " ").trim();
 
-    // Unified negative prompt with Biglust formatting constraints
+    // The negative prompt now intensely targets the input structure
     const negativeText = [
       safetyNegatives,
       genderExclusion,
       character.negativePrompt || "",
-      "(multiple girls, 2girls, 3girls, trio, duo, group, crowd:1.6), (multiple people:1.5)",
-      "(deformed iris, deformed pupils:1.2)",
-      "airbrushed skin, plastic skin, porcelain skin, doll-like skin, flawless smooth skin",
-      "beauty filter, over-smoothed, heavy retouch, instagram filter",
-      "cartoon, anime, 3d render, illustration, painting",
+      "multiple girls, 2girls, 3girls, trio, duo, group, crowd, multiple people",
+      "deformed iris, deformed pupils",
+      "airbrushed skin, plastic skin, porcelain skin, flawless smooth skin",
       "low quality, blurry, bad anatomy, deformed, extra limbs, mutated hands",
-      "replicated structure, mirroring original file composition, duplicate layout, frozen pose anchor"
+      "(copying input pose:1.5), (static composition:1.4), (same pose as reference image:1.5)"
     ].filter(Boolean).join(", ");
 
     workflow["110"] = { "inputs": { "prompt": negativeText, "clip": [lastClipNodeId, lastClipOutputIndex], "vae": ["5", 2], "image1": ["93", 0] }, "class_type": "TextEncodeQwenImageEditPlus" };
     workflow["111"] = { "inputs": { "prompt": promptText, "clip": [lastClipNodeId, lastClipOutputIndex], "vae": ["5", 2], "image1": ["93", 0] }, "class_type": "TextEncodeQwenImageEditPlus" };
     
-    // Optimized denoise step configurations for clear transformations (Stage 1 KSampler)
-    // CFG pushed slightly higher to forcefully prioritize layout prompt text over input canvas structures.
+    // Stage 1 KSampler configured explicitly to shift structure 
     workflow["3"] = {
       "inputs": {
         "seed": seed, 
@@ -885,7 +884,7 @@ export const generateAriaImage = async (
         "cfg": 2.5, 
         "sampler_name": "euler", 
         "scheduler": "simple", 
-        "denoise": 0.15, 
+        "denoise": 0.25, 
         "model": ["100", 0],
         "positive": ["202", 0],
         "negative": ["203", 0],
@@ -929,7 +928,6 @@ export const generateAriaImage = async (
       fusedDescription,
       situationalTags.filter(Boolean).join(", "),
       "masterpiece, high quality, realistic",
-      "(dynamic body structure:1.4), (change of pose:1.4), (action-oriented composition:1.3), masterpiece, high quality, realistic"
       "unfiltered raw candid cinematic photo, extremely detailed skin texture, photorealistic, natural subsurface scattering, film grain, dslr look, 8k uhd"
     ].filter(Boolean).join(", ").replace(/\s+/g, " ").trim();
 
@@ -943,7 +941,6 @@ export const generateAriaImage = async (
       "beauty filter, over-smoothed, heavy retouch, instagram filter",
       "cartoon, anime, 3d render, illustration, painting",
       "low quality, blurry, bad anatomy, deformed, extra limbs, mutated hands"
-      "(dynamic body structure:1.4), (change of pose:1.4), (action-oriented composition:1.3), masterpiece, high quality, realistic"
     ].filter(Boolean).join(", ");
 
     workflow = {
