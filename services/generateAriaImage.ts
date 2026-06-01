@@ -609,28 +609,13 @@ export const generateAriaImage = async (
   }
 
   // ==================== SMART MODEL DECISION ====================
-  const hasIdentityLora = !!activeLoraFile;
-  const hasFace = /face|eyes|lips|mouth|headshot|portrait|selfie|expression|looking at camera|smiling|eyes closed/i.test(sceneLower);
-  const isIntimateCloseup = /pussy|ass|butt|rear|boobs|tits|nipples|clit|vulva|anus|feet|toes|armpit|extreme closeup.*(body|lower|intimate)/i.test(sceneLower);
-
-  let useQwen = false;
+  // If the user is using the input image, always use Qwen with the Biglust refiner to prevent switching back and forth.
+  const useQwen = !!character.avatarImage;
   
-  if (hasIdentityLora) {
-    useQwen = false;                    // Forced Biglust for Identity LoRAs
-  } else if (isIntimateCloseup) {
-    useQwen = false;                    // Force Biglust for faceless intimate shots
-  } else if (hasFace || sceneLower.includes("selfie")) {
-    useQwen = true;                     // Face or selfie → Qwen
-  } else if (/closeup|half body|upper body|waist up|chest|shoulders/i.test(sceneLower)) {
-    useQwen = false;                    // Body closeups without face → Biglust
-  } else {
-    useQwen = !!character.avatarImage;  // Default: Qwen if we have reference
-  }
-  
-  console.log(`🎯 Model Decision → ${useQwen ? '🔵 Qwen (Face)' : '🔴 Biglust (Identity/Body/No Face)'}`);
+  console.log(`🎯 Model Decision → ${useQwen ? '🔵 Qwen AIO NSFW (Image to Image Refiner)' : '🔴 Biglust (Text to Image)'}`);
 
   // --- 2. SITUATIONAL ANALYSIS ---
-  const isFaceFocus = hasFace || (sceneLower.includes("closeup") && !isIntimateCloseup);
+  const isFaceFocus = sceneLower.includes("face") || sceneLower.includes("selfie") || (sceneLower.includes("closeup") && !sceneLower.match(/pussy|ass|butt|rear|boobs|tits|nipples|clit|vulva|anus|feet|toes|armpit|extreme closeup.*(body|lower|intimate)/i));
   const isUpperBody = /upper body|waist up|chest up|bust shot|shoulders|arms|torso|midriff/i.test(sceneLower);
   const isLowerBody = /lower body|thighs|legs|feet|waist down|ass|butt|rear|backside|behind|hips|crotch|pussy/i.test(sceneLower);
   const isPartFocus = /hands|fingers|feet|toes|skin texture|extreme closeup|armpit|underarm|navel|nails|details/i.test(sceneLower);
@@ -679,7 +664,7 @@ export const generateAriaImage = async (
     if ((s.includes("frontview") || s.includes("backview") || s.includes("sideview") || s.includes("profile") || s.includes("from above") || s.includes("from below") || s.includes("high angle") || s.includes("low angle") || s.includes("overhead") || s.includes("birdseye") || s.includes("wormseye")) && 
         (t.includes("front") || t.includes("back") || t.includes("side") || t.includes("rear") || t.includes("profile") || t.includes("bottom view") || t.includes("top view"))) return true;
 
-    if (!isFaceFocus && !isIntimateCloseup && !isLowerBody) {
+    if (!isFaceFocus && !sceneLower.match(/pussy|ass|butt|rear|boobs|tits|nipples|clit|vulva|anus|feet|toes|armpit|extreme closeup.*(body|lower|intimate)/i) && !isLowerBody) {
         const safeTagRegex = /petite|curvy|thick|slim|skinny|tall|short|slender|thin|athletic|fit|toned|muscular|chubby|voluptuous|freckles|pale|tan|dark|skin|bosom|bust|breast|hips|ass|butt|hairy|armpit/i;
         
         if (safeTagRegex.test(t)) return true;
@@ -698,7 +683,7 @@ export const generateAriaImage = async (
     situationalTags = [`medium shot showing face and lower body of ${botIdentity}`, character.ethnicity, faceTags, hairTags, bodyTags];
   } else if (isFaceFocus) {
     situationalTags = [`extreme closeup portrait of ${botIdentity}`, character.ethnicity, faceTags, hairTags, bodyTags];
-  } else if (isLowerBody || isIntimateCloseup) {
+  } else if (isLowerBody || sceneLower.match(/pussy|ass|butt|rear|boobs|tits|nipples|clit|vulva|anus|feet|toes|armpit|extreme closeup.*(body|lower|intimate)/i)) {
     situationalTags = [`detailed faceless closeup on lower body`, character.ethnicity, bodyTags];
   } else if (isPartFocus) {
     situationalTags = [`macro detailed focus on ${character.name}'s body part`, character.ethnicity, bodyTags];
@@ -743,9 +728,9 @@ export const generateAriaImage = async (
   let workflow: any = {};
   let imagesPayload: any = undefined;
 
-  // BRANCH A: Custom Identity Drop Workflow (Qwen FaceID / Image2Image)
-  if (useQwen && character.avatarImage) {
-    console.log("🧠 Using Qwen FaceID Workflow");
+  // BRANCH A: Custom Identity Drop Workflow (Qwen FaceID / Image2Image Refined with Biglust)
+  if (useQwen) {
+    console.log("🧠 Using Qwen FaceID Workflow + Biglust Refiner");
     const runpodModel = character.runpodModel || "Qwen-Rapid-AIO-NSFW-v23.safetensors";
     
     // Merge Profile LoRAs with UI-selected LoRAs
@@ -759,13 +744,16 @@ export const generateAriaImage = async (
     
     console.log(`🧠 Using Qwen Rapid Image Edit Workflow (${runpodModel}) with ${customLoras.length} LoRAs`);
 
+    // --- STAGE 1: Qwen Base Model ---
     workflow["5"] = { "inputs": { "ckpt_name": runpodModel }, "class_type": "CheckpointLoaderSimple" };
+    // --- STAGE 2: BigLust Refiner Model ---
+    workflow["100"] = { "inputs": { "ckpt_name": "biglust.safetensors" }, "class_type": "CheckpointLoaderSimple" };
     
     let lastModelNodeId = "5";
     let lastModelOutputIndex = 0;
     let lastClipNodeId = "5";
     let lastClipOutputIndex = 1;
-    let currentId = 100;
+    let currentId = 1000;
 
     customLoras.forEach((lora: any) => {
       const nodeId = currentId.toString();
@@ -788,11 +776,9 @@ export const generateAriaImage = async (
       currentId++;
     });
 
-    workflow["8"] = { "inputs": { "samples": ["3", 0], "vae": ["5", 2] }, "class_type": "VAEDecode" };
-    workflow["19"] = { "inputs": { "filename_prefix": "ARIA_QWEN_I2I", "images": ["8", 0] }, "class_type": "SaveImage" };
     workflow["78"] = { "inputs": { "image": "input_image.png" }, "class_type": "LoadImage" };
-    workflow["88"] = { "inputs": { "pixels": ["93", 0], "vae": ["5", 2] }, "class_type": "VAEEncode" };
     workflow["93"] = { "inputs": { "upscale_method": "lanczos", "megapixels": 1, "resolution_steps": 64, "image": ["78", 0] }, "class_type": "ImageScaleToTotalPixels" };
+    workflow["88"] = { "inputs": { "pixels": ["93", 0], "vae": ["5", 2] }, "class_type": "VAEEncode" };
     
     // Stripped weight brackets for clean Qwen instructions parsing
     const promptText = [
@@ -814,7 +800,7 @@ export const generateAriaImage = async (
     workflow["110"] = { "inputs": { "prompt": negativeText, "clip": [lastClipNodeId, lastClipOutputIndex], "vae": ["5", 2], "image1": ["93", 0] }, "class_type": "TextEncodeQwenImageEditPlus" };
     workflow["111"] = { "inputs": { "prompt": promptText, "clip": [lastClipNodeId, lastClipOutputIndex], "vae": ["5", 2], "image1": ["93", 0] }, "class_type": "TextEncodeQwenImageEditPlus" };
     
-    // Optimized denoise step configurations for clear transformations
+    // Optimized denoise step configurations for clear transformations (Stage 1 KSampler)
     workflow["3"] = {
       "inputs": {
         "seed": seed, 
@@ -830,6 +816,40 @@ export const generateAriaImage = async (
       },
       "class_type": "KSampler"
     };
+
+    // Decode Stage 1 output back to pixels
+    workflow["8"] = { "inputs": { "samples": ["3", 0], "vae": ["5", 2] }, "class_type": "VAEDecode" };
+
+    // --- STAGE 2 (BigLust Refiner) ---
+    // Encode pixels from Stage 1 into SDXL format using BigLust's VAE
+    workflow["200"] = { "inputs": { "pixels": ["8", 0], "vae": ["100", 2] }, "class_type": "VAEEncode" };
+
+    // Standard CLIP encoders for BigLust (SDXL) - Explicitly forcing "biglust style"
+    workflow["202"] = { "inputs": { "text": "masterpiece, best quality, ultra detailed, highly realistic, biglust style, " + promptText, "clip": ["100", 1] }, "class_type": "CLIPTextEncode" };
+    workflow["203"] = { "inputs": { "text": negativeText, "clip": ["100", 1] }, "class_type": "CLIPTextEncode" };
+
+    // Refiner KSampler
+    workflow["201"] = {
+      "inputs": {
+        "seed": seed, 
+        "steps": 20, 
+        "cfg": 2.5, 
+        "sampler_name": "euler", 
+        "scheduler": "simple", 
+        "denoise": 0.15, 
+        "model": ["100", 0],
+        "positive": ["202", 0],
+        "negative": ["203", 0],
+        "latent_image": ["200", 0]
+      },
+      "class_type": "KSampler"
+    };
+
+    // Final Stage 2 Decode
+    workflow["300"] = { "inputs": { "samples": ["201", 0], "vae": ["100", 2] }, "class_type": "VAEDecode" };
+    
+    // Output Save Node
+    workflow["19"] = { "inputs": { "filename_prefix": "ARIA_QWEN_I2I_REFINED", "images": ["300", 0] }, "class_type": "SaveImage" };
 
     let base64String = character.avatarImage;
     if (base64String.startsWith('http')) {
