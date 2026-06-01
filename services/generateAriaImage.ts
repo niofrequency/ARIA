@@ -548,7 +548,9 @@ export const generateAriaImage = async (
     ].filter(Boolean).join(', ');
     enhancedPrompt = `${statePrefix}, ${enhancedPrompt || 'current moment'}`;
   } else if (!enhancedPrompt) {
-    enhancedPrompt = "selfie, current pose, looking at camera";
+    // CRITICAL POSE-LOCK FIX: Changed from "current pose" to "fresh dynamic candid pose"
+    // This stops the initial turn from mirroring the input image configuration verbatim.
+    enhancedPrompt = "selfie, fresh dynamic candid pose, looking at camera";
   }
 
   // Force strong continuity
@@ -732,21 +734,12 @@ export const generateAriaImage = async (
   if (useQwen) {
     console.log("🧠 Using Qwen FaceID Workflow + Biglust Refiner");
 
-    // ==========================================
-    // VISION BRIDGE INJECTION FOR QWEN
-    // ==========================================
-    let visualContext = "";
-    if (character.avatarImage) {
-      console.log("👁️ Extracting visual context from reference image for Qwen Bridge...");
-      visualContext = await getVisualDescription(character.avatarImage);
-      if (visualContext) {
-         console.log("👁️ Visual Context Extracted:", visualContext);
-      }
-    }
-
-    // FUSE CHAT STATE + VISION CONTEXT TO FORCE POSE OVERRIDE
-    const poseInstruction = visualState?.pose ? `(doing: ${visualState.pose}:1.3)` : "";
-    const fusedDescription = `(${visualState?.clothing || 'casual outfit'}:1.25), (${visualState?.location || 'indoor room'}:1.2), ${poseInstruction}, ${baseDescription}${visualContext ? `, (${visualContext}:1.1)` : ''}`;
+    // NOTE: Qwen pipeline natively tracks composition using the loaded image node payload.
+    // We intentionally avoid carrying visualContext text descriptions from the avatar image inside
+    // the text prompt for Branch A, as that directly locks the initial posture into duplicating the old image coordinates.
+    // Instead, we force the parsed pose state parameters into a heavy weighted layout statement.
+    const poseInstruction = visualState?.pose ? `(doing: ${visualState.pose}:1.4), (completely different body posture:1.3)` : "(completely randomized fresh position:1.3)";
+    const fusedDescription = `(${visualState?.clothing || 'casual outfit'}:1.25), (${visualState?.location || 'indoor room'}:1.2), ${poseInstruction}, ${baseDescription}`;
     
     const runpodModel = character.runpodModel || "Qwen-Rapid-AIO-NSFW-v23.safetensors";
     
@@ -811,18 +804,20 @@ export const generateAriaImage = async (
       "multiple girls, 2girls, 3girls, trio, duo, group, crowd, multiple people",
       "deformed iris, deformed pupils",
       "airbrushed skin, plastic skin, porcelain skin, flawless smooth skin",
-      "low quality, blurry, bad anatomy, deformed, extra limbs, mutated hands"
+      "low quality, blurry, bad anatomy, deformed, extra limbs, mutated hands",
+      "replicated position, duplicate composition, original layout, cloned stance, frozen pose"
     ].filter(Boolean).join(", ");
 
     workflow["110"] = { "inputs": { "prompt": negativeText, "clip": [lastClipNodeId, lastClipOutputIndex], "vae": ["5", 2], "image1": ["93", 0] }, "class_type": "TextEncodeQwenImageEditPlus" };
     workflow["111"] = { "inputs": { "prompt": promptText, "clip": [lastClipNodeId, lastClipOutputIndex], "vae": ["5", 2], "image1": ["93", 0] }, "class_type": "TextEncodeQwenImageEditPlus" };
     
     // Optimized denoise step configurations for clear transformations (Stage 1 KSampler)
+    // CFG scale adjusted upward slightly to aggressively break position lock and force text compliance
     workflow["3"] = {
       "inputs": {
         "seed": seed, 
-        "steps": 12, 
-        "cfg": 3.0, 
+        "steps": 15, 
+        "cfg": 4.0, 
         "sampler_name": "euler",
         "scheduler": "simple",
         "denoise": 1.0, 
