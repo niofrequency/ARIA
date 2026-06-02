@@ -855,10 +855,12 @@ export const generateAriaImage = async (
       "multiple girls, group, crowd",
       "deformed, bad anatomy, extra limbs",
       "airbrushed, plastic skin, doll-like",
-      // STRONG ANTI-REFERENCE
       "same pose as reference, copied pose, identical posture, frozen composition, mirroring input image, exact same angle, replicated layout from input"
     ].filter(Boolean).join(", ");
-
+    
+    console.log("📝 [RunPod Qwen Prompt]:", promptText);
+    console.log("🚫 [RunPod Qwen Negative]:", negativeText);
+    
     workflow["110"] = { "inputs": { "prompt": negativeText, "clip": [lastClipNodeId, lastClipOutputIndex], "vae": ["5", 2], "image1": ["93", 0] }, "class_type": "TextEncodeQwenImageEditPlus" };
     workflow["111"] = { "inputs": { "prompt": promptText, "clip": [lastClipNodeId, lastClipOutputIndex], "vae": ["5", 2], "image1": ["93", 0] }, "class_type": "TextEncodeQwenImageEditPlus" };
     
