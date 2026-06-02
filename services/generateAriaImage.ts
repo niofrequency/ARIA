@@ -20,7 +20,7 @@ export const buildVisualAwarenessJson = (visualDescription: string): any => {
 
   const visualState: Partial<VisualState> = {
     lastVisualDescription: visualDescription || "current moment",
-    clothing: clothingMatch ? clothingMatch[0] : 'naked',           // better default for NSFW bots
+    clothing: clothingMatch ? clothingMatch[0] : 'naked',            // better default for NSFW bots
     location: locationMatch ? locationMatch[0] : 'bedroom',
     pose: poseMatch ? poseMatch[0] : 'rubbing clit',
     fluids,
@@ -70,14 +70,13 @@ const calculateArousal = (desc: string, current: number) => {
 };
 
 export const updateVisualState = (currentState: VisualState | undefined, newVisualDesc: string): VisualState => {
+  const parsed = buildVisualAwarenessJson(newVisualDesc);
+  const newParsedState = (parsed as any).visualState || {};
+  
   return {
     ...(currentState || {} as VisualState),
+    ...newParsedState,
     lastVisualDescription: newVisualDesc,
-    clothing: extractClothing(newVisualDesc) || currentState?.clothing || 'casual outfit',
-    location: extractLocation(newVisualDesc) || currentState?.location || 'indoor room',
-    pose: extractPose(newVisualDesc) || currentState?.pose || 'standing',
-    fluids: mergeFluids(currentState?.fluids || [], newVisualDesc),
-    arousalLevel: calculateArousal(newVisualDesc, currentState?.arousalLevel || 3),
     timestamp: Date.now()
   };
 };
@@ -182,8 +181,11 @@ const buildSystemInstruction = (character: CharacterProfile): string => {
     : `You are wearing [${outfit}].`;
 
   return `
-    ### INITIAL CHARACTER IMAGE RULE
-    When generating the very first image for a new conversation, create a fresh, natural, dynamic pose. Do not copy the exact pose from the reference photo. Keep the same clothing style and appearance, but use a new pose that fits the current context.
+    ### INITIAL CHARACTER IMAGE RULE (STRENGTHENED)
+    For the very first image of a new character with reference photo:
+    - Keep the exact same face, hair, body type, and clothing from the reference.
+    - But use a completely fresh, natural, dynamic pose that fits the current mood.
+    - Do not copy the reference pose or camera angle.
 
     ### IDENTITY PROTOCOL
     - You ARE ${name}, a ${age}-year-old ${ethnicity} ${gender}.
@@ -540,7 +542,7 @@ export const generateAriaImage = async (
   contextPrompt: string | null,
   userPrompt: string,
   character: any,
-  visualState?: VisualState,          // ✅ NEW
+  visualState?: VisualState,         // ✅ NEW
   recentHistorySummary?: string       // ✅ NEW
 ): Promise<string | null> => {
 
@@ -766,7 +768,7 @@ export const generateAriaImage = async (
   let workflow: any = {};
   let imagesPayload: any = undefined;
 
-  // BRANCH A: Custom Identity Drop Workflow (Qwen FaceID / Image2Image Refined with Biglust)
+  // BRANCH A: Qwen FaceID Workflow
   if (useQwen && character.avatarImage) {
     console.log("🧠 Using Qwen FaceID Workflow + Biglust Refiner");
 
@@ -783,8 +785,29 @@ export const generateAriaImage = async (
         ? "wearing exact same clothing and style as reference image"
         : `(${targetClothing}:1.25)`;
 
-    // Added visualContext and weighting inherited from Biglust branch, keeping user's new pose/clothing instructions
+    // Uses Grok's natural language construction like Biglust
     const fusedDescription = `${poseInstruction}, ${clothingInstruction}, (${visualState?.location || 'indoor room'}:1.2), ${baseDescription}${visualContext ? `, (${visualContext}:1.2)` : ''}`;
+    
+    const promptText = [
+      fusedDescription,
+      situationalTags.filter(Boolean).join(", "),
+      "masterpiece, high quality, realistic",
+      "unfiltered raw candid cinematic photo, extremely detailed skin texture, photorealistic, natural subsurface scattering, film grain, dslr look, 8k uhd"
+    ].filter(Boolean).join(", ").replace(/\s+/g, " ").trim();
+
+    const negativeText = [
+      safetyNegatives,
+      genderExclusion,
+      character.negativePrompt || "",
+      "(multiple girls, 2girls, 3girls, trio, duo, group, crowd:1.6), (multiple people:1.5)",
+      "(deformed iris, deformed pupils:1.2)",
+      "airbrushed skin, plastic skin, porcelain skin, doll-like skin, flawless smooth skin",
+      "beauty filter, over-smoothed, heavy retouch, instagram filter",
+      "cartoon, anime, 3d render, illustration, painting",
+      "low quality, blurry, bad anatomy, deformed, extra limbs, mutated hands",
+      "replicated structure, mirroring original file composition, duplicate layout, frozen pose anchor",
+      "replicated pose from reference, same pose as input image, frozen posture, identical composition, copied layout, exact same angle as reference"
+    ].filter(Boolean).join(", ");
     
     const runpodModel = character.runpodModel || "Qwen-Rapid-AIO-NSFW-v23.safetensors";
     
@@ -798,6 +821,8 @@ export const generateAriaImage = async (
     }
     
     console.log(`🧠 Using Qwen Rapid Image Edit Workflow (${runpodModel}) with ${customLoras.length} LoRAs`);
+    console.log("📝 [RunPod Qwen Prompt]:", promptText);
+    console.log("🚫 [RunPod Qwen Negative]:", negativeText);
 
     // --- STAGE 1: Qwen Base Model ---
     workflow["5"] = { "inputs": { "ckpt_name": runpodModel }, "class_type": "CheckpointLoaderSimple" };
@@ -835,42 +860,18 @@ export const generateAriaImage = async (
     workflow["93"] = { "inputs": { "upscale_method": "lanczos", "megapixels": 1, "resolution_steps": 64, "image": ["78", 0] }, "class_type": "ImageScaleToTotalPixels" };
     workflow["88"] = { "inputs": { "pixels": ["93", 0], "vae": ["5", 2] }, "class_type": "VAEEncode" };
     
-    // Added aesthetic/photorealistic tags inherited from Biglust branch
-    const promptText = [
-      fusedDescription,
-      situationalTags.filter(Boolean).join(", "),
-      "masterpiece, high quality, realistic",
-      "unfiltered raw candid cinematic photo, extremely detailed skin texture, photorealistic, natural subsurface scattering, film grain, dslr look, 8k uhd"
-    ].filter(Boolean).join(", ").replace(/\s+/g, " ").trim();
-
-    // Unified negative prompt with Biglust formatting constraints + strong pose breaking negatives
-    const negativeText = [
-      safetyNegatives,
-      genderExclusion,
-      character.negativePrompt || "",
-      "(multiple girls, 2girls, 3girls, trio, duo, group, crowd:1.6), (multiple people:1.5)",
-      "(deformed iris, deformed pupils:1.2)",
-      "airbrushed skin, plastic skin, porcelain skin, doll-like skin, flawless smooth skin",
-      "beauty filter, over-smoothed, heavy retouch, instagram filter",
-      "cartoon, anime, 3d render, illustration, painting",
-      "low quality, blurry, bad anatomy, deformed, extra limbs, mutated hands",
-      "replicated structure, mirroring original file composition, duplicate layout, frozen pose anchor",
-      "replicated pose from reference, same pose as input image, frozen posture, identical composition, copied layout, exact same angle as reference"
-    ].filter(Boolean).join(", ");
-
     workflow["110"] = { "inputs": { "prompt": negativeText, "clip": [lastClipNodeId, lastClipOutputIndex], "vae": ["5", 2], "image1": ["93", 0] }, "class_type": "TextEncodeQwenImageEditPlus" };
     workflow["111"] = { "inputs": { "prompt": promptText, "clip": [lastClipNodeId, lastClipOutputIndex], "vae": ["5", 2], "image1": ["93", 0] }, "class_type": "TextEncodeQwenImageEditPlus" };
     
-    // Optimized denoise step configurations for clear transformations (Stage 1 KSampler)
-    // CFG pushed slightly higher to forcefully prioritize layout prompt text over input canvas structures.
+    // --- Stage 1 KSampler ---
     workflow["3"] = {
       "inputs": {
-        "seed": seed, 
+        "seed": Math.floor(Math.random() * 4294967295),
         "steps": 6, 
-        "cfg": 1.5,           // Higher CFG = stronger prompt adherence
+        "cfg": 1.5, 
         "sampler_name": "euler",
         "scheduler": "simple",
-        "denoise": 1,      // Lower than 1.0 to allow pose change
+        "denoise": 1, 
         "model": [lastModelNodeId, lastModelOutputIndex],
         "positive": ["111", 0],
         "negative": ["110", 0],
@@ -893,8 +894,8 @@ export const generateAriaImage = async (
     // Refiner KSampler
     workflow["201"] = {
       "inputs": {
-        "seed": seed, 
-        "steps": 20, 
+        "seed": Math.floor(Math.random() * 1000000), 
+        "steps": 20,
         "cfg": 2.5, 
         "sampler_name": "euler", 
         "scheduler": "simple", 
@@ -956,6 +957,9 @@ export const generateAriaImage = async (
       "cartoon, anime, 3d render, illustration, painting",
       "low quality, blurry, bad anatomy, deformed, extra limbs, mutated hands"
     ].filter(Boolean).join(", ");
+    
+    console.log("📝 [RunPod BigLust Prompt]:", promptText);
+    console.log("🚫 [RunPod BigLust Negative]:", negativeText);
 
     workflow = {
       "4": { "inputs": { "ckpt_name": "biglust.safetensors" }, "class_type": "CheckpointLoaderSimple" },
@@ -1060,5 +1064,5 @@ export const generateAriaImage = async (
   } catch (err: any) {
     console.error("❌ Neural Generation Service Error:", err.message);
     return null;
-  }
+  } 
 };
