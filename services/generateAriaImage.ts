@@ -854,14 +854,14 @@ export const generateAriaImage = async (
     workflow["111"] = { "inputs": { "prompt": promptText, "clip": [lastClipNodeId, lastClipOutputIndex], "vae": ["5", 2], "image1": ["93", 0] }, "class_type": "TextEncodeQwenImageEditPlus" };
     
     // Final KSampler settings
-    workflow["3"] = {
+    workflowObj["3"] = {
       "inputs": {
-        "seed": seed, 
-        "steps": 22, 
-        "cfg": 6.5,           // Strong prompt control
-        "sampler_name": "euler",
-        "scheduler": "simple",
-        "denoise": 1,      // Sweet spot for pose change
+        "seed": Math.floor(Math.random() * 1000000), 
+        "steps": steps, 
+        "cfg": cfg,
+        "sampler_name": sampler,
+        "scheduler": scheduler,
+        "denoise": 1.0, 
         "model": [lastModelNodeId, lastModelOutputIndex],
         "positive": ["111", 0],
         "negative": ["110", 0],
@@ -881,15 +881,15 @@ export const generateAriaImage = async (
     workflow["202"] = { "inputs": { "text": "masterpiece, best quality, ultra detailed, highly realistic, biglust style, " + promptText, "clip": ["100", 1] }, "class_type": "CLIPTextEncode" };
     workflow["203"] = { "inputs": { "text": negativeText, "clip": ["100", 1] }, "class_type": "CLIPTextEncode" };
 
-    // Refiner KSampler
-    workflow["201"] = {
+     // Refiner KSampler
+    workflowObj["201"] = {
       "inputs": {
-        "seed": seed, 
-        "steps": 20, 
-        "cfg": 2.5, 
-        "sampler_name": "euler", 
-        "scheduler": "simple", 
-        "denoise": 0.15, 
+        "seed": Math.floor(Math.random() * 1000000), 
+        "steps": Math.max(20, steps),
+        "cfg": 1.5,           // Significantly lower CFG = More freedom
+        "sampler_name": sampler, 
+        "scheduler": scheduler, 
+        "denoise": 0.35,      // Increased from 0.15 to allow the refiner to adapt
         "model": ["100", 0],
         "positive": ["202", 0],
         "negative": ["203", 0],
