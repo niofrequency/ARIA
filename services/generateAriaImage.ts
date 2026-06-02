@@ -20,7 +20,7 @@ export const buildVisualAwarenessJson = (visualDescription: string): any => {
 
   const visualState: Partial<VisualState> = {
     lastVisualDescription: visualDescription || "current moment",
-    clothing: clothingMatch ? clothingMatch[0] : 'naked',           // better default for NSFW bots
+    clothing: clothingMatch ? clothingMatch[0] : 'naked',            // better default for NSFW bots
     location: locationMatch ? locationMatch[0] : 'bedroom',
     pose: poseMatch ? poseMatch[0] : 'rubbing clit',
     fluids,
@@ -542,7 +542,7 @@ export const generateAriaImage = async (
   contextPrompt: string | null,
   userPrompt: string,
   character: any,
-  visualState?: VisualState,          // ✅ NEW
+  visualState?: VisualState,         // ✅ NEW
   recentHistorySummary?: string       // ✅ NEW
 ): Promise<string | null> => {
 
@@ -772,25 +772,32 @@ export const generateAriaImage = async (
   if (useQwen && character.avatarImage) {
     console.log("🧠 Using Qwen FaceID Workflow + Biglust Refiner");
 
-    const isFirstImage = !visualState || !visualState.lastVisualDescription ||
-                         visualState.lastVisualDescription === "current moment";
-        
-    // === STRONGEST POSE BREAKING ===
-    const poseInstruction = isFirstImage 
-        ? "(completely fresh dynamic pose:1.65), (new natural body posture:1.7), (different angle and composition:1.6), (not copying reference pose:1.75), (varied stance:1.6)"
-        : visualState?.pose 
-            ? `(doing action: ${visualState.pose}:1.5)` 
-            : "(natural candid pose:1.35)";
+    const genderTerm = character.gender?.toLowerCase() === 'male' ? 'man' : 'woman';
+    const identity = `same ${genderTerm} from the input image, ${character.name}, a ${character.age}-year-old ${character.ethnicity} ${genderTerm}`;
+    
+    let clothing = targetClothing.replace('wearing ', '');
+    if (clothing.includes('same as') || clothing.includes('input') || clothing.includes('reference')) {
+      clothing = "same clothing as image";
+    }
 
-    const clothingInstruction = (targetClothing.includes('same as') || 
-                                 targetClothing.includes('input') || 
-                                 targetClothing.includes('reference'))
-        ? "wearing exact same clothing and style as reference image, accurate outfit replication, identical apparel details"
-        : `(${targetClothing}:1.35)`;
+    const userContext = contextPrompt || "selfie";
+    const expressionState = visualState?.pose || "looking at camera";
 
-    const locationInstruction = visualState?.location ? `(${visualState.location}:1.25)` : "(cozy indoor room:1.2)";
+    const promptText = [
+      identity,
+      clothing ? `wearing ${clothing}` : "",
+      userContext,
+      expressionState,
+      visualContext ? visualContext : "",
+      "masterpiece, best quality, highly detailed, realistic photo, cinematic lighting, sharp focus"
+    ].filter(Boolean).join(", ").replace(/\s+/g, " ").trim();
 
-    const fusedDescription = `${poseInstruction}, ${clothingInstruction}, ${locationInstruction}, ${baseDescription}${visualContext ? `, (${visualContext}:1.25)` : ''}`;
+    const negativeText = [
+      safetyNegatives,
+      genderExclusion,
+      character.negativePrompt || "",
+      "multiple girls, group, crowd, deformed, bad anatomy, extra limbs, airbrushed, plastic skin, doll-like"
+    ].filter(Boolean).join(", ");
     
     const runpodModel = character.runpodModel || "Qwen-Rapid-AIO-NSFW-v23.safetensors";
     
@@ -804,6 +811,8 @@ export const generateAriaImage = async (
     }
     
     console.log(`🧠 Using Qwen Rapid Image Edit Workflow (${runpodModel}) with ${customLoras.length} LoRAs`);
+    console.log("📝 [RunPod Qwen Prompt]:", promptText);
+    console.log("🚫 [RunPod Qwen Negative]:", negativeText);
 
     // --- STAGE 1: Qwen Base Model ---
     workflow["5"] = { "inputs": { "ckpt_name": runpodModel }, "class_type": "CheckpointLoaderSimple" };
@@ -840,26 +849,6 @@ export const generateAriaImage = async (
     workflow["78"] = { "inputs": { "image": "input_image.png" }, "class_type": "LoadImage" };
     workflow["93"] = { "inputs": { "upscale_method": "lanczos", "megapixels": 1, "resolution_steps": 64, "image": ["78", 0] }, "class_type": "ImageScaleToTotalPixels" };
     workflow["88"] = { "inputs": { "pixels": ["93", 0], "vae": ["5", 2] }, "class_type": "VAEEncode" };
-    
-    // Stronger prompt
-    const promptText = [
-      fusedDescription,
-      situationalTags.filter(Boolean).join(", "),
-      "masterpiece, best quality, highly detailed, realistic photo, cinematic lighting, sharp focus"
-    ].filter(Boolean).join(", ").replace(/\s+/g, " ").trim();
-
-    const negativeText = [
-      safetyNegatives,
-      genderExclusion,
-      character.negativePrompt || "",
-      "multiple girls, group, crowd",
-      "deformed, bad anatomy, extra limbs",
-      "airbrushed, plastic skin, doll-like",
-      "same pose as reference, copied pose, identical posture, frozen composition, mirroring input image, exact same angle, replicated layout from input"
-    ].filter(Boolean).join(", ");
-    
-    console.log("📝 [RunPod Qwen Prompt]:", promptText);
-    console.log("🚫 [RunPod Qwen Negative]:", negativeText);
     
     workflow["110"] = { "inputs": { "prompt": negativeText, "clip": [lastClipNodeId, lastClipOutputIndex], "vae": ["5", 2], "image1": ["93", 0] }, "class_type": "TextEncodeQwenImageEditPlus" };
     workflow["111"] = { "inputs": { "prompt": promptText, "clip": [lastClipNodeId, lastClipOutputIndex], "vae": ["5", 2], "image1": ["93", 0] }, "class_type": "TextEncodeQwenImageEditPlus" };
@@ -958,6 +947,9 @@ export const generateAriaImage = async (
       "cartoon, anime, 3d render, illustration, painting",
       "low quality, blurry, bad anatomy, deformed, extra limbs, mutated hands"
     ].filter(Boolean).join(", ");
+    
+    console.log("📝 [RunPod BigLust Prompt]:", promptText);
+    console.log("🚫 [RunPod BigLust Negative]:", negativeText);
 
     workflow = {
       "4": { "inputs": { "ckpt_name": "biglust.safetensors" }, "class_type": "CheckpointLoaderSimple" },
