@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { CharacterProfile } from '../types';
-import { generateAriaImage } from '../services/ariaService';
+// ✅ FIX: Updated the import path to the new generateAriaImage service
+import { generateAriaImage } from '../services/generateAriaImage';
 import { Sparkles, Cpu, Fingerprint, Activity, Loader2, Plus, Box, Camera, Upload, Server, ArrowRight, ArrowLeft, CheckCircle2, Menu, PanelLeft } from 'lucide-react';
 
 interface CompanionCreationModalProps {
