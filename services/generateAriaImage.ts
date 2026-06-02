@@ -1011,6 +1011,9 @@ export const generateAriaImage = async (
   try {
     const payload = imagesPayload ? { workflow, images: imagesPayload } : { workflow };
     
+    // === CONSOLE LOG ADDED HERE ===
+    console.log("🚀 Payload being sent to RunPod (Workflow built from Grok's prompt):", JSON.stringify(workflow, null, 2));
+
     const runResponse = await fetch('/api/generate', {
       method: "POST",
       headers: { "Content-Type": "application/json" },
