@@ -749,7 +749,7 @@ export const generateAriaImage = async (
   } else if (isFaceFocus) {
     situationalTags = [`extreme closeup portrait of ${botIdentity}`, character.ethnicity, faceTags, hairTags, bodyTags];
   } else if (isLowerBody || sceneLower.match(/pussy|ass|butt|rear|boobs|tits|nipples|clit|vulva|anus|feet|toes|armpit|extreme closeup.*(body|lower|intimate)/i)) {
-    situationalTags = [`detailed faceless closeup on lower body`, character.ethnicity, bodyTags];
+  situationalTags = [`detailed faceless extreme closeup on pussy only, tight crop excluding mouth and face completely, pussy focus only`, character.ethnicity, bodyTags];
   } else if (isPartFocus) {
     situationalTags = [`macro detailed focus on ${character.name}'s body part`, character.ethnicity, bodyTags];
   } else if (isPartFocus || isUpperBody) {
@@ -825,6 +825,7 @@ export const generateAriaImage = async (
       safetyNegatives,
       genderExclusion,
       character.negativePrompt || "",
+      "(futanari:1.65), (futa:1.65), (hermaphrodite:1.6), (penis:1.65), (cock:1.65), (dick:1.65), (self sucking:1.6), (self-suck:1.6), (autofellatio:1.6), (girl with penis:1.6), (futanari self suck:1.7)",
       "(multiple girls, 2girls, 3girls, trio, duo, group, crowd:1.6), (multiple people:1.5)",
       "(deformed iris, deformed pupils:1.2)",
       "airbrushed skin, plastic skin, porcelain skin, doll-like skin, flawless smooth skin",
