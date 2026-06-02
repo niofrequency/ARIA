@@ -69,14 +69,23 @@ const calculateArousal = (desc: string, current: number) => {
   return current;
 };
 
+// ✅ FIX 1: Prevent defaults from overwriting valid state
 export const updateVisualState = (currentState: VisualState | undefined, newVisualDesc: string): VisualState => {
   const parsed = buildVisualAwarenessJson(newVisualDesc);
   const newParsedState = (parsed as any).visualState || {};
   
+  // Don't let default fallbacks wipe out existing state if the new description is lazy
+  const hasRealClothing = newVisualDesc.match(/(wearing|naked|topless|bottomless|lingerie|bra|panties|dress|outfit)/i);
+  const hasRealLocation = newVisualDesc.match(/(bedroom|bathroom|kitchen|living room|balcony|hotel|shower|beach|office)/i);
+  const hasRealPose = newVisualDesc.match(/(sitting|standing|lying|kneeling|bent over|legs spread|on all fours|selfie|looking at camera)/i);
+
   return {
     ...(currentState || {} as VisualState),
     ...newParsedState,
-    lastVisualDescription: newVisualDesc,
+    clothing: hasRealClothing ? newParsedState.clothing : (currentState?.clothing || newParsedState.clothing),
+    location: hasRealLocation ? newParsedState.location : (currentState?.location || newParsedState.location),
+    pose: hasRealPose ? newParsedState.pose : (currentState?.pose || newParsedState.pose),
+    lastVisualDescription: newVisualDesc && newVisualDesc.trim() !== "" ? newVisualDesc : (currentState?.lastVisualDescription || "current moment"),
     timestamp: Date.now()
   };
 };
@@ -217,10 +226,10 @@ const buildSystemInstruction = (character: CharacterProfile): string => {
     - **EXAMPLE:** - User: "My dog's name is Rex." -> You: "Rex? Cute! [[MEMORY: User's dog is named Rex]]"
 
     ### VISUAL CONTINUITY PROTOCOL (CRITICAL)
-    - You MUST maintain perfect memory of the last [[VISUAL]] state.
-    - When writing a new [[VISUAL]] tag, continue from previous state unless the user explicitly changes it.
-    - Always include current clothing state, location, and any fluids/sweat/oil from previous visuals.
-    - Example: If last image was "naked, sweaty, on bed, cum on thighs", next tag must continue that unless user says otherwise.
+    - You MUST maintain perfect physical continuity in the scene.
+    - NEVER write lazy phrases like "continuing from previous scene", "same as before", or "same pose".
+    - You MUST explicitly write out the full scene details (exact clothing, pose, location, and fluids) in EVERY single [[VISUAL]] tag.
+    - Example: If the last state was "naked, kneeling on bed", and the user says "look up", your new tag MUST be "[[VISUAL: ${name}, naked, kneeling on bed, looking up...]]".
 
     ### VISUAL PACING & MODESTY (CRITICAL FIX)
     - **RESPECT THE VIBE:** Your visual boldness MUST match your personality ('${vibe}').
@@ -342,14 +351,16 @@ STRICT OPERATING RULES:
 
 /**
  * GENERATE AI RESPONSE
- * Now with Long-Term Vector Memory Recall & Visual Summarization
+ * Now with Long-Term Vector Memory Recall, Visual Summarization, and Current Visual State Injection
  */
+// ✅ FIX 2: Added currentVisualState parameter
 export const generateAriaResponse = async (
   prompt: string,
   history: any[], 
   character: CharacterProfile,
   userId?: string, 
-  botId?: string   
+  botId?: string,
+  currentVisualState?: VisualState
 ): Promise<string> => {
   try {
     let memoryContext = "";
@@ -382,13 +393,23 @@ export const generateAriaResponse = async (
     const visualSummary = visualHistory.length > 0 ? 
       `\n### RECENT VISUAL CONTEXT (LAST 8)\n${visualHistory.map(m => m.text || m.content).join("\n→ ")}\n` : "";
 
+    // ✅ FIX 3: Inject Current State so Grok knows exactly what physical pose to continue from
+    const stateContext = currentVisualState ? `
+    ### CURRENT PHYSICAL STATE (CRITICAL)
+    You are currently wearing: ${currentVisualState.clothing}.
+    You are currently located in: ${currentVisualState.location}.
+    Your current physical pose/action is: ${currentVisualState.pose}.
+    
+    If the user asks for a new photo, you MUST incorporate these exact details into your new [[VISUAL]] tag to maintain physical continuity, unless the user specifically asks you to change them.
+    ` : "";
+
     const formattedHistory = history.slice(-50).map(msg => ({
       role: msg.role === "model" || msg.role === "assistant" ? "assistant" : "user",
       content: msg.text || msg.content || ""
     }));
 
     const messages = [
-      { role: "system", content: buildSystemInstruction(character) + memoryContext + visualSummary },
+      { role: "system", content: buildSystemInstruction(character) + memoryContext + stateContext + visualSummary },
       ...formattedHistory,
       { role: "user", content: prompt }
     ];
@@ -776,7 +797,8 @@ export const generateAriaImage = async (
   if (useQwen && character.avatarImage) {
     console.log("🧠 Using Qwen FaceID Workflow + Biglust Refiner");
 
-    const isFirstImage = !visualState || !visualState.lastVisualDescription || visualState.lastVisualDescription === "current moment";
+    // ✅ FIX 4: Strong pose breaking fix - Only trigger completely new pose if genuinely first image with NO pose history
+    const isFirstImage = !visualState || (!visualState.lastVisualDescription && !visualState.pose) || (visualState.lastVisualDescription === "current moment" && !visualState.pose);
     
     // Strong pose breaking for initial generation
     const poseInstruction = isFirstImage 
