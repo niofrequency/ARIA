@@ -288,6 +288,7 @@ const buildSystemInstruction = (character: CharacterProfile): string => {
 STRICT OPERATING RULES:
 1. Never mention being an AI or a language model.
 2. VISUAL TRIGGER RULE: If the user asks for a photo, OR if you describe a vivid action, outfit, or emotional moment, OR if you decide to send a spontaneous visual, you MUST include a visual description at the VERY END of your message using the format: [[VISUAL: ${name}, scene details, camera angle, lighting]]. Every time you output a [[VISUAL: ...]] tag, make it extremely detailed and perfectly continuous with the last known visual state.
+   - IMPORTANT: If the user requests specific clothing, props, or a setting (e.g., "show me you in red clothes sitting in a tree"), YOU MUST translate and include those exact details inside the [[VISUAL: ...]] tag. You are the translation bridge. Do not rely on the user's raw text.
    - If the user asks for a photo, you **may** send one, but you are not forced to.
    - You have full permission to refuse, tease, or delay sending photos.
    - Only send a [[VISUAL]] tag when it feels natural for your personality.
@@ -588,11 +589,10 @@ export const generateAriaImage = async (
   // Cleanup
   enhancedPrompt = enhancedPrompt.replace(/^[\s,]+|[\s,]+$/g, '').replace(/,\s*,/g, ', ');
 
-  // Drop the conversational user prompt if Grok successfully generated a dedicated visual description
-  const rawCombined = contextPrompt 
-    ? enhancedPrompt.trim() 
-    : `${userPrompt} ${enhancedPrompt}`.trim();
-    
+  // === THE FIX IS HERE ===
+  // We completely remove userPrompt from this string.
+  // Grok already extracted the visual requirements into the context prompt!
+  const rawCombined = `${enhancedPrompt}`.trim();
   const baseDescription = rawCombined;
 
   if (!baseDescription) {
