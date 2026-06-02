@@ -264,17 +264,51 @@ const ChatDashboard: React.FC<ChatDashboardProps> = ({
     if (!userData?.uid) return;
     try {
       await deleteBotFromFirestore(userData.uid, botId);
-      setBots(prev => prev.filter(b => b.id !== botId));
+      
+      const remainingBots = bots.filter(b => b.id !== botId);
+      setBots(remainingBots);
+      
       setConversations(prev => {
         const next = new Map(prev);
         next.delete(botId);
         return next;
       });
+
+      // Handle the case where the currently active bot is the one being deleted
       if (selectedBotId === botId) {
-        setSelectedBotId('');
-        setCurrentConversationId(null);
-        localStorage.removeItem('aria_last_active_bot');
-        if (bots.length <= 1) setActiveView('discover'); // Send to discover if no bots left
+        if (remainingBots.length > 0) {
+          const nextBot = remainingBots[0];
+          setSelectedBotId(nextBot.id);
+          localStorage.setItem('aria_last_active_bot', nextBot.id);
+          
+          const botConvs = conversations.get(nextBot.id) || [];
+          if (botConvs.length > 0) {
+            setCurrentConversationId(botConvs[0].id);
+          } else {
+            // Initiate a blank conversation instance for the newly selected bot
+            const newConvId = generateUniqueId('conv');
+            const newConversation: Conversation = { 
+                id: newConvId, 
+                title: `Session ${new Date().toLocaleDateString()}`, 
+                messages: [], 
+                timestamp: Date.now() 
+            };
+            setConversations(prev => {
+                const next = new Map(prev);
+                next.set(nextBot.id, [newConversation]);
+                return next;
+            });
+            saveConversationToFirestore(userData.uid, nextBot.id, newConversation);
+            setCurrentConversationId(newConvId);
+          }
+          setActiveView('chat');
+        } else {
+          // No bots left, return to discover state
+          setSelectedBotId('');
+          setCurrentConversationId(null);
+          localStorage.removeItem('aria_last_active_bot');
+          setActiveView('discover');
+        }
       }
     } catch (err) {
       console.error("Delete failed:", err);
