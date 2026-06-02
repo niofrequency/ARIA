@@ -861,7 +861,7 @@ export const generateAriaImage = async (
         "cfg": 6.5,           // Strong prompt control
         "sampler_name": "euler",
         "scheduler": "simple",
-        "denoise": 0.82,      // Sweet spot for pose change
+        "denoise": 1,      // Sweet spot for pose change
         "model": [lastModelNodeId, lastModelOutputIndex],
         "positive": ["111", 0],
         "negative": ["110", 0],
