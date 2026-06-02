@@ -588,7 +588,11 @@ export const generateAriaImage = async (
   // Cleanup
   enhancedPrompt = enhancedPrompt.replace(/^[\s,]+|[\s,]+$/g, '').replace(/,\s*,/g, ', ');
 
-  const rawCombined = `${userPrompt} ${enhancedPrompt}`.trim();
+  // Drop the conversational user prompt if Grok successfully generated a dedicated visual description
+  const rawCombined = contextPrompt 
+    ? enhancedPrompt.trim() 
+    : `${userPrompt} ${enhancedPrompt}`.trim();
+    
   const baseDescription = rawCombined;
 
   if (!baseDescription) {
