@@ -853,15 +853,15 @@ export const generateAriaImage = async (
     workflow["110"] = { "inputs": { "prompt": negativeText, "clip": [lastClipNodeId, lastClipOutputIndex], "vae": ["5", 2], "image1": ["93", 0] }, "class_type": "TextEncodeQwenImageEditPlus" };
     workflow["111"] = { "inputs": { "prompt": promptText, "clip": [lastClipNodeId, lastClipOutputIndex], "vae": ["5", 2], "image1": ["93", 0] }, "class_type": "TextEncodeQwenImageEditPlus" };
     
-    // Final KSampler settings
+// --- Stage 1 KSampler ---
     workflowObj["3"] = {
       "inputs": {
-        "seed": Math.floor(Math.random() * 1000000), 
-        "steps": steps, 
-        "cfg": cfg,
+        "seed": Math.floor(Math.random() * 4294967295)
+        "steps": 4, 
+        "cfg": 5.0, // Reduced from 6.5
         "sampler_name": sampler,
         "scheduler": scheduler,
-        "denoise": 1.0, 
+        "denoise": 1, // Reduced from 1.0 to add stability
         "model": [lastModelNodeId, lastModelOutputIndex],
         "positive": ["111", 0],
         "negative": ["110", 0],
@@ -886,10 +886,10 @@ export const generateAriaImage = async (
       "inputs": {
         "seed": Math.floor(Math.random() * 1000000), 
         "steps": Math.max(20, steps),
-        "cfg": 1.5,           // Significantly lower CFG = More freedom
+        "cfg": 2.5, 
         "sampler_name": sampler, 
         "scheduler": scheduler, 
-        "denoise": 0.35,      // Increased from 0.15 to allow the refiner to adapt
+        "denoise": 0.15, 
         "model": ["100", 0],
         "positive": ["202", 0],
         "negative": ["203", 0],
