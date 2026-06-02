@@ -2,7 +2,7 @@ import { CharacterProfile, VisualState } from "../types";
 import { retrieveMemories } from "./memoryService";
  
 /**
- * ARIA VISUAL STATE PARSER - IMPROVED
+ * ARIA VISUAL STATE PARSER - CONTEXT FLEXIBLE
  */
 export const buildVisualAwarenessJson = (visualDescription: string): any => {
   const desc = (visualDescription || "").toLowerCase();
@@ -18,11 +18,13 @@ export const buildVisualAwarenessJson = (visualDescription: string): any => {
   if (desc.includes('wet') || desc.includes('arousal') || desc.includes('dripping')) fluids.push('wet');
   if (desc.includes('oil') || desc.includes('oiled')) fluids.push('oiled');
 
+  // We set these to null if no regex matches. This allows updateVisualState 
+  // to dynamically look at the character context or previous history.
   const visualState: Partial<VisualState> = {
     lastVisualDescription: visualDescription || "current moment",
-    clothing: clothingMatch ? clothingMatch[0] : 'naked',            // better default for NSFW bots
-    location: locationMatch ? locationMatch[0] : 'bedroom',
-    pose: poseMatch ? poseMatch[0] : 'rubbing clit',
+    clothing: clothingMatch ? clothingMatch[0] : null,            
+    location: locationMatch ? locationMatch[0] : null,
+    pose: poseMatch ? poseMatch[0] : null,
     fluids,
     arousalLevel: desc.includes('horny') || desc.includes('aroused') || desc.includes('pleasure') || desc.includes('rubbing') ? 8 : 5,
     timestamp: Date.now()
@@ -69,22 +71,60 @@ const calculateArousal = (desc: string, current: number) => {
   return current;
 };
 
-// ✅ FIX 1: Prevent defaults from overwriting valid state
-export const updateVisualState = (currentState: VisualState | undefined, newVisualDesc: string): VisualState => {
+// ✅ FIX 1: Prevent defaults from overwriting valid state (Now Context Flexible)
+export const updateVisualState = (
+  currentState: VisualState | undefined, 
+  newVisualDesc: string, 
+  character?: CharacterProfile
+): VisualState => {
   const parsed = buildVisualAwarenessJson(newVisualDesc);
   const newParsedState = (parsed as any).visualState || {};
+  const descLower = (newVisualDesc || "").toLowerCase();
   
-  // Don't let default fallbacks wipe out existing state if the new description is lazy
-  const hasRealClothing = newVisualDesc.match(/(wearing|naked|topless|bottomless|lingerie|bra|panties|dress|outfit)/i);
-  const hasRealLocation = newVisualDesc.match(/(bedroom|bathroom|kitchen|living room|balcony|hotel|shower|beach|office)/i);
-  const hasRealPose = newVisualDesc.match(/(sitting|standing|lying|kneeling|bent over|legs spread|on all fours|selfie|looking at camera)/i);
+  // 1. DYNAMIC CLOTHING DETERMINATION
+  let resolvedClothing = currentState?.clothing || newParsedState.clothing;
+  if (!resolvedClothing) {
+    if (descLower.includes("naked") || descLower.includes("nude") || descLower.includes("undressed")) {
+      resolvedClothing = "naked";
+    } else if (character && character.outfit) {
+      resolvedClothing = character.outfit;
+    } else {
+      resolvedClothing = "casual outfit";
+    }
+  }
+
+  // 2. DYNAMIC LOCATION DETERMINATION
+  let resolvedLocation = currentState?.location || newParsedState.location;
+  if (!resolvedLocation) {
+    if (descLower.includes("bed") || descLower.includes("sleep") || descLower.includes("wake up")) {
+      resolvedLocation = "bedroom";
+    } else if (descLower.includes("shower") || descLower.includes("bath") || descLower.includes("mirror")) {
+      resolvedLocation = "bathroom";
+    } else if (descLower.includes("outside") || descLower.includes("sun") || descLower.includes("beach")) {
+      resolvedLocation = "outdoors";
+    } else {
+      resolvedLocation = "candid setting"; // Entirely flexible backdrop
+    }
+  }
+
+  // 3. DYNAMIC POSE DETERMINATION
+  let resolvedPose = currentState?.pose || newParsedState.pose;
+  if (!resolvedPose) {
+    if (descLower.includes("selfie") || descLower.includes("photo") || descLower.includes("pic")) {
+      resolvedPose = "posing for a quick selfie, looking at camera";
+    } else if (descLower.includes("laying") || descLower.includes("lying") || descLower.includes("bed")) {
+      resolvedPose = "relaxing comfortably";
+    } else {
+      resolvedPose = "natural candid posture"; // Completely leaves it up to Grok's system instructions
+    }
+  }
 
   return {
     ...(currentState || {} as VisualState),
     ...newParsedState,
-    clothing: hasRealClothing ? newParsedState.clothing : (currentState?.clothing || newParsedState.clothing),
-    location: hasRealLocation ? newParsedState.location : (currentState?.location || newParsedState.location),
-    pose: hasRealPose ? newParsedState.pose : (currentState?.pose || newParsedState.pose),
+    clothing: resolvedClothing,
+    location: resolvedLocation,
+    pose: resolvedPose,
     lastVisualDescription: newVisualDesc && newVisualDesc.trim() !== "" ? newVisualDesc : (currentState?.lastVisualDescription || "current moment"),
     timestamp: Date.now()
   };
@@ -589,14 +629,14 @@ export const generateAriaImage = async (
   if (visualState) {
     const statePrefix = [
       targetClothing,
-      visualState.location || 'bedroom',
-      visualState.pose || 'lying on bed',
+      visualState.location || 'candid setting',
+      visualState.pose || 'natural posture',
       ...(visualState.fluids || [])
     ].filter(Boolean).join(', ');
     enhancedPrompt = `${statePrefix}, ${enhancedPrompt || 'current moment'}`;
   } else if (!enhancedPrompt) {
     // CRITICAL FIRST MESSAGE POSE LOCK FIX
-    const stateFallbackPose = visualState?.pose ? `candid setup, doing action: ${visualState.pose}` : "selfie, fresh dynamic candid pose, looking at camera";
+    const stateFallbackPose = visualState?.pose ? `doing action: ${visualState.pose}` : "candid look, fresh dynamic natural pose, looking at camera";
     enhancedPrompt = `${targetClothing}, ${stateFallbackPose}`;
   }
 
@@ -812,7 +852,7 @@ export const generateAriaImage = async (
         : `(${targetClothing}:1.25)`;
 
     // Uses Grok's natural language construction like Biglust
-    const fusedDescription = `${poseInstruction}, ${clothingInstruction}, (${visualState?.location || 'indoor room'}:1.2), ${baseDescription}${visualContext ? `, (${visualContext}:1.2)` : ''}`;
+    const fusedDescription = `${poseInstruction}, ${clothingInstruction}, (${visualState?.location || 'candid setting'}:1.2), ${baseDescription}${visualContext ? `, (${visualContext}:1.2)` : ''}`;
     
     const promptText = [
       fusedDescription,
@@ -964,7 +1004,7 @@ export const generateAriaImage = async (
     if (activeLoraFile) console.log(`🧬 Active LoRA: ${activeLoraFile}.safetensors (Weight: ${activeWeight})`);
     
     // The vision extraction has now been shifted up, we just inject it here
-    const fusedDescription = `(${visualState?.clothing || 'casual outfit'}:1.25), (${visualState?.location || 'indoor room'}:1.2), ${baseDescription}${visualContext ? `, (${visualContext}:1.2)` : ''}`; 
+    const fusedDescription = `(${visualState?.clothing || 'casual outfit'}:1.25), (${visualState?.location || 'candid setting'}:1.2), ${baseDescription}${visualContext ? `, (${visualContext}:1.2)` : ''}`; 
     
     const promptText = [
       fusedDescription,
