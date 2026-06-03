@@ -100,7 +100,7 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({ character
   
   const [ageError, setAgeError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [imageError, setImageError] = useState<string | null>(null); // Added state for manual upload limit
+  const [imageError, setImageError] = useState<string | null>(null);
   const [tagInputs, setTagInputs] = useState({ hair: '', face: '', body: '' });
 
   useEffect(() => {
@@ -161,12 +161,11 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({ character
   const handleImageProcess = (file: File) => {
     if (!file.type.startsWith('image/')) return;
     
-    // Validate image size (4.5 MB limit)
     if (file.size > 4.5 * 1024 * 1024) {
       setImageError("Images must be lesser or equal to 4.5 MB image size for the input image.");
       return;
     }
-    setImageError(null); // Clear error if file size is valid
+    setImageError(null);
 
     const reader = new FileReader();
     reader.readAsDataURL(file);
@@ -412,10 +411,10 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({ character
                     name="runpodModel"
                     value={formData.runpodModel}
                     onChange={handleChange}
-                    className="w-full p-3 bg-white/[0.02] border border-white/10 rounded-xl text-sm text-zinc-300 outline-none focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/50 transition-colors cursor-pointer"
+                    className="w-full p-4 bg-white/[0.02] border border-white/10 rounded-2xl text-sm text-zinc-300 outline-none focus:border-purple-500/50 transition-colors cursor-pointer"
                   >
                     {RUNPOD_MODELS.map(m => (
-                      <option key={m.id} value={m.id}>{m.name}</option>
+                      <option key={m.id} value={m.id} className="bg-zinc-900">{m.name}</option>
                     ))}
                   </select>
                 </div>
@@ -425,24 +424,24 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({ character
                     <span>Active LoRAs Chain</span>
                   </label>
                   
-                  <div className="space-y-2 mb-3 max-h-[120px] overflow-y-auto custom-scrollbar">
+                  <div className="space-y-3 mb-5 max-h-[160px] overflow-y-auto custom-scrollbar pr-2">
                     {(formData.activeRunpodLoras || []).map(lora => (
-                      <div key={lora.id} className="flex items-center gap-3 bg-white/[0.02] p-2 rounded-lg border border-white/10">
-                        <span className="text-[10px] font-mono text-zinc-300 w-24 truncate">{lora.name}</span>
+                      <div key={lora.id} className="flex items-center gap-4 bg-white/[0.02] p-4 rounded-2xl border border-white/10">
+                        <span className="text-xs font-mono text-zinc-300 flex-1 truncate">{lora.name}</span>
                         <input 
                           type="range" min="0" max="2" step="0.1" 
                           value={lora.strength} 
                           onChange={(e) => updateRunpodLoraStrength(lora.id, Number(e.target.value))}
-                          className="flex-1 accent-purple-500 h-1" 
+                          className="w-24 accent-purple-500 h-1.5" 
                         />
-                        <span className="text-[10px] font-mono text-zinc-500 w-6 text-right">{lora.strength.toFixed(1)}</span>
-                        <button type="button" onClick={() => removeRunpodLora(lora.id)} className="text-zinc-600 hover:text-red-400 p-1 transition-colors">
-                          <X className="w-3 h-3" />
+                        <span className="text-xs font-mono text-zinc-500 w-8 text-right">{lora.strength.toFixed(1)}</span>
+                        <button type="button" onClick={() => removeRunpodLora(lora.id)} className="text-zinc-600 hover:text-red-400 p-1.5 transition-colors">
+                          <Plus className="w-4 h-4 rotate-45" />
                         </button>
                       </div>
                     ))}
                     {(formData.activeRunpodLoras || []).length === 0 && (
-                      <div className="text-[10px] font-mono text-zinc-600 italic text-center py-2">No active LoRAs linked</div>
+                      <div className="text-xs font-mono text-zinc-600 italic text-center py-6 border border-dashed border-white/5 rounded-2xl">No Matrix Injectors Linked</div>
                     )}
                   </div>
 
