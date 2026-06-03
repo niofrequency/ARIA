@@ -100,6 +100,7 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({ character
   
   const [ageError, setAgeError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [imageError, setImageError] = useState<string | null>(null); // Added state for manual upload limit
   const [tagInputs, setTagInputs] = useState({ hair: '', face: '', body: '' });
 
   useEffect(() => {
@@ -159,6 +160,14 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({ character
 
   const handleImageProcess = (file: File) => {
     if (!file.type.startsWith('image/')) return;
+    
+    // Validate image size (4.5 MB limit)
+    if (file.size > 4.5 * 1024 * 1024) {
+      setImageError("Images must be lesser or equal to 4.5 MB image size for the input image.");
+      return;
+    }
+    setImageError(null); // Clear error if file size is valid
+
     const reader = new FileReader();
     reader.readAsDataURL(file);
     reader.onload = () => {
@@ -391,6 +400,8 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({ character
                      <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold group-hover:text-zinc-200">Upload Photo Matrix</span>
                   </div>
                 )}
+                {/* Display Image Upload Error Here */}
+                {imageError && <p className="text-red-400 text-[10px] uppercase font-bold text-center mt-1 animate-pulse">{imageError}</p>}
               </div>
 
               {/* Engine Tuning Architecture */}
@@ -435,21 +446,16 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({ character
                     )}
                   </div>
 
-                  <div className="flex gap-2">
-                    <select 
-                      onChange={addRunpodLora}
-                      value="none"
-                      className="flex-1 p-2 bg-white/[0.02] border border-white/10 rounded-lg text-[10px] uppercase tracking-widest outline-none focus:border-purple-500/50 text-zinc-400 shadow-inner"
-                    >
-                      <option value="none">Add LoRA to Chain...</option>
-                      {LORA_OPTIONS.filter(opt => !(formData.activeRunpodLoras || []).find(l => l.id === opt.id)).map(opt => (
-                        <option key={opt.id} value={opt.id}>{opt.name}</option>
-                      ))}
-                    </select>
-                    <div className="w-8 h-8 bg-white/5 rounded-lg flex items-center justify-center text-zinc-500 border border-white/10 pointer-events-none">
-                      <Plus className="w-4 h-4" />
-                    </div>
-                  </div>
+                  <select 
+                    onChange={addRunpodLora}
+                    value="none"
+                    className="w-full p-4 bg-purple-500/5 border border-purple-500/20 rounded-2xl text-xs uppercase tracking-widest outline-none focus:border-purple-500/50 text-purple-300 shadow-inner cursor-pointer"
+                  >
+                    <option value="none" className="bg-zinc-900">+ Inject Sub-Matrix (LoRA)...</option>
+                    {LORA_OPTIONS.filter(opt => !(formData.activeRunpodLoras || []).find(l => l.id === opt.id)).map(opt => (
+                      <option key={opt.id} value={opt.id} className="bg-zinc-900">{opt.name}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
             </div>
