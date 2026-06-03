@@ -32,7 +32,8 @@ const LORA_OPTIONS = [
   { id: "NRDX_LIGHTING.safetensors", name: "NRDX_LIGHTING" }, { id: "ALCAITIFF.safetensors", name: "ALCAITIFF" },
   { id: "NATURALSKIN.safetensors", name: "NATURALSKIN" },
 
- 
+ ];
+
 const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({ character, onSave, onClose }) => {
   const [formData, setFormData] = useState<CharacterProfile>({
     ...character,
