@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { Bot, Conversation } from '../types';
-import { LogOut, X, Trash, Cpu, ShieldCheck, PanelLeftClose, Search, Compass, MessageSquare, Sparkles } from 'lucide-react';
+import { LogOut, X, Trash, Cpu, ShieldCheck, PanelLeftClose, Search, Compass, MessageSquare, Sparkles, ChevronLeft } from 'lucide-react';
 
 export type ViewState = 'discover' | 'create' | 'chat';
 
@@ -190,7 +190,7 @@ return (
         `}
       >
         <div className="absolute inset-0 z-0 opacity-10 pointer-events-none" 
-             style={{ backgroundImage: 'linear-gradient(#27272a 1px, transparent 1px), linear-gradient(90deg, #27272a 1px, transparent 1px)', backgroundSize: '30px 30px' }}>
+              style={{ backgroundImage: 'linear-gradient(#27272a 1px, transparent 1px), linear-gradient(90deg, #27272a 1px, transparent 1px)', backgroundSize: '30px 30px' }}>
         </div>
 
      {/* Brand Header */}
@@ -215,38 +215,50 @@ return (
           </div>
         </div>
 
-        {/* MAIN NAVIGATION */}
-        <nav className="relative z-10 flex flex-col gap-1.5 p-4 border-b border-white/5">
-          <button 
-            onClick={() => handleMobileAction(() => setActiveView('discover'))}
-            className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${activeView === 'discover' ? 'bg-white/10 text-white font-bold shadow-inner' : 'text-zinc-400 hover:bg-white/5 hover:text-white font-medium'}`}
-          >
-            <Compass className={`w-5 h-5 ${activeView === 'discover' ? 'text-purple-400' : ''}`} />
-            <span className="text-sm tracking-wide">Discover</span>
-          </button>
+        {/* MAIN NAVIGATION (Hidden when actively chatting) */}
+        {activeView !== 'chat' && (
+          <nav className="relative z-10 flex flex-col gap-1.5 p-4 border-b border-white/5">
+            <button 
+              onClick={() => handleMobileAction(() => setActiveView('discover'))}
+              className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${activeView === 'discover' ? 'bg-white/10 text-white font-bold shadow-inner' : 'text-zinc-400 hover:bg-white/5 hover:text-white font-medium'}`}
+            >
+              <Compass className={`w-5 h-5 ${activeView === 'discover' ? 'text-purple-400' : ''}`} />
+              <span className="text-sm tracking-wide">Discover</span>
+            </button>
 
-          <button 
-            onClick={() => handleMobileAction(() => setActiveView('chat'))}
-            className={`flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-300 ${activeView === 'chat' ? 'bg-white/10 text-white font-bold shadow-inner' : 'text-zinc-400 hover:bg-white/5 hover:text-white font-medium'}`}
-          >
-            <div className="flex items-center gap-3">
-              <MessageSquare className={`w-5 h-5 ${activeView === 'chat' ? 'text-purple-400' : ''}`} />
-              <span className="text-sm tracking-wide">Chat</span>
-            </div>
-          </button>
+            <button 
+              onClick={() => handleMobileAction(() => setActiveView('chat'))}
+              className={`flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-300 ${activeView === 'chat' ? 'bg-white/10 text-white font-bold shadow-inner' : 'text-zinc-400 hover:bg-white/5 hover:text-white font-medium'}`}
+            >
+              <div className="flex items-center gap-3">
+                <MessageSquare className={`w-5 h-5 ${activeView === 'chat' ? 'text-purple-400' : ''}`} />
+                <span className="text-sm tracking-wide">Chat</span>
+              </div>
+            </button>
 
-          <button 
-            onClick={() => handleMobileAction(() => setActiveView('create'))}
-            className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${activeView === 'create' ? 'bg-white/10 text-white font-bold shadow-inner' : 'text-zinc-400 hover:bg-white/5 hover:text-white font-medium'}`}
-          >
-            <Sparkles className={`w-5 h-5 ${activeView === 'create' ? 'text-purple-400' : ''}`} />
-            <span className="text-sm tracking-wide">Create Character</span>
-          </button>
-        </nav>
+            <button 
+              onClick={() => handleMobileAction(() => setActiveView('create'))}
+              className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${activeView === 'create' ? 'bg-white/10 text-white font-bold shadow-inner' : 'text-zinc-400 hover:bg-white/5 hover:text-white font-medium'}`}
+            >
+              <Sparkles className={`w-5 h-5 ${activeView === 'create' ? 'text-purple-400' : ''}`} />
+              <span className="text-sm tracking-wide">Create Character</span>
+            </button>
+          </nav>
+        )}
 
         {/* NEURAL PROFILES (Only visible when actively chatting) */}
         {activeView === 'chat' ? (
           <section className="relative z-10 flex-1 px-4 overflow-hidden flex flex-col mt-4">
+            
+            {/* BACK BUTTON */}
+            <button
+              onClick={() => handleMobileAction(() => setActiveView('discover'))}
+              className="flex items-center gap-2 mb-4 text-zinc-400 hover:text-white transition-all px-2 py-1.5 -ml-2 rounded-lg hover:bg-white/5 w-fit group"
+            >
+              <ChevronLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+              <span className="text-[10px] uppercase tracking-widest font-bold">Back to Menus</span>
+            </button>
+
             <div className="flex items-center justify-between mb-3 px-2">
               <h3 className="text-[10px] uppercase tracking-[0.3em] text-zinc-500 font-bold flex items-center gap-2">
                  <Cpu className="w-3 h-3" /> My AI
