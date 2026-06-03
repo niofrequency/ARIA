@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { CharacterProfile } from '../types';
-// ✅ FIX: Updated the import path to the new generateAriaImage service
 import { generateAriaImage } from '../services/generateAriaImage';
-import { Sparkles, Cpu, Fingerprint, Activity, Loader2, Plus, Box, Camera, Upload, Server, ArrowRight, ArrowLeft, CheckCircle2, Menu, PanelLeft } from 'lucide-react';
+import { Sparkles, Cpu, Fingerprint, Activity, Loader2, Plus, Box, Camera, Upload, Server, ArrowRight, ArrowLeft, CheckCircle2, Menu, PanelLeft, ChevronDown } from 'lucide-react';
 
 interface CompanionCreationModalProps {
   onSave: (newCharacter: CharacterProfile) => void;
@@ -44,18 +43,10 @@ const CompanionCreationModal: React.FC<CompanionCreationModalProps> = ({
 }) => {
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState<Partial<CharacterProfile>>({
-    name: '',
-    age: '24',
-    gender: '',
-    ethnicity: '',
-    hair: [],
-    face: [],
-    body: [],
-    outfit: '',
+    name: '', age: '24', gender: '', ethnicity: '',
+    hair: [], face: [], body: [], outfit: '',
     runpodModel: 'Qwen-Rapid-AIO-NSFW-v23.safetensors',
-    activeRunpodLoras: [],
-    avatarImage: null,
-    vibe: '',
+    activeRunpodLoras: [], avatarImage: null, vibe: '',
     negativePrompt: 'glasses, hat, extra fingers, low quality, distorted anatomy, text, watermark'
   });
   
@@ -63,10 +54,13 @@ const CompanionCreationModal: React.FC<CompanionCreationModalProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [isForging, setIsForging] = useState(false);
   const [forgeError, setForgeError] = useState<string | null>(null);
-  const [imageError, setImageError] = useState<string | null>(null); // Added state for manual upload limit
+  const [imageError, setImageError] = useState<string | null>(null);
   const [tagInputs, setTagInputs] = useState({ hair: '', face: '', body: '' });
 
-  // Escape key always goes back/cancels. (Removed body scroll lock as it's a full page now)
+  // Custom Dropdown States
+  const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
+  const [isLoraDropdownOpen, setIsLoraDropdownOpen] = useState(false);
+
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -111,13 +105,11 @@ const CompanionCreationModal: React.FC<CompanionCreationModalProps> = ({
 
   const handleImageProcess = (file: File) => {
     if (!file.type.startsWith('image/')) return;
-    
-    // Validate image size (4.5 MB limit)
     if (file.size > 4.5 * 1024 * 1024) {
       setImageError("Images must be lesser or equal to 4.5 MB image size for the input image.");
       return;
     }
-    setImageError(null); // Clear error if file size is valid
+    setImageError(null);
 
     const reader = new FileReader();
     reader.readAsDataURL(file);
@@ -136,7 +128,6 @@ const CompanionCreationModal: React.FC<CompanionCreationModalProps> = ({
       
       const identityPrompt = `Cinematic portrait of a ${formData.age || '24'} year old ${formData.ethnicity || 'person'} ${formData.gender || ''}, ${hairStr}, ${faceStr}, ${bodyStr}, outfit: ${formData.outfit || 'minimalist clothing'}, looking directly at camera, medium portrait studio shot, realistic lighting, 8k, highly detailed`;
       
-      // Auto-forge generates a brand new image, so we pass null for avatarImage
       const generatedUrl = await generateAriaImage(null, identityPrompt, { ...formData, avatarImage: null } as CharacterProfile);
       
       if (generatedUrl) {
@@ -150,21 +141,6 @@ const CompanionCreationModal: React.FC<CompanionCreationModalProps> = ({
     } finally {
       setIsForging(false);
     }
-  };
-
-  const addRunpodLora = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const val = e.target.value;
-    if (val === 'none') return;
-    const opt = LORA_OPTIONS.find(l => l.id === val);
-    const currentLoras = formData.activeRunpodLoras || [];
-    
-    if (opt && !currentLoras.find(l => l.id === val)) {
-      setFormData(prev => ({
-        ...prev,
-        activeRunpodLoras: [...currentLoras, { id: opt.id, name: opt.name, strength: 0.8 }]
-      }));
-    }
-    e.target.value = 'none';
   };
 
   const updateRunpodLoraStrength = (id: string, strength: number) => {
@@ -347,14 +323,9 @@ const CompanionCreationModal: React.FC<CompanionCreationModalProps> = ({
           </div>
         );
 
-      case 4:
-        return renderTagField('hair', 'Hair Presentation', 'Describe style, length, color, and texture.', 'e.g., long wavy raven hair, curtain bangs...');
-      
-      case 5:
-        return renderTagField('face', 'Facial Configuration', 'Detail eye color, shape, makeup, or distinguishing marks.', 'e.g., piercing blue eyes, freckles, soft jawline...');
-      
-      case 6:
-        return renderTagField('body', 'Physique Architecture', 'Set the physical build and proportions.', 'e.g., petite, athletic core, hourglass...');
+      case 4: return renderTagField('hair', 'Hair Presentation', 'Describe style, length, color, and texture.', 'e.g., long wavy raven hair, curtain bangs...');
+      case 5: return renderTagField('face', 'Facial Configuration', 'Detail eye color, shape, makeup, or distinguishing marks.', 'e.g., piercing blue eyes, freckles, soft jawline...');
+      case 6: return renderTagField('body', 'Physique Architecture', 'Set the physical build and proportions.', 'e.g., petite, athletic core, hourglass...');
 
       case 7:
         return (
@@ -364,13 +335,9 @@ const CompanionCreationModal: React.FC<CompanionCreationModalProps> = ({
             </div>
             <h2 className="text-3xl font-light text-white tracking-tight mb-3">Apparel Initialization</h2>
             <p className="text-base text-zinc-400 mb-10 max-w-md">What is their default clothing protocol?</p>
-            
             <textarea
-              name="outfit"
-              value={formData.outfit || ''}
-              onChange={handleChange}
-              placeholder="e.g., Minimalist black turtleneck, techwear jacket, silver necklace..."
-              rows={4}
+              name="outfit" value={formData.outfit || ''} onChange={handleChange}
+              placeholder="e.g., Minimalist black turtleneck, techwear jacket, silver necklace..." rows={4}
               className="w-full bg-white/[0.02] border border-white/10 focus:border-purple-500/50 rounded-3xl px-6 py-5 text-base text-white placeholder-zinc-600 outline-none transition-all resize-none shadow-inner custom-scrollbar"
             />
           </div>
@@ -384,13 +351,9 @@ const CompanionCreationModal: React.FC<CompanionCreationModalProps> = ({
             </div>
             <h2 className="text-3xl font-light text-white tracking-tight mb-3">Cognitive Persona Matrix</h2>
             <p className="text-base text-zinc-400 mb-10 max-w-md">Describe their personality, tone, quirks, and how they should interact with you.</p>
-            
             <textarea
-              name="vibe"
-              value={formData.vibe || ''}
-              onChange={handleChange}
-              placeholder="e.g., Highly intelligent, deeply sarcastic but caring, uses dry humor..."
-              rows={5}
+              name="vibe" value={formData.vibe || ''} onChange={handleChange}
+              placeholder="e.g., Highly intelligent, deeply sarcastic but caring, uses dry humor..." rows={5}
               className="w-full bg-purple-900/5 border border-purple-500/20 focus:border-purple-500/60 rounded-3xl px-6 py-5 text-base text-purple-100 placeholder-purple-900/40 outline-none transition-all resize-none shadow-inner custom-scrollbar"
             />
           </div>
@@ -410,7 +373,6 @@ const CompanionCreationModal: React.FC<CompanionCreationModalProps> = ({
             </div>
             
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-              {/* Image Matrix */}
               <div className="flex flex-col gap-4">
                 <label className="block text-[11px] uppercase tracking-widest font-bold text-zinc-500">Visual Core Preview</label>
                 
@@ -454,27 +416,49 @@ const CompanionCreationModal: React.FC<CompanionCreationModalProps> = ({
                        <Upload className="w-6 h-6 text-zinc-500 mb-2 group-hover:text-white transition-colors" />
                        <span className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold group-hover:text-zinc-300">Manual Photo Override</span>
                     </div>
-                    {/* Display Image Upload Error Here */}
                     {imageError && <p className="text-red-400 text-xs uppercase font-bold text-center animate-pulse">{imageError}</p>}
                   </div>
                 )}
                 {forgeError && <p className="text-red-400 text-xs uppercase mt-2 font-bold text-center">{forgeError}</p>}
               </div>
 
-              {/* Models & LoRAs */}
               <div className="space-y-8 flex flex-col justify-center">
+                
+                {/* 🔴 REPLACED NATIVE SELECT WITH CUSTOM DROPDOWN */}
                 <div>
                   <label className="block text-[11px] uppercase tracking-widest font-bold text-zinc-500 mb-3">Base Generation Architecture</label>
-                  <select
-                    name="runpodModel"
-                    value={formData.runpodModel}
-                    onChange={handleChange}
-                    className="w-full p-5 bg-white/[0.02] border border-white/10 rounded-2xl text-base text-zinc-300 outline-none focus:border-purple-500/50 transition-colors cursor-pointer"
-                  >
-                    {RUNPOD_MODELS.map(m => (
-                      <option key={m.id} value={m.id} className="bg-zinc-900">{m.name}</option>
-                    ))}
-                  </select>
+                  <div className="relative">
+                    <div 
+                      onClick={() => setIsModelDropdownOpen(!isModelDropdownOpen)}
+                      className="w-full p-5 bg-white/[0.02] border border-white/10 rounded-2xl text-base text-zinc-300 outline-none hover:border-purple-500/50 transition-colors cursor-pointer flex items-center justify-between"
+                    >
+                      <span>{RUNPOD_MODELS.find(m => m.id === formData.runpodModel)?.name || 'Select Model...'}</span>
+                      <ChevronDown className={`w-4 h-4 text-zinc-500 transition-transform ${isModelDropdownOpen ? 'rotate-180' : ''}`} />
+                    </div>
+                    
+                    {isModelDropdownOpen && (
+                      <>
+                        <div className="fixed inset-0 z-[110]" onClick={() => setIsModelDropdownOpen(false)} />
+                        <div className="absolute top-full left-0 right-0 mt-2 z-[120] bg-zinc-900 border border-purple-500/20 rounded-xl shadow-[0_0_30px_rgba(0,0,0,0.8)] overflow-hidden">
+                          {RUNPOD_MODELS.map(m => (
+                            <button
+                              key={m.id}
+                              type="button"
+                              onClick={() => {
+                                setFormData(prev => ({ ...prev, runpodModel: m.id }));
+                                setIsModelDropdownOpen(false);
+                              }}
+                              className={`w-full text-left px-4 py-3 text-base transition-colors
+                                ${formData.runpodModel === m.id ? 'bg-purple-600/20 text-purple-300 font-bold' : 'text-zinc-300 hover:bg-white/5 hover:text-white'}
+                              `}
+                            >
+                              {m.name}
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </div>
 
                 <div>
@@ -501,16 +485,45 @@ const CompanionCreationModal: React.FC<CompanionCreationModalProps> = ({
                     )}
                   </div>
 
-                  <select 
-                    onChange={addRunpodLora}
-                    value="none"
-                    className="w-full p-4 bg-purple-500/5 border border-purple-500/20 rounded-2xl text-xs uppercase tracking-widest outline-none focus:border-purple-500/50 text-purple-300 shadow-inner cursor-pointer"
-                  >
-                    <option value="none" className="bg-zinc-900">+ Inject Sub-Matrix (LoRA)...</option>
-                    {LORA_OPTIONS.filter(opt => !(formData.activeRunpodLoras || []).find(l => l.id === opt.id)).map(opt => (
-                      <option key={opt.id} value={opt.id} className="bg-zinc-900">{opt.name}</option>
-                    ))}
-                  </select>
+                  {/* 🔴 REPLACED NATIVE SELECT WITH CUSTOM DROPDOWN */}
+                  <div className="relative">
+                    <div 
+                      onClick={() => setIsLoraDropdownOpen(!isLoraDropdownOpen)}
+                      className="w-full p-4 bg-purple-500/5 border border-purple-500/20 rounded-2xl text-xs uppercase tracking-widest outline-none hover:border-purple-500/50 text-purple-300 shadow-inner cursor-pointer flex items-center justify-between transition-colors"
+                    >
+                      <span>+ Inject Sub-Matrix (LoRA)...</span>
+                      <ChevronDown className={`w-4 h-4 text-purple-500/50 transition-transform ${isLoraDropdownOpen ? 'rotate-180' : ''}`} />
+                    </div>
+
+                    {isLoraDropdownOpen && (
+                      <>
+                        <div className="fixed inset-0 z-[110]" onClick={() => setIsLoraDropdownOpen(false)} />
+                        <div className="absolute bottom-full mb-2 left-0 right-0 z-[120] bg-zinc-900 border border-purple-500/20 rounded-xl shadow-[0_0_30px_rgba(0,0,0,0.8)] max-h-[250px] overflow-y-auto custom-scrollbar">
+                          {LORA_OPTIONS.filter(opt => !(formData.activeRunpodLoras || []).find(l => l.id === opt.id)).map(opt => (
+                            <button
+                              key={opt.id}
+                              type="button"
+                              onClick={() => {
+                                const currentLoras = formData.activeRunpodLoras || [];
+                                setFormData(prev => ({
+                                  ...prev,
+                                  activeRunpodLoras: [...currentLoras, { id: opt.id, name: opt.name, strength: 0.8 }]
+                                }));
+                                setIsLoraDropdownOpen(false);
+                              }}
+                              className="w-full text-left px-4 py-3 text-xs font-mono text-zinc-300 hover:bg-purple-500/20 hover:text-purple-300 transition-colors border-b border-white/5 last:border-0"
+                            >
+                              {opt.name}
+                            </button>
+                          ))}
+                          {LORA_OPTIONS.filter(opt => !(formData.activeRunpodLoras || []).find(l => l.id === opt.id)).length === 0 && (
+                            <div className="p-4 text-xs font-mono text-zinc-500 text-center italic">All LoRAs Active</div>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
+
                 </div>
               </div>
             </div>
@@ -554,7 +567,6 @@ const CompanionCreationModal: React.FC<CompanionCreationModalProps> = ({
   return (
     <div className="relative w-full h-full bg-zinc-950 flex flex-col overflow-hidden animate-in fade-in duration-500">
         
-        {/* NEW STICKY HEADER MATCHING MAIN CHAT AREA */}
         <header 
           className={`fixed top-0 left-0 right-0 z-40 px-6 py-4 border-b border-white/5 bg-zinc-950/80 backdrop-blur-xl flex items-center justify-between transition-transform duration-300 ease-in-out
             ${isDesktopSidebarOpen ? 'lg:left-[280px]' : 'lg:left-0'}
@@ -581,16 +593,13 @@ const CompanionCreationModal: React.FC<CompanionCreationModalProps> = ({
           </div>
         </header>
 
-        {/* Full Page Cinematic Backgrounds */}
         <div className="absolute inset-0 z-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: 'linear-gradient(#a855f7 1px, transparent 1px), linear-gradient(90deg, #a855f7 1px, transparent 1px)', backgroundSize: '40px 40px' }}></div>
         <div className="absolute top-[-20%] right-[-10%] w-[800px] h-[800px] bg-purple-600/10 rounded-full blur-[150px] z-0 pointer-events-none" />
         <div className="absolute bottom-[-20%] left-[-10%] w-[600px] h-[600px] bg-blue-600/5 rounded-full blur-[120px] z-0 pointer-events-none" />
 
         <div className="relative z-10 w-full max-w-5xl mx-auto flex flex-col h-full pt-20">
             
-            {/* Progress Matrix Header */}
             <div className="flex flex-col pt-8 px-8 shrink-0">
-              
               <div className="w-full bg-zinc-900 h-2 rounded-full overflow-hidden">
                 <div 
                   className="h-full bg-gradient-to-r from-purple-700 to-purple-400 transition-all duration-500 ease-out relative"
@@ -605,15 +614,11 @@ const CompanionCreationModal: React.FC<CompanionCreationModalProps> = ({
               </div>
             </div>
             
-            {/* Main Content Area */}
             <div className="flex-1 overflow-y-auto px-8 py-8 custom-scrollbar flex flex-col justify-center">
               {renderStep()}
             </div>
 
-            {/* Footer Navigation */}
             <div className="flex flex-col-reverse sm:flex-row justify-between items-center p-8 shrink-0 border-t border-white/5 gap-4 sm:gap-0 mt-auto">
-                
-                {/* Abort/Cancel Button */}
                 <button 
                   type="button" 
                   onClick={onClose} 
