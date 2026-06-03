@@ -1,136 +1,122 @@
-# 🤖 ARIA ✨ 
-### A Multi-Modal AI Platform for Living Customized Digital Characters
+# 🤖 ARIA ✨
+### The Next-Generation Multi-Modal AI Companion Platform
 
-![ARIA Logo](<img/ARIA-BANNER.png>)
+![ARIA Logo](img/ARIA-BANNER.png)
 
-ARIA is a next-generation **multi-modal AI companion platform** that fuses advanced conversational intelligence with real-time cinematic image generation. Designed with a sleek **Cyber-Noir** aesthetic, ARIA creates immersive digital characters that don’t just respond — they *exist visually*, consistently, and persistently across conversations.
+Welcome to **ARIA**—an experimental, cutting-edge AI platform designed to create living, customized digital characters. By fusing advanced conversational intelligence with real-time cinematic image generation, ARIA characters don't just respond to text; they visually persist and interact within a sleek **Cyber-Noir** environment. 
 
-Built for experimentation, storytelling, and next-level AI companions, ARIA bridges text, memory, and vision into a single coherent system.
-
----
-
-## 🚀 Core Features
-
-- **Multi-Modal Intelligence**  
-  Powered by **Grok-3**, ARIA maintains deep personality consistency, emotional tone, and situational awareness across conversations.
-
-- **Real-Time Visual Synthesis**  
-  A custom **RunPod + ComfyUI** pipeline generates photorealistic, cinematic images dynamically from conversation context.
-
-- **Persistent Character Identity**  
-  Physical traits (age, skin tone, hair, vibe, style) are stored in Firebase and injected into both text and image prompts for exact character continuity.
-
-- **Director’s Notes System**  
-  The AI appends structured visual instructions that seamlessly bridge language and vision without polluting the user-facing dialogue.
-
-- **Smart Memory Engine**  
-  Rolling context windows combined with Firebase-backed message history for long-term conversational coherence.
-
-- **Image Archive Management**  
-  Automatic rotation of generated images with a per-character **“Recent 10”** gallery to control storage usage.
-
-- **Neural Link UI**  
-  High-performance React interface with a futuristic grid aesthetic, fully responsive and iOS safe-area aware.
+Whether you're building next-level AI companions, experimenting with storytelling, or pushing the boundaries of interactive AI, ARIA merges text, vision, and memory into one seamless experience.
 
 ---
 
-## 🎬 Visual-First AI Architecture (“Director’s Notes”)
+## ✨ Core Features
 
-ARIA uses a purpose-built bridge between language and vision.
-
-The system prompt instructs the LLM to append **Director’s Notes** in a structured format:
-
-
-
-Application logic then:
-1. Extracts the visual directive for the image pipeline  
-2. Cleans the response text for the user interface  
-3. Merges the directive with persistent character traits  
-4. Generates a consistent image using a dual-sampling refiner workflow  
-
-This ensures **cinematic consistency without breaking immersion**.
+*   **Multi-Modal Intelligence**: Powered by **Grok-3**, ARIA guarantees situational awareness, emotional depth, and rock-solid personality consistency across conversations.
+*   **Real-Time Visual Synthesis**: Leverages a custom **RunPod + ComfyUI** pipeline to dynamically generate photorealistic, cinematic images based on the conversation's immediate context.
+*   **Persistent Character Identity**: Physical traits (style, vibe, hair, skin tone, age) are securely stored in Firebase and automatically injected into image and text prompts for flawless visual continuity.
+*   **Director’s Notes System**: The AI invisibly appends structured visual instructions bridging vision and language, keeping the user-facing chat perfectly clean and immersive.
+*   **Smart Memory Engine**: Combines rolling context windows with Firebase-backed message history to ensure long-term conversational coherence.
+*   **Image Archive Management**: Automatically rotates generated images, maintaining a per-character “Recent 10” gallery to optimize cloud storage usage.
+*   **Neural Link UI**: A fully responsive, high-performance React interface featuring a futuristic grid aesthetic that is iOS safe-area aware.
 
 ---
 
-## 🖼️ ARIA Interface Preview
+## 🎬 Architecture: The "Director's Notes" Bridge
 
-Visual examples of ARIA in action:
+ARIA achieves cinematic consistency without breaking immersion by using a purpose-built bridge between vision and language. 
 
-![ARIA Dashboard](<img/ARIA-DASHBOARD.png>)
-
----
-
-## 🛠 Technology Stack
-
-- **Frontend**: React 19, TypeScript, Vite  
-- **Styling**: Tailwind CSS  
-- **AI Engine**: Grok-3 (via x.ai API)  
-- **Image Generation**: Stable Diffusion / ComfyUI (RunPod Serverless)  
-- **Backend / BaaS**: Firebase (Auth, Firestore, Storage)  
-- **UI Components**: Radix UI, Lucide React  
+The LLM is instructed via the system prompt to append **Director’s Notes** in a structured format. The application logic then:
+1.  **Extracts** the visual directive tailored for the image pipeline.
+2.  **Cleans** the response text to maintain a natural user interface.
+3.  **Merges** the visual directive with the character's persistent physical traits.
+4.  **Generates** the final image using a dual-sampling refiner workflow.
 
 ---
 
-## 📦 Project Structure
+## 🛠️ Technology Stack
+
+*   **Frontend**: React 19, TypeScript, Vite, Tailwind CSS
+*   **UI Components**: Radix UI, Lucide React
+*   **AI Engine**: Grok-3 (via x.ai API)
+*   **Image Generation**: Stable Diffusion / ComfyUI (via RunPod Serverless)
+*   **Backend & BaaS**: Firebase (Auth, Firestore, Storage)
+*   **Extended Integrations**:
+    *   YouTube API integration[cite: 1].
+    *   Giphy service integration[cite: 1].
+    *   Discord bot capabilities[cite: 1].
+
+---
+
+## 📂 Project Structure
+
 ```text
-
-├── components/        # UI components (Auth, Sidebar, ChatArea)
-│   └── ui/            # Base Radix / Shadcn components
-├── lib/               # Core configuration (Firebase, utilities)
-├── services/          # AI logic (ARIA brain, image generation, memory)
-├── types.ts           # Global TypeScript interfaces
-└── main.tsx           # Application entry point
+├── api/
+│   ├── chat.ts                 # Chat endpoint logic[cite: 1]
+│   ├── generate.ts             # Image generation routing[cite: 1]
+│   ├── spicy-search.ts         # Specialized search capabilities[cite: 1]
+│   ├── vision-caption.ts       # Vision and captioning endpoints[cite: 1]
+│   └── neural-motion/          # Animation and motion endpoints[cite: 1]
+├── components/                 # UI components (Auth, Sidebar, ChatArea, etc.)
+│   └── ui/                     # Base Radix / Shadcn components
+├── lib/                        # Core configuration (Firebase, utils)
+├── services/                   # AI & App logic
+│   ├── discord-bot.ts          # Discord integration service[cite: 1]
+│   ├── firebaseService.ts      # Firebase operations[cite: 1]
+│   ├── generateAriaImage.ts    # Core image generation service[cite: 1]
+│   ├── giphyService.ts         # Giphy API integration[cite: 1]
+│   ├── memoryService.ts        # Rolling context and memory logic[cite: 1]
+│   ├── neuralMotionManager.ts  # Motion and animation management[cite: 1]
+│   └── youtubeService.ts       # YouTube data service[cite: 1]
+├── types.ts                    # Global TypeScript interfaces
+└── main.tsx                    # Application entry point
 
 ```
 ---
 
-## ⚠️ Usage Disclaimer
+## 🚀 Installation & Setup
 
----
 
-ARIA is an experimental AI companion platform.  
-All generated content (text and images) is produced by machine learning models and should be interpreted as **fictional or creative output**.
+1. Clone the repository
 
-Users are responsible for:
-- Ensuring compliance with local laws and platform policies  
-- Managing API usage costs (x.ai, RunPod, Firebase)  
-- Avoiding misuse of generated content  
-
----
-
-## 🛠 Installation
-
----
-
-### 1. Clone the repository
-
-```text
-```bash
-git clone https://github.com/your-username/ARIA-main.git
+Bash
+```
+git clone [https://github.com/your-username/ARIA-main.git](https://github.com/your-username/ARIA-main.git)
 cd ARIA-main
 ```
-
-### 2. Install dependencies:
-
-```text
+2. Install dependencies
+Bash
+```
 npm install
 ```
 
-### 3. Create a .env.local file:
+3. Environment Configuration
+Create a .env.local file in the root directory and add your API keys:
 
-```text
+Code snippet
+```
 VITE_XAI_API_KEY=your_grok_key
 VITE_RUNPOD_API_KEY=your_runpod_key
 VITE_FIREBASE_API_KEY=your_firebase_key
 ```
-
-### 4. Start the development server:
-
-```text
+4. Run the development server
+Bash
+```
 npm run dev
 ```
 ---
 
-*Developed by Mark Antonio Pigome*
+##⚠️ Usage Disclaimer
 
 ---
+ARIA is strictly an experimental AI companion platform. All text and image content is generated by machine learning models and must be interpreted as creative or fictional output.
+
+User Responsibilities:
+
+Ensure full compliance with local laws and platform policies.
+
+Monitor and manage your own API usage costs (x.ai, RunPod, Firebase).
+
+Prevent and avoid any misuse of the generated content.
+
+---
+*Developed by Mark Antonio Pigome*
