@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { CharacterProfile } from '../types';
-import { X, Save, Cpu, Fingerprint, Activity, Loader2, Plus, Box, Camera, Upload, Server } from 'lucide-react';
+import { X, Save, Cpu, Fingerprint, Activity, Loader2, Plus, Box, Camera, Upload, Server, ChevronDown } from 'lucide-react';
 
 export interface ActiveLora { 
   id: string; 
@@ -49,6 +49,10 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({ character
   const [isSaving, setIsSaving] = useState(false);
   const [imageError, setImageError] = useState<string | null>(null);
   const [tagInputs, setTagInputs] = useState({ hair: '', face: '', body: '' });
+
+  // Custom Dropdown States
+  const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
+  const [isLoraDropdownOpen, setIsLoraDropdownOpen] = useState(false);
 
   useEffect(() => {
     const originalStyle = window.getComputedStyle(document.body).overflow;
@@ -121,21 +125,6 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({ character
     };
   };
 
-  const addRunpodLora = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const val = e.target.value;
-    if (val === 'none') return;
-    const opt = LORA_OPTIONS.find(l => l.id === val);
-    const currentLoras = formData.activeRunpodLoras || [];
-    
-    if (opt && !currentLoras.find(l => l.id === val)) {
-      setFormData(prev => ({
-        ...prev,
-        activeRunpodLoras: [...currentLoras, { id: opt.id, name: opt.name, strength: 0.8 }]
-      }));
-    }
-    e.target.value = 'none';
-  };
-
   const updateRunpodLoraStrength = (id: string, strength: number) => {
     setFormData(prev => ({
       ...prev,
@@ -178,19 +167,19 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({ character
       <label className="block text-[10px] uppercase tracking-[0.2em] text-zinc-500 font-bold ml-1">
         {label}
       </label>
-      <div className="flex flex-wrap gap-2 p-5 bg-white/[0.02] border border-white/10 rounded-3xl min-h-[120px] focus-within:border-purple-500/50 transition-all shadow-inner">
-        {(formData[field] as string[] || []).map((tag, idx) => (
+      <div className="flex flex-wrap gap-2 p-3 bg-white/[0.02] border border-white/10 rounded-xl min-h-[52px] focus-within:border-purple-500/50 transition-all">
+        {(formData[field] as string[]).map((tag, idx) => (
           <div 
             key={`${field}-${idx}`} 
-            className="flex items-center gap-1.5 px-4 py-2 bg-purple-500/20 border border-purple-500/40 text-purple-300 text-sm font-bold rounded-xl animate-in zoom-in duration-200"
+            className="flex items-center gap-1.5 px-3 py-1 bg-purple-500/10 border border-purple-500/20 text-purple-400 text-[11px] font-bold rounded-lg animate-in zoom-in duration-200"
           >
             {tag}
             <button 
               type="button" 
               onClick={() => handleRemoveTag(field, tag)}
-              className="hover:text-white transition-colors ml-1"
+              className="hover:text-white transition-colors"
             >
-              <Plus className="w-4 h-4 rotate-45" />
+              <X className="w-3 h-3" />
             </button>
           </div>
         ))}
@@ -199,10 +188,54 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({ character
           value={tagInputs[field]}
           onChange={(e) => setTagInputs(prev => ({ ...prev, [field]: e.target.value }))}
           onKeyDown={(e) => handleTagKeyDown(e, field)}
-          placeholder={(formData[field] as string[] || []).length === 0 ? placeholder : "Type and press Enter..."}
-          className="flex-1 min-w-[200px] bg-transparent text-base text-white placeholder-zinc-600 focus:outline-none py-2"
+          placeholder={(formData[field] as string[]).length === 0 ? placeholder : "Add more..."}
+          className="flex-1 min-w-[120px] bg-transparent text-sm text-white placeholder-zinc-700 focus:outline-none"
         />
+        <button 
+          type="button"
+          onClick={() => handleAddTag(field)}
+          className="p-1 hover:bg-white/5 rounded-md text-zinc-500 transition-colors"
+        >
+          <Plus className="w-4 h-4" />
+        </button>
       </div>
+    </div>
+  );
+
+  const renderInput = (
+    name: keyof CharacterProfile, 
+    label: string, 
+    placeholder: string, 
+    type: 'text' | 'number' | 'textarea' = 'text',
+    isAnchor: boolean = false
+  ) => (
+    <div className="space-y-1.5">
+      <label htmlFor={name} className={`block text-[10px] uppercase tracking-[0.2em] font-bold ml-1 ${isAnchor ? 'text-purple-500' : 'text-zinc-500'}`}>
+        {isAnchor ? `Identity Anchor (${label})` : label}
+      </label>
+      {type === 'textarea' ? (
+        <textarea
+          id={name}
+          name={name}
+          disabled={isSaving}
+          value={formData[name] as string || ''}
+          onChange={handleChange}
+          placeholder={placeholder}
+          rows={3}
+          className="w-full bg-white/[0.02] border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/50 transition-all resize-none custom-scrollbar disabled:opacity-50"
+        />
+      ) : (
+        <input
+          type={type}
+          id={name}
+          name={name}
+          disabled={isSaving}
+          value={formData[name] as string || ''}
+          onChange={handleChange}
+          placeholder={placeholder}
+          className={`w-full bg-white/[0.02] border rounded-xl px-4 py-3 text-sm text-white placeholder-zinc-600 focus:outline-none focus:ring-1 transition-all disabled:opacity-50 ${isAnchor ? 'border-purple-500/40 focus:border-purple-500 focus:ring-purple-500/50 shadow-[0_0_15px_rgba(147,51,234,0.05)]' : 'border-white/10 focus:border-purple-500/50 focus:ring-purple-500/50'}`}
+        />
+      )}
     </div>
   );
 
@@ -242,96 +275,14 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({ character
                 <Fingerprint className="w-4 h-4 text-zinc-500" />
                 <h3 className="text-xs uppercase tracking-widest text-zinc-300 font-bold">Core Identity</h3>
             </div>
-            
-            <div className="space-y-6">
-              {/* Designation Input styled like Anchor */}
-              <div className="space-y-2">
-                <label className="block text-[10px] uppercase tracking-[0.2em] font-bold text-purple-500 ml-1">Identity Anchor (Designation)</label>
-                <input
-                  type="text"
-                  name="name"
-                  value={formData.name || ''}
-                  onChange={handleChange}
-                  placeholder="Unique Interface Name"
-                  disabled={isSaving}
-                  className="w-full bg-black/40 border border-purple-500/30 focus:border-purple-500 rounded-3xl px-6 py-4 text-xl text-white placeholder-zinc-700 outline-none transition-all shadow-[inset_0_0_20px_rgba(147,51,234,0.1)] disabled:opacity-50"
-                />
-              </div>
-
-              {/* Age Input styled */}
-              <div className="space-y-2">
-                <label className="block text-[10px] uppercase tracking-[0.2em] font-bold text-zinc-500 ml-1">Chronological Age (Min. 18)</label>
-                <input
-                  type="number"
-                  name="age"
-                  value={formData.age || ''}
-                  onChange={handleChange}
-                  placeholder="24"
-                  disabled={isSaving}
-                  className="w-full bg-white/[0.02] border border-white/10 focus:border-purple-500/50 rounded-3xl px-6 py-4 text-xl text-white placeholder-zinc-600 outline-none transition-all shadow-inner disabled:opacity-50"
-                />
-                {ageError && <p className="text-red-500 text-[10px] uppercase mt-1 font-bold">{ageError}</p>}
-              </div>
-
-              {/* Styled Gender Grid */}
-              <div className="space-y-2">
-                <label className="block text-[10px] uppercase tracking-[0.2em] font-bold text-zinc-500 ml-1">Biological Blueprint</label>
-                <div className="grid grid-cols-2 gap-3 mb-2">
-                  {['Female', 'Male', 'Non-Binary', 'Transgender'].map(opt => (
-                    <button
-                      key={opt}
-                      type="button"
-                      disabled={isSaving}
-                      onClick={() => setFormData(prev => ({ ...prev, gender: opt.toLowerCase() }))}
-                      className={`p-4 rounded-2xl border transition-all duration-300 flex items-center justify-center font-bold tracking-widest text-xs uppercase disabled:opacity-50
-                        ${formData.gender === opt.toLowerCase() 
-                          ? 'bg-purple-600 border-purple-400 text-white shadow-[0_0_20px_rgba(147,51,234,0.3)]' 
-                          : 'bg-white/5 border-white/10 text-zinc-400 hover:bg-white/10 hover:text-white hover:border-white/20'}`}
-                    >
-                      {opt}
-                    </button>
-                  ))}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {renderInput('name', 'Designation', 'Unique Interface Name', 'text', true)}
+                <div>
+                  {renderInput('age', 'Chronological Age', 'Min. 18', 'number')}
+                  {ageError && <p className="text-red-500 text-[10px] uppercase mt-1 font-bold">{ageError}</p>}
                 </div>
-                <input
-                  type="text"
-                  name="gender"
-                  value={formData.gender || ''}
-                  onChange={handleChange}
-                  disabled={isSaving}
-                  placeholder="Or type a custom protocol..."
-                  className="w-full bg-white/[0.02] border border-white/10 focus:border-purple-500/50 rounded-2xl px-5 py-3 text-sm text-white placeholder-zinc-600 outline-none transition-all disabled:opacity-50"
-                />
-              </div>
-
-              {/* Styled Ethnicity Grid */}
-              <div className="space-y-2">
-                <label className="block text-[10px] uppercase tracking-[0.2em] font-bold text-zinc-500 ml-1">Ethnicity</label>
-                <div className="flex flex-wrap gap-2 mb-2">
-                  {['Asian', 'Latina', 'Caucasian', 'Black', 'Mixed', 'Middle Eastern'].map(opt => (
-                    <button
-                      key={opt}
-                      type="button"
-                      disabled={isSaving}
-                      onClick={() => setFormData(prev => ({ ...prev, ethnicity: opt }))}
-                      className={`px-4 py-2.5 rounded-xl border transition-all duration-300 font-bold tracking-widest text-[10px] uppercase flex-1 min-w-[30%] disabled:opacity-50
-                        ${formData.ethnicity === opt
-                          ? 'bg-purple-600 border-purple-400 text-white shadow-[0_0_15px_rgba(147,51,234,0.3)]' 
-                          : 'bg-white/5 border-white/10 text-zinc-400 hover:bg-white/10 hover:text-white'}`}
-                    >
-                      {opt}
-                    </button>
-                  ))}
-                </div>
-                <input
-                  type="text"
-                  name="ethnicity"
-                  value={formData.ethnicity || ''}
-                  onChange={handleChange}
-                  disabled={isSaving}
-                  placeholder="Or specify exactly..."
-                  className="w-full bg-white/[0.02] border border-white/10 focus:border-purple-500/50 rounded-2xl px-5 py-3 text-sm text-white placeholder-zinc-600 outline-none transition-all disabled:opacity-50"
-                />
-              </div>
+                {renderInput('gender', 'Biological Blueprint', 'female, male, etc.')}
+                {renderInput('ethnicity', 'Ethnicity', 'Latina, Asian, Caucasian, etc.')}
             </div>
           </div>
 
@@ -342,24 +293,13 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({ character
                 <h3 className="text-xs uppercase tracking-widest text-zinc-300 font-bold">Morphological Specs</h3>
             </div>
             
-            <div className="space-y-6">
+            <div className="space-y-4">
                 {renderTagField('hair', 'Hair Detail Configuration', 'blonde, long, wavy')}
                 {renderTagField('face', 'Facial Neural Markers', 'freckles, blue eyes, sharp jawline')}
                 {renderTagField('body', 'Physique Parameters', 'athletic, tall, hourglass')}
-                
-                <div className="space-y-2">
-                  <label className="block text-[10px] uppercase tracking-[0.2em] font-bold text-zinc-500 ml-1">Apparel Protocol</label>
-                  <textarea
-                    name="outfit"
-                    value={formData.outfit || ''}
-                    onChange={handleChange}
-                    disabled={isSaving}
-                    placeholder="Silk dress, oversized sweater, etc."
-                    rows={4}
-                    className="w-full bg-white/[0.02] border border-white/10 focus:border-purple-500/50 rounded-3xl px-6 py-5 text-base text-white placeholder-zinc-600 outline-none transition-all resize-none shadow-inner custom-scrollbar disabled:opacity-50"
-                  />
-                </div>
             </div>
+
+            {renderInput('outfit', 'Apparel Protocol', 'Silk dress, oversized sweater, etc.', 'textarea')}
           </div>
 
           {/* SECTION 3: Imaging Architecture & LoRAs */}
@@ -395,23 +335,48 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({ character
                      <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold group-hover:text-zinc-200">Upload Photo Matrix</span>
                   </div>
                 )}
+                {/* Display Image Upload Error Here */}
                 {imageError && <p className="text-red-400 text-[10px] uppercase font-bold text-center mt-1 animate-pulse">{imageError}</p>}
               </div>
 
               {/* Engine Tuning Architecture */}
               <div className="space-y-4">
+                
+                {/* Custom Model Dropdown */}
                 <div>
                   <label className="block text-[10px] uppercase tracking-[0.2em] font-bold text-zinc-500 mb-2 ml-1">Base Model Core</label>
-                  <select
-                    name="runpodModel"
-                    value={formData.runpodModel}
-                    onChange={handleChange}
-                    className="w-full p-4 bg-white/[0.02] border border-white/10 rounded-2xl text-sm text-zinc-300 outline-none focus:border-purple-500/50 transition-colors cursor-pointer"
-                  >
-                    {RUNPOD_MODELS.map(m => (
-                      <option key={m.id} value={m.id} className="bg-zinc-900">{m.name}</option>
-                    ))}
-                  </select>
+                  <div className="relative">
+                    <div 
+                      onClick={() => setIsModelDropdownOpen(!isModelDropdownOpen)}
+                      className="w-full p-4 bg-white/[0.02] border border-white/10 rounded-2xl text-sm text-zinc-300 outline-none hover:border-purple-500/50 transition-colors cursor-pointer flex items-center justify-between"
+                    >
+                      <span>{RUNPOD_MODELS.find(m => m.id === formData.runpodModel)?.name || 'Select Model...'}</span>
+                      <ChevronDown className={`w-4 h-4 text-zinc-500 transition-transform ${isModelDropdownOpen ? 'rotate-180' : ''}`} />
+                    </div>
+                    
+                    {isModelDropdownOpen && (
+                      <>
+                        <div className="fixed inset-0 z-[110]" onClick={() => setIsModelDropdownOpen(false)} />
+                        <div className="absolute top-full left-0 right-0 mt-2 z-[120] bg-zinc-900 border border-purple-500/20 rounded-xl shadow-[0_0_30px_rgba(0,0,0,0.8)] overflow-hidden">
+                          {RUNPOD_MODELS.map(m => (
+                            <button
+                              key={m.id}
+                              type="button"
+                              onClick={() => {
+                                setFormData(prev => ({ ...prev, runpodModel: m.id }));
+                                setIsModelDropdownOpen(false);
+                              }}
+                              className={`w-full text-left px-4 py-3 text-base transition-colors
+                                ${formData.runpodModel === m.id ? 'bg-purple-600/20 text-purple-300 font-bold' : 'text-zinc-300 hover:bg-white/5 hover:text-white'}
+                              `}
+                            >
+                              {m.name}
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </div>
 
                 <div>
@@ -431,7 +396,7 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({ character
                         />
                         <span className="text-xs font-mono text-zinc-500 w-8 text-right">{lora.strength.toFixed(1)}</span>
                         <button type="button" onClick={() => removeRunpodLora(lora.id)} className="text-zinc-600 hover:text-red-400 p-1.5 transition-colors">
-                          <Plus className="w-4 h-4 rotate-45" />
+                          <X className="w-4 h-4" />
                         </button>
                       </div>
                     ))}
@@ -440,16 +405,45 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({ character
                     )}
                   </div>
 
-                  <select 
-                    onChange={addRunpodLora}
-                    value="none"
-                    className="w-full p-4 bg-purple-500/5 border border-purple-500/20 rounded-2xl text-xs uppercase tracking-widest outline-none focus:border-purple-500/50 text-purple-300 shadow-inner cursor-pointer"
-                  >
-                    <option value="none" className="bg-zinc-900">+ Inject Sub-Matrix (LoRA)...</option>
-                    {LORA_OPTIONS.filter(opt => !(formData.activeRunpodLoras || []).find(l => l.id === opt.id)).map(opt => (
-                      <option key={opt.id} value={opt.id} className="bg-zinc-900">{opt.name}</option>
-                    ))}
-                  </select>
+                  {/* Custom LoRA Dropdown */}
+                  <div className="relative">
+                    <div 
+                      onClick={() => setIsLoraDropdownOpen(!isLoraDropdownOpen)}
+                      className="w-full p-4 bg-purple-500/5 border border-purple-500/20 rounded-2xl text-xs uppercase tracking-widest outline-none hover:border-purple-500/50 text-purple-300 shadow-inner cursor-pointer flex items-center justify-between transition-colors"
+                    >
+                      <span>+ Inject Sub-Matrix (LoRA)...</span>
+                      <ChevronDown className={`w-4 h-4 text-purple-500/50 transition-transform ${isLoraDropdownOpen ? 'rotate-180' : ''}`} />
+                    </div>
+
+                    {isLoraDropdownOpen && (
+                      <>
+                        <div className="fixed inset-0 z-[110]" onClick={() => setIsLoraDropdownOpen(false)} />
+                        <div className="absolute bottom-full mb-2 left-0 right-0 z-[120] bg-zinc-900 border border-purple-500/20 rounded-xl shadow-[0_0_30px_rgba(0,0,0,0.8)] max-h-[250px] overflow-y-auto custom-scrollbar">
+                          {LORA_OPTIONS.filter(opt => !(formData.activeRunpodLoras || []).find(l => l.id === opt.id)).map(opt => (
+                            <button
+                              key={opt.id}
+                              type="button"
+                              onClick={() => {
+                                const currentLoras = formData.activeRunpodLoras || [];
+                                setFormData(prev => ({
+                                  ...prev,
+                                  activeRunpodLoras: [...currentLoras, { id: opt.id, name: opt.name, strength: 0.8 }]
+                                }));
+                                setIsLoraDropdownOpen(false);
+                              }}
+                              className="w-full text-left px-4 py-3 text-xs font-mono text-zinc-300 hover:bg-purple-500/20 hover:text-purple-300 transition-colors border-b border-white/5 last:border-0"
+                            >
+                              {opt.name}
+                            </button>
+                          ))}
+                          {LORA_OPTIONS.filter(opt => !(formData.activeRunpodLoras || []).find(l => l.id === opt.id)).length === 0 && (
+                            <div className="p-4 text-xs font-mono text-zinc-500 text-center italic">All LoRAs Active</div>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
+
                 </div>
               </div>
             </div>
@@ -461,18 +455,8 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({ character
                 <Activity className="w-4 h-4 text-zinc-500" />
                 <h3 className="text-xs uppercase tracking-widest text-zinc-300 font-bold">Behavioral Logic</h3>
             </div>
-            
-            <div className="space-y-2">
-              <label className="block text-[10px] uppercase tracking-[0.2em] font-bold text-zinc-500 ml-1">Personality Matrix</label>
-              <textarea
-                name="vibe"
-                value={formData.vibe || ''}
-                onChange={handleChange}
-                disabled={isSaving}
-                placeholder="Nurturing, playful, elegant..."
-                rows={5}
-                className="w-full bg-purple-900/5 border border-purple-500/20 focus:border-purple-500/60 rounded-3xl px-6 py-5 text-base text-purple-100 placeholder-purple-900/40 outline-none transition-all resize-none shadow-inner custom-scrollbar disabled:opacity-50"
-              />
+            <div className="p-4 bg-purple-500/5 rounded-2xl border border-purple-500/10">
+                {renderInput('vibe', 'Personality Matrix', 'Nurturing, playful, elegant...', 'textarea')}
             </div>
           </div>
           
@@ -481,18 +465,7 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({ character
                 <Camera className="w-4 h-4 text-zinc-500" />
                 <h3 className="text-xs uppercase tracking-widest text-zinc-300 font-bold">Imaging Filters (Negative)</h3>
             </div>
-            <div className="space-y-2">
-              <label className="block text-[10px] uppercase tracking-[0.2em] font-bold text-zinc-500 ml-1">Exclusion Parameters</label>
-              <textarea
-                name="negativePrompt"
-                value={formData.negativePrompt || ''}
-                onChange={handleChange}
-                disabled={isSaving}
-                placeholder="Glasses, hats, structural anomalies..."
-                rows={4}
-                className="w-full bg-white/[0.02] border border-white/10 focus:border-purple-500/50 rounded-3xl px-6 py-5 text-base text-white placeholder-zinc-600 outline-none transition-all resize-none shadow-inner custom-scrollbar disabled:opacity-50"
-              />
-            </div>
+            {renderInput('negativePrompt', 'Exclusion Parameters', 'Glasses, hats, structural anomalies...', 'textarea')}
           </div>
         </form>
 
