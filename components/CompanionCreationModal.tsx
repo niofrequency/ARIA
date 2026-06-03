@@ -424,13 +424,13 @@ const CompanionCreationModal: React.FC<CompanionCreationModalProps> = ({
 
               <div className="space-y-8 flex flex-col justify-center">
                 
-                {/* 🔴 REPLACED NATIVE SELECT WITH CUSTOM DROPDOWN */}
+                {/* Custom Model Dropdown */}
                 <div>
                   <label className="block text-[11px] uppercase tracking-widest font-bold text-zinc-500 mb-3">Base Generation Architecture</label>
                   <div className="relative">
                     <div 
                       onClick={() => setIsModelDropdownOpen(!isModelDropdownOpen)}
-                      className="w-full p-5 bg-white/[0.02] border border-white/10 rounded-2xl text-base text-zinc-300 outline-none hover:border-purple-500/50 transition-colors cursor-pointer flex items-center justify-between"
+                      className="w-full p-4 bg-white/[0.02] border border-white/10 rounded-2xl text-sm text-zinc-300 outline-none hover:border-purple-500/50 transition-colors cursor-pointer flex items-center justify-between shadow-inner"
                     >
                       <span>{RUNPOD_MODELS.find(m => m.id === formData.runpodModel)?.name || 'Select Model...'}</span>
                       <ChevronDown className={`w-4 h-4 text-zinc-500 transition-transform ${isModelDropdownOpen ? 'rotate-180' : ''}`} />
@@ -448,7 +448,7 @@ const CompanionCreationModal: React.FC<CompanionCreationModalProps> = ({
                                 setFormData(prev => ({ ...prev, runpodModel: m.id }));
                                 setIsModelDropdownOpen(false);
                               }}
-                              className={`w-full text-left px-4 py-3 text-base transition-colors
+                              className={`w-full text-left px-4 py-3 text-sm transition-colors
                                 ${formData.runpodModel === m.id ? 'bg-purple-600/20 text-purple-300 font-bold' : 'text-zinc-300 hover:bg-white/5 hover:text-white'}
                               `}
                             >
@@ -485,7 +485,7 @@ const CompanionCreationModal: React.FC<CompanionCreationModalProps> = ({
                     )}
                   </div>
 
-                  {/* 🔴 REPLACED NATIVE SELECT WITH CUSTOM DROPDOWN */}
+                  {/* Custom LoRA Dropdown */}
                   <div className="relative">
                     <div 
                       onClick={() => setIsLoraDropdownOpen(!isLoraDropdownOpen)}
