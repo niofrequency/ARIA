@@ -30,7 +30,7 @@ const LORA_OPTIONS = [
   { id: "IR_BJ.safetensors", name: "IR_BJ" }, { id: "JIB_SKIN.safetensors", name: "JIB_SKIN" },
   { id: "NRDX_LIGHTING.safetensors", name: "NRDX_LIGHTING" }, { id: "ALCAITIFF.safetensors", name: "ALCAITIFF" },
   { id: "NATURALSKIN.safetensors", name: "NATURALSKIN" },
-
+];
 
 
 const TOTAL_STEPS = 10;
