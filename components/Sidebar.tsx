@@ -64,7 +64,7 @@ interface SidebarProps {
   conversations: Conversation[]; 
   onSelectConversation: (conversationId: string) => void; 
   onDeleteConversation: (botId: string, conversationId: string) => void;
-  onDeleteBot: (botId: string) => void; 
+  onDeleteBot: (botId: string) => Promise<void> | void; // Updated to allow async awaiting
   onSignOut: () => void;
   theme: 'dark' | 'light';
   onToggleTheme: () => void;
@@ -93,6 +93,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   
   const [searchQuery, setSearchQuery] = useState('');
   const [botToDelete, setBotToDelete] = useState<{ id: string; name: string } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false); // New state to manage loading bar
 
   const handleMobileAction = useCallback((action: () => void) => {
     action();
@@ -122,7 +123,7 @@ return (
       {/* Desktop Layout Spacer (Pushes main content naturally) */}
       <div className={`hidden lg:block shrink-0 transition-all duration-300 ease-in-out ${isDesktopSidebarOpen ? 'w-[280px]' : 'w-0'}`} />
 
-      {/* Custom Delete Confirmation Modal */}
+      {/* Custom Delete Confirmation Modal with Loading Bar */}
       {botToDelete && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
           <div className="bg-zinc-900 border border-white/10 rounded-2xl p-6 max-w-sm w-full shadow-2xl flex flex-col gap-4 animate-in fade-in zoom-in duration-200">
@@ -133,24 +134,40 @@ return (
             <p className="text-zinc-400 text-sm">
               Are you sure you want to permanently delete <span className="text-purple-400 font-bold">{botToDelete.name}</span>? This neural link cannot be restored.
             </p>
-            <div className="flex justify-end gap-3 mt-4">
-              <button 
-                onClick={() => setBotToDelete(null)}
-                className="px-4 py-2 rounded-xl text-zinc-300 hover:text-white hover:bg-white/5 transition-all text-sm font-medium"
-              >
-                Cancel
-              </button>
-              <button 
-                onClick={() => {
-                  if (window.innerWidth < 1024) onCloseMobileSidebar();
-                  onDeleteBot(botToDelete.id);
-                  setBotToDelete(null);
-                }}
-                className="px-4 py-2 rounded-xl bg-red-500/20 border border-red-500/30 text-red-400 hover:bg-red-500 hover:text-white transition-all text-sm font-medium"
-              >
-                Confirm Delete
-              </button>
-            </div>
+            
+            {/* Conditional Rendering: Buttons or Loading Bar */}
+            {isDeleting ? (
+              <div className="mt-4 flex flex-col gap-3">
+                <div className="flex justify-between items-center text-xs text-red-400 font-bold uppercase tracking-widest">
+                  <span>Purging Neural Link...</span>
+                  <span className="animate-pulse">Processing</span>
+                </div>
+                <div className="w-full h-1.5 bg-red-950 rounded-full overflow-hidden">
+                  <div className="h-full bg-red-500 rounded-full w-full animate-pulse shadow-[0_0_10px_rgba(239,68,68,0.8)]"></div>
+                </div>
+              </div>
+            ) : (
+              <div className="flex justify-end gap-3 mt-4">
+                <button 
+                  onClick={() => setBotToDelete(null)}
+                  className="px-4 py-2 rounded-xl text-zinc-300 hover:text-white hover:bg-white/5 transition-all text-sm font-medium"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={async () => {
+                    setIsDeleting(true);
+                    if (window.innerWidth < 1024) onCloseMobileSidebar();
+                    await onDeleteBot(botToDelete.id);
+                    setIsDeleting(false);
+                    setBotToDelete(null);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-red-500/20 border border-red-500/30 text-red-400 hover:bg-red-500 hover:text-white transition-all text-sm font-medium"
+                >
+                  Confirm Delete
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
