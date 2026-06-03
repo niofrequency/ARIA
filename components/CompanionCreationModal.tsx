@@ -116,6 +116,7 @@ const CompanionCreationModal: React.FC<CompanionCreationModalProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [isForging, setIsForging] = useState(false);
   const [forgeError, setForgeError] = useState<string | null>(null);
+  const [imageError, setImageError] = useState<string | null>(null); // Added state for manual upload limit
   const [tagInputs, setTagInputs] = useState({ hair: '', face: '', body: '' });
 
   // Escape key always goes back/cancels. (Removed body scroll lock as it's a full page now)
@@ -163,6 +164,14 @@ const CompanionCreationModal: React.FC<CompanionCreationModalProps> = ({
 
   const handleImageProcess = (file: File) => {
     if (!file.type.startsWith('image/')) return;
+    
+    // Validate image size (4.5 MB limit)
+    if (file.size > 4.5 * 1024 * 1024) {
+      setImageError("Images must be lesser or equal to 4.5 MB image size for the input image.");
+      return;
+    }
+    setImageError(null); // Clear error if file size is valid
+
     const reader = new FileReader();
     reader.readAsDataURL(file);
     reader.onload = () => {
@@ -498,6 +507,8 @@ const CompanionCreationModal: React.FC<CompanionCreationModalProps> = ({
                        <Upload className="w-6 h-6 text-zinc-500 mb-2 group-hover:text-white transition-colors" />
                        <span className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold group-hover:text-zinc-300">Manual Photo Override</span>
                     </div>
+                    {/* Display Image Upload Error Here */}
+                    {imageError && <p className="text-red-400 text-xs uppercase font-bold text-center animate-pulse">{imageError}</p>}
                   </div>
                 )}
                 {forgeError && <p className="text-red-400 text-xs uppercase mt-2 font-bold text-center">{forgeError}</p>}
