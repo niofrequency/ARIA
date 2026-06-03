@@ -646,7 +646,7 @@ const CompanionCreationModal: React.FC<CompanionCreationModalProps> = ({
                       onClick={handleNext}
                       className="px-10 py-4 rounded-2xl bg-white text-black text-sm uppercase tracking-widest font-bold hover:bg-zinc-200 transition-all flex items-center gap-2 flex-1 sm:flex-none justify-center"
                     >
-                      Next Phase <ArrowRight className="w-5 h-5" />
+                      Next <ArrowRight className="w-5 h-5" />
                     </button>
                   ) : (
                     <button 
