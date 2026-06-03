@@ -3,62 +3,37 @@ import React, { useState, useEffect } from 'react';
 // Store progress globally so it doesn't reset to 0 if the component unmounts and remounts 
 // between different route transitions (e.g. from App.tsx to ChatDashboard.tsx)
 let globalProgress = 0;
-let globalHasCompleted = false;
 
 const LoadingScreen = ({ isReady }: { isReady?: boolean }) => {
   const [progress, setProgress] = useState(globalProgress);
-  const [isVisible, setIsVisible] = useState(!globalHasCompleted);
 
   useEffect(() => {
-    // If we've already loaded the app previously, don't show the screen again
-    if (globalHasCompleted) {
-      setIsVisible(false);
-      return;
-    }
-
     const interval = setInterval(() => {
       setProgress((prev) => {
         let next = prev;
 
         // If isReady is explicitly true, zip to 100 quickly
         if (isReady) {
-          next = prev + 15;
+          next += 15;
         } else {
           // Simulate realistic, non-linear loading crawl
-          if (prev < 30) next = prev + (Math.random() * 8 + 2);
-          else if (prev < 70) next = prev + (Math.random() * 4 + 1);
-          else if (prev < 95) next = prev + (Math.random() * 1.5 + 0.1);
-          else next = 95; // Hold at 95% until ready flag is passed or fallback triggers
+          if (prev < 40) next += (Math.random() * 5 + 2);
+          else if (prev < 80) next += (Math.random() * 3 + 1);
+          else if (prev < 99) next += (Math.random() * 1 + 0.1);
+          else next = 99; // Hold safely at 99% until the parent component unmounts it
         }
 
-        if (next >= 100) {
-          next = 100;
-          clearInterval(interval);
-          globalHasCompleted = true;
-          setTimeout(() => setIsVisible(false), 800);
-        }
+        // Cap at 100 and ensure it never goes backwards
+        next = Math.min(100, next);
+        if (next < globalProgress) next = globalProgress;
 
-        globalProgress = Math.min(100, Math.round(next));
+        globalProgress = Math.round(next);
         return globalProgress;
       });
-    }, 40);
+    }, 50);
 
     return () => clearInterval(interval);
   }, [isReady]);
-
-  // Safety Fallback: If no isReady flag is ever passed and it hangs at 95%, force it to finish
-  useEffect(() => {
-    if (progress >= 95 && isReady === undefined && !globalHasCompleted) {
-      const timeout = setTimeout(() => {
-        setProgress(100);
-        globalProgress = 100;
-        globalHasCompleted = true;
-        setTimeout(() => setIsVisible(false), 800);
-      }, 1500); // Wait 1.5s at 95% then auto-complete gracefully
-      
-      return () => clearTimeout(timeout);
-    }
-  }, [progress, isReady]);
 
   const getStatusText = () => {
     if (progress >= 100) return "SYSTEM ONLINE";
@@ -68,10 +43,12 @@ const LoadingScreen = ({ isReady }: { isReady?: boolean }) => {
     return "INITIALIZING ARIA PROTOCOL";
   };
 
-  if (!isVisible) return null;
-
   return (
-    <div className="fixed inset-0 z-[999] bg-[#050507] flex flex-col items-center justify-center overflow-hidden">
+    <div 
+      className={`fixed inset-0 z-[999] bg-[#050507] flex flex-col items-center justify-center overflow-hidden transition-opacity duration-500 ${
+        progress >= 100 && isReady ? 'opacity-0 pointer-events-none' : 'opacity-100'
+      }`}
+    >
       {/* Subtle animated grid background */}
       <div
         className="absolute inset-0 opacity-10"
