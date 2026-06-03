@@ -12,34 +12,47 @@ const LoadingScreen = ({ isReady }: { isReady?: boolean }) => {
       setProgress((prev) => {
         let next = prev;
 
-        // If isReady is explicitly true, zip to 100 quickly
         if (isReady) {
-          next += 15;
+          // The app is fully loaded. Accelerate rapidly to 100% smoothly.
+          next += (100 - prev) * 0.15 + 2; 
         } else {
-          // Simulate realistic, non-linear loading crawl
-          if (prev < 40) next += (Math.random() * 5 + 2);
-          else if (prev < 80) next += (Math.random() * 3 + 1);
-          else if (prev < 99) next += (Math.random() * 1 + 0.1);
-          else next = 99; // Hold safely at 99% until the parent component unmounts it
+          // Asymptotic loading curve: 
+          // Moves fast initially, then slows down dramatically as it nears 99%.
+          // This perfectly masks the exact wait time without ever getting completely stuck.
+          const distance = 99 - prev;
+          
+          if (prev < 60) {
+            next += Math.random() * 2 + 1; // Fast early loading
+          } else if (prev < 85) {
+            next += Math.random() * 0.8 + 0.2; // Mid-phase
+          } else {
+            next += distance * 0.015; // Infinitesimal crawl (Zeno's paradox)
+          }
+          
+          if (next > 99.5) next = 99.5; // Safe decimal cap while waiting
         }
 
         // Cap at 100 and ensure it never goes backwards
         next = Math.min(100, next);
         if (next < globalProgress) next = globalProgress;
 
-        globalProgress = Math.round(next);
+        globalProgress = next;
         return globalProgress;
       });
-    }, 50);
+    }, 30); // Faster tick rate for butter-smooth CSS animation
 
     return () => clearInterval(interval);
   }, [isReady]);
 
+  // Use Math.floor so the UI text shows whole numbers, 
+  // but keep the actual progress state as a float for smooth CSS bar width scaling.
+  const displayProgress = Math.floor(progress);
+
   const getStatusText = () => {
-    if (progress >= 100) return "SYSTEM ONLINE";
-    if (progress >= 85) return "ESTABLISHING NEURAL LINK";
-    if (progress > 60) return "SYNCING BIO-SIGNATURE";
-    if (progress > 35) return "LOADING QUANTUM CORE";
+    if (displayProgress >= 100) return "SYSTEM ONLINE";
+    if (displayProgress >= 85) return "ESTABLISHING NEURAL LINK";
+    if (displayProgress > 60) return "SYNCING BIO-SIGNATURE";
+    if (displayProgress > 35) return "LOADING QUANTUM CORE";
     return "INITIALIZING ARIA PROTOCOL";
   };
 
@@ -87,10 +100,10 @@ const LoadingScreen = ({ isReady }: { isReady?: boolean }) => {
             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-purple-500/30 to-transparent" />
           </div>
 
-          {/* Progress Fill (Absolute positioning ensures it overlays correctly on the track) */}
+          {/* Progress Fill (Uses the exact float progress for sub-pixel smooth width) */}
           <div
-            className="absolute top-0 left-0 h-px bg-gradient-to-r from-purple-400 via-purple-500 to-purple-400 transition-all duration-200 ease-out"
-            style={{ width: `${Math.min(100, progress)}%` }}
+            className="absolute top-0 left-0 h-px bg-gradient-to-r from-purple-400 via-purple-500 to-purple-400 transition-all duration-75 ease-linear"
+            style={{ width: `${progress}%` }}
           >
             {/* Shine effect */}
             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent animate-[shine_1.5s_linear_infinite]" />
@@ -102,10 +115,10 @@ const LoadingScreen = ({ isReady }: { isReady?: boolean }) => {
             <div className="flex items-center gap-1">
               <span
                 className={`font-light text-5xl transition-all duration-300 text-white ${
-                  progress >= 100 ? 'tracking-normal text-purple-300' : ''
+                  displayProgress >= 100 ? 'tracking-normal text-purple-300' : ''
                 }`}
               >
-                {Math.min(100, progress)}
+                {Math.min(100, displayProgress)}
               </span>
               <span className="text-purple-400/70 text-2xl font-light -translate-y-1">%</span>
             </div>
@@ -116,7 +129,7 @@ const LoadingScreen = ({ isReady }: { isReady?: boolean }) => {
         <div className="mt-12 h-7 flex items-center">
           <p
             className={`text-[10px] font-mono uppercase tracking-[0.35em] transition-all duration-500 ${
-              progress >= 100
+              displayProgress >= 100
                 ? 'text-white drop-shadow-[0_0_8px_rgba(168,85,247,0.9)]'
                 : 'text-zinc-500'
             }`}
