@@ -119,4 +119,4 @@ Monitor and manage your own API usage costs (x.ai, RunPod, Firebase).
 Prevent and avoid any misuse of the generated content.
 
 ---
-*Developed by Mark Antonio Pigome*
+*Developed by niofrequency*
