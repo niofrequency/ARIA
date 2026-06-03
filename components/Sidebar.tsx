@@ -64,13 +64,13 @@ interface SidebarProps {
   conversations: Conversation[]; 
   onSelectConversation: (conversationId: string) => void; 
   onDeleteConversation: (botId: string, conversationId: string) => void;
-  onDeleteBot: (botId: string) => Promise<void> | void; // Updated to allow async awaiting
+  onDeleteBot: (botId: string) => Promise<void> | void; 
   onSignOut: () => void;
   theme: 'dark' | 'light';
   onToggleTheme: () => void;
   isMobileSidebarOpen: boolean;
   onCloseMobileSidebar: () => void;
-  onToggleMobileSidebar?: () => void; // Kept in interface to prevent ChatDashboard type errors
+  onToggleMobileSidebar?: () => void; 
   isDesktopSidebarOpen: boolean;
   onToggleDesktopSidebar: () => void;
   activeView: ViewState;
@@ -93,7 +93,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   
   const [searchQuery, setSearchQuery] = useState('');
   const [botToDelete, setBotToDelete] = useState<{ id: string; name: string } | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false); // New state to manage loading bar
+  const [isDeleting, setIsDeleting] = useState(false); 
 
   const handleMobileAction = useCallback((action: () => void) => {
     action();
@@ -216,8 +216,9 @@ return (
         </div>
 
         {/* MAIN NAVIGATION (Hidden when actively chatting) */}
+        {/* ADDED: animate-in slide-in-from-left-8 fade-in */}
         {activeView !== 'chat' && (
-          <nav className="relative z-10 flex flex-col gap-1.5 p-4 border-b border-white/5">
+          <nav className="relative z-10 flex flex-col gap-1.5 p-4 border-b border-white/5 animate-in slide-in-from-left-8 fade-in duration-300 ease-out">
             <button 
               onClick={() => handleMobileAction(() => setActiveView('discover'))}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${activeView === 'discover' ? 'bg-white/10 text-white font-bold shadow-inner' : 'text-zinc-400 hover:bg-white/5 hover:text-white font-medium'}`}
@@ -247,8 +248,9 @@ return (
         )}
 
         {/* NEURAL PROFILES (Only visible when actively chatting) */}
+        {/* ADDED: animate-in slide-in-from-right-8 fade-in */}
         {activeView === 'chat' ? (
-          <section className="relative z-10 flex-1 px-4 overflow-hidden flex flex-col mt-4">
+          <section className="relative z-10 flex-1 px-4 overflow-hidden flex flex-col mt-4 animate-in slide-in-from-right-8 fade-in duration-300 ease-out">
             
             {/* BACK BUTTON */}
             <button
