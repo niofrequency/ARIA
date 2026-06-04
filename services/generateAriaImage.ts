@@ -1,6 +1,6 @@
 import { CharacterProfile, VisualState } from "../types";
 import { retrieveMemories } from "./memoryService";
- 
+  
 /**
  * ARIA VISUAL STATE PARSER - CONTEXT FLEXIBLE
  */
