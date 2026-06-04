@@ -809,11 +809,10 @@ export const generateAriaImage = async (
 
     const isFirstImage = !visualState || (!visualState.lastVisualDescription && !visualState.pose) || (visualState.lastVisualDescription === "current moment" && !visualState.pose);
     
-    // --- ✅ QWEN POSE/CLOTHING INSTRUCTIONS INJECTED ---
-    let poseInstruction = "(completely new dynamic pose:1.5), (fresh natural stance:1.55), (different body posture from reference:1.6), (varied angle:1.4)";
-    
-    if (sceneLower.includes("lay") || sceneLower.includes("bed")) {
-        poseInstruction = "(laying on bed:1.5), (on back:1.4), (moaning while laying down:1.45)";
+    // --- STRONGER POSE + SCENE LOGIC ---
+    let poseInstruction = "(completely new dynamic pose:1.55), (fresh natural stance:1.5), (different body posture from reference:1.65), (varied angle:1.45)";
+    if (sceneLower.includes("lay") || sceneLower.includes("bed") || sceneLower.includes("closer look")) {
+        poseInstruction = "(laying on bed on her back:1.6), (moaning while laying down:1.55), (legs slightly spread:1.3), (making eye contact:1.45)";
     } else if (!isFirstImage && visualState?.pose) {
         poseInstruction = `(doing action: ${visualState.pose}:1.55)`;
     }
@@ -835,6 +834,16 @@ export const generateAriaImage = async (
       "masterpiece, high quality, realistic",
       "unfiltered raw candid cinematic photo, extremely detailed skin texture, photorealistic, natural subsurface scattering, film grain, dslr look, 8k uhd"
     ].filter(Boolean).join(", ").replace(/\s+/g, " ").trim();
+
+    // === FORCE FRAMING OVERRIDE (Critical) ===
+    let finalPromptText = promptText;
+    if (userWantsFace && userWantsTits) {
+        // Override any "extreme closeup portrait" with chest-up shot
+        finalPromptText = finalPromptText
+            .replace(/extreme closeup portrait[^,]+/i, "medium closeup from chest up showing face and tits")
+            .replace(/extreme closeup[^,]+/i, "medium closeup from chest up");
+        finalPromptText += ", tits out, breasts fully visible, topless, laying on bed";
+    }
 
     const negativeText = [
       safetyNegatives,
@@ -861,7 +870,7 @@ export const generateAriaImage = async (
     }
     
     console.log(`🧠 Using Qwen Rapid Image Edit Workflow (${runpodModel}) with ${customLoras.length} LoRAs`);
-    console.log("📝 [RunPod Qwen Prompt]:", promptText);
+    console.log("📝 [RunPod Qwen Prompt]:", finalPromptText);
     console.log("🚫 [RunPod Qwen Negative]:", negativeText);
 
     workflow["5"] = { "inputs": { "ckpt_name": runpodModel }, "class_type": "CheckpointLoaderSimple" };
@@ -899,7 +908,7 @@ export const generateAriaImage = async (
     workflow["88"] = { "inputs": { "pixels": ["93", 0], "vae": ["5", 2] }, "class_type": "VAEEncode" };
     
     workflow["110"] = { "inputs": { "prompt": negativeText, "clip": [lastClipNodeId, lastClipOutputIndex], "vae": ["5", 2], "image1": ["93", 0] }, "class_type": "TextEncodeQwenImageEditPlus" };
-    workflow["111"] = { "inputs": { "prompt": promptText, "clip": [lastClipNodeId, lastClipOutputIndex], "vae": ["5", 2], "image1": ["93", 0] }, "class_type": "TextEncodeQwenImageEditPlus" };
+    workflow["111"] = { "inputs": { "prompt": finalPromptText, "clip": [lastClipNodeId, lastClipOutputIndex], "vae": ["5", 2], "image1": ["93", 0] }, "class_type": "TextEncodeQwenImageEditPlus" };
     
     workflow["3"] = {
       "inputs": {
@@ -921,7 +930,7 @@ export const generateAriaImage = async (
 
     workflow["200"] = { "inputs": { "pixels": ["8", 0], "vae": ["100", 2] }, "class_type": "VAEEncode" };
 
-    workflow["202"] = { "inputs": { "text": "masterpiece, best quality, ultra detailed, highly realistic, biglust style, " + promptText, "clip": ["100", 1] }, "class_type": "CLIPTextEncode" };
+    workflow["202"] = { "inputs": { "text": "masterpiece, best quality, ultra detailed, highly realistic, biglust style, " + finalPromptText, "clip": ["100", 1] }, "class_type": "CLIPTextEncode" };
     workflow["203"] = { "inputs": { "text": negativeText, "clip": ["100", 1] }, "class_type": "CLIPTextEncode" };
 
     workflow["201"] = {
@@ -975,6 +984,16 @@ export const generateAriaImage = async (
       "unfiltered raw candid cinematic photo, extremely detailed skin texture, photorealistic, natural subsurface scattering, film grain, dslr look, 8k uhd"
     ].filter(Boolean).join(", ").replace(/\s+/g, " ").trim();
 
+    // === FORCE FRAMING OVERRIDE (Critical) ===
+    let finalPromptText = promptText;
+    if (userWantsFace && userWantsTits) {
+        // Override any "extreme closeup portrait" with chest-up shot
+        finalPromptText = finalPromptText
+            .replace(/extreme closeup portrait[^,]+/i, "medium closeup from chest up showing face and tits")
+            .replace(/extreme closeup[^,]+/i, "medium closeup from chest up");
+        finalPromptText += ", tits out, breasts fully visible, topless, laying on bed";
+    }
+
     const negativeText = [
       safetyNegatives,
       genderExclusion,
@@ -987,7 +1006,7 @@ export const generateAriaImage = async (
       "low quality, blurry, bad anatomy, deformed, extra limbs, mutated hands, missing limbs, floating limbs, disconnected limbs, mutated fingers, fused fingers, messy background, incoherent scene"
     ].filter(Boolean).join(", ");
     
-    console.log("📝 [RunPod BigLust Prompt]:", promptText);
+    console.log("📝 [RunPod BigLust Prompt]:", finalPromptText);
     console.log("🚫 [RunPod BigLust Negative]:", negativeText);
 
     workflow = {
@@ -1013,7 +1032,7 @@ export const generateAriaImage = async (
       };
     }
 
-    workflow["6"] = { "inputs": { "text": promptText, "clip": clipSource }, "class_type": "CLIPTextEncode" };
+    workflow["6"] = { "inputs": { "text": finalPromptText, "clip": clipSource }, "class_type": "CLIPTextEncode" };
     workflow["7"] = { "inputs": { "text": negativeText, "clip": clipSource }, "class_type": "CLIPTextEncode" };
 
     workflow["10"] = {
