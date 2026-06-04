@@ -847,8 +847,7 @@ export const generateAriaImage = async (
       "beauty filter, over-smoothed, heavy retouch, instagram filter",
       "cartoon, anime, 3d render, illustration, painting",
       "low quality, blurry, bad anatomy, deformed, extra limbs, mutated hands, missing limbs, floating limbs, disconnected limbs, mutated fingers, fused fingers, messy background, incoherent scene",
-      "replicated structure, mirroring original file composition, duplicate layout, frozen pose anchor",
-      "replicated pose from reference, same pose as input image, frozen posture, identical composition, copied layout, exact same angle as reference"
+
     ].filter(Boolean).join(", ");
     
     const runpodModel = character.runpodModel || "Qwen-Rapid-AIO-NSFW-v23.safetensors";
