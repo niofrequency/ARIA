@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ChatMessage from './ChatMessage';
-import { Message, CharacterProfile, UserData, VisualState } from '../types';
-// ✅ FIXED IMPORTS: Everything now comes from generateAriaImage
-import { generateAriaResponse, extractContextPrompt, updateVisualState, generateAriaImage } from '../services/generateAriaImage'; 
+import { Message, CharacterProfile, UserData } from '../types';
+import { generateAriaResponse, extractContextPrompt } from '../services/ariaService'; 
+import { generateAriaImage } from '../services/generateAriaImage'; 
 import { initiateNeuralMotion, pollNeuralMotionStatus } from '../services/neuralMotionService';
 import { uploadImageToStorage, deleteMediaFromStorage } from '../services/firebaseService';
 import { Loader2, X, Download, Menu, Settings, Cpu, ArrowUp, PanelLeft } from 'lucide-react';
@@ -43,9 +43,6 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
   setIsLoading
 }) => {
   const [input, setInput] = useState('');
-  
-  // ✅ NEW: Track the visual state across the conversation
-  const [currentVisualState, setCurrentVisualState] = useState<VisualState | undefined>(undefined);
   
   const [selectedMedia, setSelectedMedia] = useState<{ url: string; type: 'image' | 'video' | 'embed' | 'youtube' } | null>(null);
   
@@ -107,8 +104,7 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
       const oldImageUrl = message.imageUrl;
       const oldVideoUrl = message.videoUrl;
 
-      // Note: Regeneration doesn't pass new visual state intentionally to just remake the last prompt
-      const tempImageUrl = await generateAriaImage(message.text || "", lookAnchor, character, currentVisualState);
+      const tempImageUrl = await generateAriaImage(message.text || "", lookAnchor, character);
       
       if (tempImageUrl) {
         if (oldImageUrl && oldImageUrl.startsWith('http')) deleteMediaFromStorage(oldImageUrl);
@@ -210,7 +206,8 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
     }
   };
 
-  /**
+  
+/**
    * CORE INTERACTION: HANDLE SEND
    */
   const handleSend = async () => {
@@ -242,39 +239,12 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
         };
       });
 
-      // ✅ CALL BRAIN PROXY
-      const rawResponse = await generateAriaResponse(userText, history, character, userData?.uid, botId, currentVisualState);
+      // Call Brain Proxy
+      const rawResponse = await generateAriaResponse(userText, history, character, userData?.uid, botId);
       
-      // Safety check: ensure rawResponse is stringified if it came back as an object from the backend
-      const responseString = typeof rawResponse === 'string' ? rawResponse : (rawResponse?.content || rawResponse?.text || JSON.stringify(rawResponse));
-
       // Extract Context
-      let { cleanText, contextPrompt, memoryText, gifSearchTerm, youtubeSearchTerm, spicySearchTerm } = extractContextPrompt(responseString);
+      let { cleanText, contextPrompt, memoryText, gifSearchTerm, youtubeSearchTerm, spicySearchTerm } = extractContextPrompt(rawResponse);
       
-      // 🚨 CRITICAL FIX: Aggressive Failsafe Check for Visual Tags
-      // If the extractor missed it, manually hunt for [[VISUAL: ...]] or [SCENE_IMAGE: ...]
-      if (!contextPrompt) {
-          const visualRegex = /\[\[VISUAL:\s*([\s\S]*?)\s*\]\]/i;
-          const sceneRegex = /\[SCENE_IMAGE:\s*([\s\S]*?)\]/i;
-          
-          let match = cleanText.match(visualRegex) || responseString.match(visualRegex);
-          if (match) {
-              contextPrompt = match[1].trim();
-              cleanText = cleanText.replace(visualRegex, '').trim();
-          } else {
-              match = cleanText.match(sceneRegex) || responseString.match(sceneRegex);
-              if (match) {
-                  contextPrompt = match[1].trim();
-                  cleanText = cleanText.replace(sceneRegex, '').trim();
-              }
-          }
-          
-          // Final fallback if backend stripped it into aria_meta
-          if (!contextPrompt && typeof rawResponse === 'object' && (rawResponse as any)?.aria_meta?.has_visual) {
-              contextPrompt = (rawResponse as any).aria_meta.visual_description;
-          }
-      }
-
       if (memoryText && userData?.uid) {
         storeMemory(memoryText, userData.uid, botId);
       }
@@ -300,9 +270,10 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
       }
 
       // 3. CHECK: SPICY CONTENT (Adult)
+      // Double check regex just in case ariaService didn't catch it
       if (!spicySearchTerm) {
         const spicyRegex = /[\[\{]{2}\s*SPICY\s*:\s*([\s\S]*?)\s*[\]\}]{2}/i;
-        const spicyMatch = cleanText.match(spicyRegex) || responseString.match(spicyRegex);
+        const spicyMatch = cleanText.match(spicyRegex) || rawResponse.match(spicyRegex);
         if (spicyMatch) {
             spicySearchTerm = spicyMatch[1].trim();
             cleanText = cleanText.replace(spicyRegex, '').trim(); 
@@ -316,8 +287,9 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
           } catch(e) { console.error("Spicy search failed", e); }
       }
 
-      // ✅ FIX: "The Standoff"
+      // ✅ CRITICAL FIX: "The Standoff"
       // Only set isImageLoading to TRUE if we have a prompt AND we did NOT find a video/gif.
+      // This prevents the infinite "Imaging Protocol" loader when sending links.
       const shouldGenerateImage = !!contextPrompt && !finalVideoUrl && !finalImageUrl;
 
       // 4. SEND BOT RESPONSE
@@ -327,7 +299,7 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
           text: cleanText,
           imageUrl: finalImageUrl,
           videoUrl: finalVideoUrl,
-          isImageLoading: shouldGenerateImage, 
+          isImageLoading: shouldGenerateImage, // ✅ Uses the corrected flag
           timestamp: Date.now()
       });
 
@@ -335,13 +307,7 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
       if (shouldGenerateImage) {
         try {
           const promptToUse = contextPrompt || userText;
-
-          // ✅ UPDATE THE VISUAL STATE FIRST
-          const newVisualState = updateVisualState(currentVisualState, promptToUse);
-          setCurrentVisualState(newVisualState);
-
-          // ✅ PASS THE NEW STATE TO THE GENERATOR
-          const tempImageUrl = await generateAriaImage(promptToUse, userText, character, newVisualState);
+          const tempImageUrl = await generateAriaImage(promptToUse, userText, character);
           
           if (tempImageUrl) {
             onUpdateMessage(responseMessageId, { 
@@ -380,7 +346,7 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
     }
   };
 
-  // ✅ Download Media (Safety Check for Embeds)
+  // ✅ UPDATED: Download Media (Safety Check for Embeds)
   const downloadMedia = async (url: string, type: string) => {
     if (isDownloading) return;
     
@@ -414,6 +380,7 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
   };
 
   return (
+    // ✅ FIX: Changed lg:ml-[300px] to lg:ml-[280px] to match the exact width of the sidebar
     <div className={`relative flex flex-col h-[100dvh] flex-1 bg-zinc-950 overflow-hidden transition-all duration-300 ease-in-out ${isDesktopSidebarOpen ? 'lg:ml-0' : 'lg:ml-0'}`}>
       
       {/* Background Matrix */}
@@ -422,6 +389,7 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
       </div>
 
       <header 
+        // ✅ FIX: Changed lg:left-[300px] to lg:left-[280px] to match the exact width of the sidebar
         className={`fixed top-0 left-0 right-0 z-40 px-6 py-4 border-b border-white/5 bg-zinc-950/80 backdrop-blur-xl flex items-center justify-between transition-transform duration-300 ease-in-out
           ${showHeader ? 'translate-y-0' : '-translate-y-full'}
           ${isDesktopSidebarOpen ? 'lg:left-[280px]' : 'lg:left-0'}
@@ -471,6 +439,7 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
                 key={msg.id} 
                 message={msg} 
                 characterName={character.name} 
+                // ✅ UPDATED: Pass type as 'any' to accept new types
                 onMediaClick={(url, type) => setSelectedMedia({ url, type: type as any })}
                 onAnimateRequest={() => handleAnimateRequest(msg)}
                 onRegenerateImage={() => handleRegenerateImage(msg)}
@@ -483,6 +452,7 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
 
       {/* INPUT AREA */}
       <footer 
+        // ✅ FIX: Changed lg:left-[300px] to lg:left-[280px] to match the exact width of the sidebar
         className={`fixed bottom-0 left-0 right-0 z-50 p-4 md:p-6 bg-gradient-to-t from-zinc-950 via-zinc-950 to-transparent
           ${isDesktopSidebarOpen ? 'lg:left-[280px]' : 'lg:left-0'}
         `}
@@ -513,7 +483,7 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
         </div>
       </footer>
 
-      {/* MEDIA MODAL */}
+      {/* ✅ UPDATED MEDIA MODAL (HANDLES EMBEDS & YOUTUBE) */}
       {selectedMedia && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/95 backdrop-blur-md p-4" onClick={() => setSelectedMedia(null)}>
           <div className="relative max-w-6xl w-full flex flex-col items-center" onClick={(e) => e.stopPropagation()}>
