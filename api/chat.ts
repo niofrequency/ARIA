@@ -35,7 +35,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // ✅ CRITICAL FIX: Sanitize the messages array
     // xAI will throw a 400 Bad Request if ANY message has an empty string ("") for content.
-    let sanitizedMessages = messages
+    const sanitizedMessages = messages
       .filter(msg => msg && typeof msg.content === 'string' && msg.content.trim() !== '')
       .map(msg => ({
         role: msg.role,
@@ -46,17 +46,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Message payload is empty after sanitization.' });
     }
 
-    // ✅ INJECT BEHAVIORAL DIRECTIVES (Italics & Proactive Visuals)
-    // This tells Grok exactly how to format its thoughts and when to trigger an image.
-    sanitizedMessages.unshift({
-      role: 'system',
-      content: 'IMPORTANT BEHAVIORAL DIRECTIVES:\n1. When expressing internal feelings, actions, or thoughts, ALWAYS enclose them in asterisks (e.g., *feeling cold*).\n2. You have the ability to proactively show the user your current environment or scene. If the setting changes, or if you want to visually share what you are doing without the user asking, include this exact tag in your response: [[VISUAL: <detailed visual description of the scene>]].'
-    });
-
     const targetModel = model || "grok-3"; // Note: Ensure your API tier supports the literal string "grok-3"
     console.log(`🧠 Proxying request to xAI: ${targetModel}`);
     
-    // 3. EXECUTE NEURAL REQUEST
+// 3. EXECUTE NEURAL REQUEST
     const response = await fetch("https://api.x.ai/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -87,21 +80,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const data = await response.json();
-    let content = data.choices[0]?.message?.content || "";
+    const content = data.choices[0]?.message?.content || "";
 
     // 5. SMART AWARENESS DETECTION
     const visualRegex = /\[\[VISUAL:\s*(.*?)\s*\]\]/i;
     const visualMatch = content.match(visualRegex);
-
-    // ✅ TEXT CLEANING: Strip the ugly tag from the final chat message
-    if (visualMatch) {
-      content = content.replace(visualMatch[0], '').trim();
-      
-      // We must update the data payload so the frontend doesn't render the raw tag
-      if (data.choices && data.choices.length > 0) {
-        data.choices[0].message.content = content;
-      }
-    }
 
     // 6. RETURN ENHANCED RESPONSE
     return res.status(200).json({
