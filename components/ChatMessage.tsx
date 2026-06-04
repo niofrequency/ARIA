@@ -367,14 +367,4 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
   );
 };
 
-export default React.memo(ChatMessage, (prevProps, nextProps) => {
-  return (
-    prevProps.message.id === nextProps.message.id &&
-    prevProps.message.text === nextProps.message.text &&
-    prevProps.message.imageUrl === nextProps.message.imageUrl &&
-    prevProps.message.videoUrl === nextProps.message.videoUrl &&
-    prevProps.message.isImageLoading === nextProps.message.isImageLoading &&
-    prevProps.message.isVideoLoading === nextProps.message.isVideoLoading &&
-    prevProps.characterName === nextProps.characterName
-  );
-});
+export default ChatMessage;
