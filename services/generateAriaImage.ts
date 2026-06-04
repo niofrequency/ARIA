@@ -2,7 +2,7 @@ import { CharacterProfile, VisualState } from "../types";
 import { retrieveMemories } from "./memoryService";
   
 /**
- * ARIA VISUAL STATE PARSER - CONTEXT FLEXIBLE
+ * ARIA VISUAL STATE PARSER - CONTEXT FLEXIBLE 
  */
 export const buildVisualAwarenessJson = (visualDescription: string): any => {
   const desc = (visualDescription || "").toLowerCase();
