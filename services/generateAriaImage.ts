@@ -394,6 +394,7 @@ STRICT OPERATING RULES:
  * Now with Long-Term Vector Memory Recall, Visual Summarization, and Current Visual State Injection
  */
 // ✅ FIX 2: Added currentVisualState parameter
+// ✅ FIX 3 (CRITICAL): Changed return type to Promise<any> so MainChatArea can read aria_meta
 export const generateAriaResponse = async (
   prompt: string,
   history: any[], 
@@ -401,7 +402,7 @@ export const generateAriaResponse = async (
   userId?: string, 
   botId?: string,
   currentVisualState?: VisualState
-): Promise<string> => {
+): Promise<any> => {
   try {
     let memoryContext = "";
     
@@ -433,7 +434,7 @@ export const generateAriaResponse = async (
     const visualSummary = visualHistory.length > 0 ? 
       `\n### RECENT VISUAL CONTEXT (LAST 8)\n${visualHistory.map(m => m.text || m.content).join("\n→ ")}\n` : "";
 
-    // ✅ FIX 3: Inject Current State so Grok knows exactly what physical pose to continue from
+    // ✅ FIX 4: Inject Current State so Grok knows exactly what physical pose to continue from
     const stateContext = currentVisualState ? `
     ### CURRENT PHYSICAL STATE (CRITICAL)
     You are currently wearing: ${currentVisualState.clothing}.
@@ -470,13 +471,18 @@ export const generateAriaResponse = async (
     }
 
     const data = await response.json();
-    const content = data.choices[0]?.message?.content;
     
-    return content ? content.trim() : "I'm lost in thought... 💕";
+    // ✅ CRITICAL DATA PRESERVATION: Extract text, but RETURN THE FULL OBJECT so we don't lose aria_meta!
+    const content = data.choices?.[0]?.message?.content || data.content || "";
+    
+    return {
+      content: content ? content.trim() : "I'm lost in thought... 💕",
+      aria_meta: data.aria_meta // ⬅️ THIS is what MainChatArea.tsx needs to trigger the image!
+    };
 
   } catch (err: any) {
     console.error("❌ AI Service Error:", err);
-    return "I'm having a little trouble connecting... check your connection? 💕";
+    return { content: "I'm having a little trouble connecting... check your connection? 💕" };
   }
 };
 
