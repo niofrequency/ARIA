@@ -10,7 +10,7 @@ export const buildVisualAwarenessJson = (visualDescription: string): any => {
   const clothingMatch = desc.match(/wearing\s+([^,|]+)/i) ||
                         desc.match(/(naked|topless|bottomless|lingerie|bra|panties|dress|outfit)/i);
   const locationMatch = desc.match(/(bedroom|bathroom|kitchen|living room|balcony|hotel|shower|beach|office)/i);
-  const poseMatch = desc.match(/(sitting|standing|lying|kneeling|bent over|legs spread|on all fours|selfie|looking at camera|leaning|squatting|arching|crawling|laying|resting|posing|straddling|riding|bending|stretching|reaching|looking back|over shoulder)/i);
+  const poseMatch = desc.match(/(sitting|standing|lying|kneeling|bent over|legs spread|on all fours|selfie|looking at camera)/i);
 
   const fluids: string[] = [];
   if (desc.includes('sweat') || desc.includes('sweaty')) fluids.push('sweaty');
@@ -18,6 +18,8 @@ export const buildVisualAwarenessJson = (visualDescription: string): any => {
   if (desc.includes('wet') || desc.includes('arousal') || desc.includes('dripping')) fluids.push('wet');
   if (desc.includes('oil') || desc.includes('oiled')) fluids.push('oiled');
 
+  // We set these to null if no regex matches. This allows updateVisualState 
+  // to dynamically look at the character context or previous history.
   const visualState: Partial<VisualState> = {
     lastVisualDescription: visualDescription || "current moment",
     clothing: clothingMatch ? clothingMatch[0] : null,            
@@ -31,7 +33,7 @@ export const buildVisualAwarenessJson = (visualDescription: string): any => {
   return {
     role: 'system',
     content: `[VISUAL_STATE_SYNC]: ${JSON.stringify(visualState, null, 2)}\nMaintain perfect continuity using this exact state for the next response.`,
-    visualState
+    visualState   // ← helpful to return it
   };
 };
 
@@ -49,7 +51,7 @@ const extractLocation = (desc: string) => {
 };
 
 const extractPose = (desc: string) => {
-  const match = desc.match(/(sitting|standing|lying|kneeling|bent over|legs spread|on all fours|selfie|looking at camera|leaning|squatting|arching|crawling|laying|resting|posing|straddling|riding|bending|stretching|reaching|looking back|over shoulder)/i);
+  const match = desc.match(/(sitting|standing|lying|kneeling|bent over|legs spread|on all fours|selfie|looking at camera)/i);
   return match ? match[0] : null;
 };
 
@@ -69,6 +71,7 @@ const calculateArousal = (desc: string, current: number) => {
   return current;
 };
 
+// ✅ FIX 1: Prevent defaults from overwriting valid state (Now Context Flexible)
 export const updateVisualState = (
   currentState: VisualState | undefined, 
   newVisualDesc: string, 
@@ -78,6 +81,7 @@ export const updateVisualState = (
   const newParsedState = (parsed as any).visualState || {};
   const descLower = (newVisualDesc || "").toLowerCase();
   
+  // 1. DYNAMIC CLOTHING DETERMINATION
   let resolvedClothing = currentState?.clothing || newParsedState.clothing;
   if (!resolvedClothing) {
     if (descLower.includes("naked") || descLower.includes("nude") || descLower.includes("undressed")) {
@@ -89,6 +93,7 @@ export const updateVisualState = (
     }
   }
 
+  // 2. DYNAMIC LOCATION DETERMINATION
   let resolvedLocation = currentState?.location || newParsedState.location;
   if (!resolvedLocation) {
     if (descLower.includes("bed") || descLower.includes("sleep") || descLower.includes("wake up")) {
@@ -98,10 +103,11 @@ export const updateVisualState = (
     } else if (descLower.includes("outside") || descLower.includes("sun") || descLower.includes("beach")) {
       resolvedLocation = "outdoors";
     } else {
-      resolvedLocation = "candid setting"; 
+      resolvedLocation = "candid setting"; // Entirely flexible backdrop
     }
   }
 
+  // 3. DYNAMIC POSE DETERMINATION
   let resolvedPose = currentState?.pose || newParsedState.pose;
   if (!resolvedPose) {
     if (descLower.includes("selfie") || descLower.includes("photo") || descLower.includes("pic")) {
@@ -109,7 +115,7 @@ export const updateVisualState = (
     } else if (descLower.includes("laying") || descLower.includes("lying") || descLower.includes("bed")) {
       resolvedPose = "relaxing comfortably";
     } else {
-      resolvedPose = "natural candid posture"; 
+      resolvedPose = "natural candid posture"; // Completely leaves it up to Grok's system instructions
     }
   }
 
@@ -124,7 +130,13 @@ export const updateVisualState = (
   };
 };
 
+/**
+ * EXTRACT CONTEXT PROMPT
+ * Parses the AI response to separate chat text from Visual tags, Memory tags, GIFs, Links, and YouTube.
+ * Includes Hallucination Patch and Emoji Sanitization.
+ */
 export const extractContextPrompt = (text: string) => {
+  // 1. Define Regex Patterns
   const visualRegex = /[\[\{]{2}\s*VISUAL\s*:\s*([\s\S]*?)\s*[\]\}]{2}/i;
   const memoryRegex = /[\[\{]{2}\s*MEMORY\s*:\s*([\s\S]*?)\s*[\]\}]{2}/i;
   const gifRegex = /[\[\{]{2}\s*GIF\s*:\s*([\s\S]*?)\s*[\]\}]{2}/i;
@@ -132,6 +144,7 @@ export const extractContextPrompt = (text: string) => {
   const youtubeRegex = /[\[\{]{2}\s*YOUTUBE\s*:\s*([\s\S]*?)\s*[\]\}]{2}/i;
   const spicyRegex = /[\[\{]{2}\s*SPICY\s*:\s*([\s\S]*?)\s*[\]\}]{2}/i;
 
+  // 2. Extract Data
   const visualMatch = text.match(visualRegex);
   let contextPrompt = visualMatch ? visualMatch[1].trim() : null;
 
@@ -147,19 +160,22 @@ export const extractContextPrompt = (text: string) => {
   const linkMatch = text.match(linkRegex);
   const externalLink = linkMatch ? linkMatch[1].trim() : null;
 
+  // ✅ Extract Spicy Term
   const spicyMatch = text.match(spicyRegex);
   const spicySearchTerm = spicyMatch ? spicyMatch[1].trim() : null;
 
+  // 3. Clean the UI text (Remove ALL tags in one go)
   let cleanText = text
     .replace(visualRegex, '')
     .replace(memoryRegex, '')
     .replace(gifRegex, '')
     .replace(youtubeRegex, '')
     .replace(linkRegex, '')
-    .replace(spicyRegex, '') 
-    .replace(/\*\s*sends\s+.*?\*/gi, '') 
+    .replace(spicyRegex, '') // ✅ Remove Spicy Tag
+    .replace(/\*\s*sends\s+.*?\*/gi, '') // Removes "*sends giggle emoji*"
     .trim();
 
+  // ✅ HALLUCINATION PATCH (IMPROVED)
   if (!contextPrompt && !gifSearchTerm && !externalLink && !youtubeSearchTerm && !spicySearchTerm) {
       const implicitTriggers = [
         "check this out", "look at this", "can you see", "look at me", "see this", "view",
@@ -175,11 +191,13 @@ export const extractContextPrompt = (text: string) => {
       }
   }
 
+  // 4. Emoji Sanitization for RunPod
   if (contextPrompt) {
     contextPrompt = contextPrompt.replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '');
     contextPrompt = contextPrompt.replace(/\s+/g, ' ').trim();
   }
 
+  // 5. Safety cleanup for malformed tags
   if (cleanText.includes('[[VISUAL:') || cleanText.includes('{{visual:')) {
     cleanText = cleanText.split(/[\[\{]{2}VISUAL/i)[0].trim();
   }
@@ -190,11 +208,14 @@ export const extractContextPrompt = (text: string) => {
     memoryText,
     gifSearchTerm,
     youtubeSearchTerm,
-    spicySearchTerm,
+    spicySearchTerm, // ✅ Return this new field
     externalLink
   };
 };
 
+/**
+ * BUILD SYSTEM INSTRUCTION
+ */
 const buildSystemInstruction = (character: CharacterProfile): string => {
   const { name, age, gender, ethnicity, body, hair, vibe, outfit } = character;
   
@@ -202,6 +223,7 @@ const buildSystemInstruction = (character: CharacterProfile): string => {
   const bodyDesc = body.length > 0 ? body.join(", ") : "not specified";
   const faceDesc = character.face.length > 0 ? character.face.join(", ") : "standard features";
 
+  // Dynamic Outfit Logic for the LLM Brain
   const isInputOutfit = outfit?.toLowerCase().includes('input') || outfit?.toLowerCase().includes('reference') || outfit?.toLowerCase().includes('same as');
   const outfitInstruction = isInputOutfit 
     ? "Assume you are wearing the exact clothes shown in your reference profile image. Do not invent new clothing." 
@@ -367,6 +389,11 @@ STRICT OPERATING RULES:
 `.trim().replace(/\s+/g, ' ');
 };
 
+/**
+ * GENERATE AI RESPONSE
+ * Now with Long-Term Vector Memory Recall, Visual Summarization, and Current Visual State Injection
+ */
+// ✅ FIX 2: Added currentVisualState parameter
 export const generateAriaResponse = async (
   prompt: string,
   history: any[], 
@@ -395,16 +422,18 @@ export const generateAriaResponse = async (
       }
     }
 
+    // 🧠 NEW: Visual History Summarization to prevent context drift
     const visualHistory = history
       .filter(m => {
           const text = m.text || m.content || "";
           return text.includes('[[VISUAL') || (m.role === 'system' && text.includes('VISUAL_STATE'));
       })
-      .slice(-8); 
+      .slice(-8); // Collect the last 8 visual events
       
     const visualSummary = visualHistory.length > 0 ? 
       `\n### RECENT VISUAL CONTEXT (LAST 8)\n${visualHistory.map(m => m.text || m.content).join("\n→ ")}\n` : "";
 
+    // ✅ FIX 3: Inject Current State so Grok knows exactly what physical pose to continue from
     const stateContext = currentVisualState ? `
     ### CURRENT PHYSICAL STATE (CRITICAL)
     You are currently wearing: ${currentVisualState.clothing}.
@@ -538,10 +567,19 @@ const LORA_MAP: Record<string, string> = {
   "xochitl-v1": "xochitl-v1"
 };
 
+/**
+ * ==========================================
+ * NEW: VISION BRIDGE CAPTIONING LOGIC
+ * ==========================================
+ * This helper calls an endpoint to generate a text description
+ * of the character's reference image so Biglust can "see" it.
+ */
 const getVisualDescription = async (base64Image: string): Promise<string> => {
   try {
     if (!base64Image) return "";
     
+    // You will need to create this endpoint (`/api/vision-caption`)
+    // It should use GPT-4o, Grok Vision, or LLaVA to return a short descriptive string.
     const response = await fetch('/api/vision-caption', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -558,19 +596,25 @@ const getVisualDescription = async (base64Image: string): Promise<string> => {
   }
 };
 
+/**
+ * GENERATE ARIA IMAGE - REFINED
+ * Now accepts VisualState object to prevent context drift
+ */
 export const generateAriaImage = async (
   contextPrompt: string | null,
   userPrompt: string,
   character: any,
-  visualState?: VisualState,
-  recentHistorySummary?: string 
+  visualState?: VisualState,         // ✅ NEW
+  recentHistorySummary?: string       // ✅ NEW
 ): Promise<string | null> => {
 
   let enhancedPrompt = contextPrompt || "";
 
+  // === DYNAMIC BOT CUSTOMIZATION & CLOTHING LOGIC ===
   let targetClothing = visualState?.clothing || '';
   const profileOutfit = character.outfit ? character.outfit.toLowerCase() : "";
   
+  // If chat parser didn't specify a clothing change (or it's the generic fallback), check the Bot Profile outfit settings
   if (!targetClothing || targetClothing === 'casual outfit') {
       if (profileOutfit.includes('input') || profileOutfit.includes('reference') || profileOutfit.includes('same as')) {
           targetClothing = "wearing exact same original outfit as the reference image";
@@ -581,6 +625,7 @@ export const generateAriaImage = async (
       }
   }
 
+  // === STRONGER PERSISTENT STATE INJECTION ===
   if (visualState) {
     const statePrefix = [
       targetClothing,
@@ -590,18 +635,24 @@ export const generateAriaImage = async (
     ].filter(Boolean).join(', ');
     enhancedPrompt = `${statePrefix}, ${enhancedPrompt || 'current moment'}`;
   } else if (!enhancedPrompt) {
+    // CRITICAL FIRST MESSAGE POSE LOCK FIX
     const stateFallbackPose = visualState?.pose ? `doing action: ${visualState.pose}` : "candid look, fresh dynamic natural pose, looking at camera";
     enhancedPrompt = `${targetClothing}, ${stateFallbackPose}`;
   }
 
+  // Force strong continuity
   enhancedPrompt = `${character.name}, ${character.ethnicity}, ${enhancedPrompt}, consistent appearance, same girl, continuing from previous scene`;
 
   if (recentHistorySummary) {
     enhancedPrompt += ` ${recentHistorySummary}`;
   }
 
+  // Cleanup
   enhancedPrompt = enhancedPrompt.replace(/^[\s,]+|[\s,]+$/g, '').replace(/,\s*,/g, ', ');
 
+  // === THE FIX IS HERE ===
+  // We completely remove userPrompt from this string.
+  // Grok already extracted the visual requirements into the context prompt!
   const rawCombined = `${enhancedPrompt}`.trim();
   const baseDescription = rawCombined;
 
@@ -612,6 +663,7 @@ export const generateAriaImage = async (
 
   const sceneLower = baseDescription.toLowerCase();
 
+  // --- 1. LORA DETECTION (Determine Identity BEFORE Model Choice) ---
   let activeLoraFile = "";
   let activeWeight = 0.88;
 
@@ -648,6 +700,9 @@ export const generateAriaImage = async (
     }
   }
 
+  // ==========================================
+  // VISION BRIDGE INJECTION (AVAILABLE FOR BOTH)
+  // ==========================================
   let visualContext = "";
   if (character.avatarImage) {
     console.log("👁️ Extracting visual context from reference image...");
@@ -657,15 +712,24 @@ export const generateAriaImage = async (
     }
   }
 
+  // ==================== SMART MODEL DECISION ====================
+  // If the user is using the input image, always use Qwen with the Biglust refiner to prevent switching back and forth.
   const useQwen = !!character.avatarImage;
   
   console.log(`🎯 Model Decision → ${useQwen ? '🔵 Qwen AIO NSFW (Image to Image Refiner)' : '🔴 Biglust (Text to Image)'}`);
 
+  // --- 2. SITUATIONAL ANALYSIS ---
+  const isFaceFocus = sceneLower.includes("face") || sceneLower.includes("selfie") || (sceneLower.includes("closeup") && !sceneLower.match(/pussy|ass|butt|rear|boobs|tits|nipples|clit|vulva|anus|feet|toes|armpit|extreme closeup.*(body|lower|intimate)/i));
+  const isUpperBody = /upper body|waist up|chest up|bust shot|shoulders|arms|torso|midriff/i.test(sceneLower);
+  const isLowerBody = /lower body|thighs|legs|feet|waist down|ass|butt|rear|backside|behind|hips|crotch|pussy/i.test(sceneLower);
+  const isPartFocus = /hands|fingers|feet|toes|skin texture|extreme closeup|armpit|underarm|navel|nails|details/i.test(sceneLower);
   const isHorizontal = /landscape|horizontal|wide shot|panoramic/i.test(sceneLower);
 
   const imgWidth = isHorizontal ? 1500 : 1024;
   const imgHeight = isHorizontal ? 1024 : 1500;
 
+  // --- 3. DYNAMIC TAG ORCHESTRATION ---
+  // Ensure profile traits are always passed to the prompt generator
   const hairTags = character.hair?.length > 0 ? `${character.hair.join(", ")} hair` : "";
   const faceTags = character.face?.join(", ") || "";
    
@@ -705,27 +769,12 @@ export const generateAriaImage = async (
     if ((s.includes("frontview") || s.includes("backview") || s.includes("sideview") || s.includes("profile") || s.includes("from above") || s.includes("from below") || s.includes("high angle") || s.includes("low angle") || s.includes("overhead") || s.includes("birdseye") || s.includes("wormseye")) && 
         (t.includes("front") || t.includes("back") || t.includes("side") || t.includes("rear") || t.includes("profile") || t.includes("bottom view") || t.includes("top view"))) return true;
 
-    const userWantsFace = sceneLower.includes("face") ||
-                          sceneLower.includes("moan") ||
-                          sceneLower.includes("looking") ||
-                          sceneLower.includes("eyes");
-    const userWantsTits = sceneLower.includes("tits") ||
-                          sceneLower.includes("boobs") ||
-                          sceneLower.includes("cleavage") ||
-                          sceneLower.includes("chest");
-    const userWantsPussy = sceneLower.includes("pussy") ||
-                           sceneLower.includes("vulva") ||
-                           sceneLower.includes("crotch") ||
-                           sceneLower.includes("ass") ||
-                           sceneLower.includes("butt");
-
-    if (!userWantsFace && !userWantsTits && !userWantsPussy) {
+    if (!isFaceFocus && !sceneLower.match(/pussy|ass|butt|rear|boobs|tits|nipples|clit|vulva|anus|feet|toes|armpit|extreme closeup.*(body|lower|intimate)/i) && !isLowerBody) {
         const safeTagRegex = /petite|curvy|thick|slim|skinny|tall|short|slender|thin|athletic|fit|toned|muscular|chubby|voluptuous|freckles|pale|tan|dark|skin|bosom|bust|breast|hips|ass|butt|hairy|armpit/i;
         
         if (safeTagRegex.test(t)) return true;
         return false;
       }
-      return true; // fallback to include matched tag if relevant requests were found
   });
 
   const bodyTags = filteredBodyTags.join(", ");
@@ -733,33 +782,23 @@ export const generateAriaImage = async (
   const baseTag = character.gender?.toLowerCase() === 'male' ? '1boy' : '1girl';
   const botIdentity = `solo, ${baseTag}, ${character.name}, a ${character.age}-year-old ${character.gender}`;
 
-  // === IMPROVED SITUATIONAL TAGS LOGIC ===
-  const userWantsFace = sceneLower.includes("face") ||
-                        sceneLower.includes("moan") ||
-                        sceneLower.includes("moaning") ||
-                        sceneLower.includes("looking") ||
-                        sceneLower.includes("eyes");
-  const userWantsTits = sceneLower.includes("tits") ||
-                        sceneLower.includes("boobs") ||
-                        sceneLower.includes("cleavage") ||
-                        sceneLower.includes("chest") ||
-                        sceneLower.includes("topless");
-  const userWantsPussy = sceneLower.includes("pussy") ||
-                         sceneLower.includes("vulva");
-
   let situationalTags: string[] = [];
-  if (userWantsFace && userWantsTits) {
-      situationalTags = [`medium closeup from chest up showing face and tits of ${botIdentity}, tits out, topless, moaning expression, half-lidded eyes, looking at viewer, breasts visible`, character.ethnicity, faceTags, hairTags, bodyTags];
-  } else if (userWantsFace) {
-      situationalTags = [`extreme closeup portrait of ${botIdentity}, moaning, half-lidded eyes looking at viewer`, character.ethnicity, faceTags, hairTags, bodyTags];
-  } else if (userWantsPussy && !userWantsFace) {
-      situationalTags = [`detailed faceless extreme closeup on pussy only, tight crop excluding face`, character.ethnicity, bodyTags];
-  } else if (userWantsTits) {
-      situationalTags = [`closeup on tits, cleavage, topless`, character.ethnicity, bodyTags];
+
+  if (isFaceFocus && isLowerBody) {
+    situationalTags = [`medium shot showing face and lower body of ${botIdentity}`, character.ethnicity, faceTags, hairTags, bodyTags];
+  } else if (isFaceFocus) {
+    situationalTags = [`extreme closeup portrait of ${botIdentity}`, character.ethnicity, faceTags, hairTags, bodyTags];
+  } else if (isLowerBody || sceneLower.match(/pussy|ass|butt|rear|boobs|tits|nipples|clit|vulva|anus|feet|toes|armpit|extreme closeup.*(body|lower|intimate)/i)) {
+  situationalTags = [`detailed faceless extreme closeup on pussy only, tight crop excluding mouth and face completely, pussy focus only`, character.ethnicity, bodyTags];
+  } else if (isPartFocus) {
+    situationalTags = [`macro detailed focus on ${character.name}'s body part`, character.ethnicity, bodyTags];
+  } else if (isPartFocus || isUpperBody) {
+    situationalTags = [`waist-up shot of ${botIdentity}`, character.ethnicity, faceTags, hairTags, bodyTags];
   } else {
-      situationalTags = [`raw candid photo of ${botIdentity}`, character.ethnicity, bodyTags, hairTags, faceTags];
+    situationalTags = [`raw candid photo of ${botIdentity}`, character.ethnicity, bodyTags, hairTags, faceTags];
   }
 
+  // --- 4. NEURAL CONTEXT SYNC ---
   const actionTriggers = ["nude", "naked", "sex", "intimate", "undressing", "exposed", "touching", "pussy", "vagina", "penis", "dick"];
   const hasExplicitIntent = actionTriggers.some(t => sceneLower.includes(t));
 
@@ -790,43 +829,30 @@ export const generateAriaImage = async (
   console.log(`🚀 Dispatching Neural Sync: ${character.name}`);
   console.log(`🛡️ Safety Mode: ${bypassSafety ? "OFF (Bypass Active)" : "ON (Forcing Clothes)"}`);
 
+  // --- 5. DYNAMIC WORKFLOW ORCHESTRATION ---
   let workflow: any = {};
   let imagesPayload: any = undefined;
-
-  // --- ANTI-CLASH LOGIC ---
-  const isSameOutfit = targetClothing.includes('same as') || targetClothing.includes('input') || targetClothing.includes('reference');
-  const isSameLocation = !visualState?.location || visualState.location === 'candid setting';
-  const isSamePose = !visualState?.pose || visualState.pose.includes('candid') || visualState.pose.includes('natural');
-  
-  let contextWeight = 1.1;
-  if (!isSameOutfit || !isSameLocation || !isSamePose) {
-      contextWeight = 0.45; 
-  }
 
   // BRANCH A: Qwen FaceID Workflow
   if (useQwen && character.avatarImage) {
     console.log("🧠 Using Qwen FaceID Workflow + Biglust Refiner");
 
+    // ✅ FIX 4: Strong pose breaking fix - Only trigger completely new pose if genuinely first image with NO pose history
     const isFirstImage = !visualState || (!visualState.lastVisualDescription && !visualState.pose) || (visualState.lastVisualDescription === "current moment" && !visualState.pose);
     
-    // --- STRONGER POSE + SCENE LOGIC ---
-    let poseInstruction = "(completely new dynamic pose:1.55), (fresh natural stance:1.5), (different body posture from reference:1.65), (varied angle:1.45)";
-    if (sceneLower.includes("lay") || sceneLower.includes("bed") || sceneLower.includes("closer look")) {
-        poseInstruction = "(laying on bed on her back:1.6), (moaning while laying down:1.55), (legs slightly spread:1.3), (making eye contact:1.45)";
-    } else if (!isFirstImage && visualState?.pose) {
-        poseInstruction = `(doing action: ${visualState.pose}:1.55)`;
-    }
+    // Strong pose breaking for initial generation
+    const poseInstruction = isFirstImage 
+        ? "(completely new dynamic pose:1.45), (fresh natural stance:1.5), (different body posture from reference:1.6), (varied angle:1.3)"
+        : visualState?.pose 
+            ? `(doing action: ${visualState.pose}:1.4)` 
+            : "(natural candid pose:1.3)";
 
-    let clothingInstruction = isSameOutfit
+    const clothingInstruction = targetClothing.includes('same as') || targetClothing.includes('input') || targetClothing.includes('reference')
         ? "wearing exact same clothing and style as reference image"
-        : `(${targetClothing}:1.35)`;
+        : `(${targetClothing}:1.25)`;
 
-    // Conditionally force the top off if the user explicitly asked for tits
-    if (userWantsTits) {
-        clothingInstruction = "tits out, topless, breasts exposed, wearing exact same clothing style as reference but top pulled down or removed";
-    }
-
-    const fusedDescription = `${poseInstruction}, ${clothingInstruction}, (${visualState?.location || 'candid setting'}:1.3), ${baseDescription}${visualContext ? `, (${visualContext}:${contextWeight})` : ''}`;
+    // Uses Grok's natural language construction like Biglust
+    const fusedDescription = `${poseInstruction}, ${clothingInstruction}, (${visualState?.location || 'candid setting'}:1.2), ${baseDescription}${visualContext ? `, (${visualContext}:1.2)` : ''}`;
     
     const promptText = [
       fusedDescription,
@@ -834,16 +860,6 @@ export const generateAriaImage = async (
       "masterpiece, high quality, realistic",
       "unfiltered raw candid cinematic photo, extremely detailed skin texture, photorealistic, natural subsurface scattering, film grain, dslr look, 8k uhd"
     ].filter(Boolean).join(", ").replace(/\s+/g, " ").trim();
-
-    // === FORCE FRAMING OVERRIDE (Critical) ===
-    let finalPromptText = promptText;
-    if (userWantsFace && userWantsTits) {
-        // Override any "extreme closeup portrait" with chest-up shot
-        finalPromptText = finalPromptText
-            .replace(/extreme closeup portrait[^,]+/i, "medium closeup from chest up showing face and tits")
-            .replace(/extreme closeup[^,]+/i, "medium closeup from chest up");
-        finalPromptText += ", tits out, breasts fully visible, topless, laying on bed";
-    }
 
     const negativeText = [
       safetyNegatives,
@@ -855,12 +871,14 @@ export const generateAriaImage = async (
       "airbrushed skin, plastic skin, porcelain skin, doll-like skin, flawless smooth skin",
       "beauty filter, over-smoothed, heavy retouch, instagram filter",
       "cartoon, anime, 3d render, illustration, painting",
-      "low quality, blurry, bad anatomy, deformed, extra limbs, mutated hands, missing limbs, floating limbs, disconnected limbs, mutated fingers, fused fingers, messy background, incoherent scene",
-
+      "low quality, blurry, bad anatomy, deformed, extra limbs, mutated hands",
+      "replicated structure, mirroring original file composition, duplicate layout, frozen pose anchor",
+      "replicated pose from reference, same pose as input image, frozen posture, identical composition, copied layout, exact same angle as reference"
     ].filter(Boolean).join(", ");
     
     const runpodModel = character.runpodModel || "Qwen-Rapid-AIO-NSFW-v23.safetensors";
     
+    // Merge Profile LoRAs with UI-selected LoRAs
     const customLoras = character.activeRunpodLoras ? [...character.activeRunpodLoras] : [];
     if (activeLoraFile) {
       const loraFileName = activeLoraFile.endsWith('.safetensors') ? activeLoraFile : `${activeLoraFile}.safetensors`;
@@ -870,10 +888,12 @@ export const generateAriaImage = async (
     }
     
     console.log(`🧠 Using Qwen Rapid Image Edit Workflow (${runpodModel}) with ${customLoras.length} LoRAs`);
-    console.log("📝 [RunPod Qwen Prompt]:", finalPromptText);
+    console.log("📝 [RunPod Qwen Prompt]:", promptText);
     console.log("🚫 [RunPod Qwen Negative]:", negativeText);
 
+    // --- STAGE 1: Qwen Base Model ---
     workflow["5"] = { "inputs": { "ckpt_name": runpodModel }, "class_type": "CheckpointLoaderSimple" };
+    // --- STAGE 2: BigLust Refiner Model ---
     workflow["100"] = { "inputs": { "ckpt_name": "biglust.safetensors" }, "class_type": "CheckpointLoaderSimple" };
     
     let lastModelNodeId = "5";
@@ -908,8 +928,9 @@ export const generateAriaImage = async (
     workflow["88"] = { "inputs": { "pixels": ["93", 0], "vae": ["5", 2] }, "class_type": "VAEEncode" };
     
     workflow["110"] = { "inputs": { "prompt": negativeText, "clip": [lastClipNodeId, lastClipOutputIndex], "vae": ["5", 2], "image1": ["93", 0] }, "class_type": "TextEncodeQwenImageEditPlus" };
-    workflow["111"] = { "inputs": { "prompt": finalPromptText, "clip": [lastClipNodeId, lastClipOutputIndex], "vae": ["5", 2], "image1": ["93", 0] }, "class_type": "TextEncodeQwenImageEditPlus" };
+    workflow["111"] = { "inputs": { "prompt": promptText, "clip": [lastClipNodeId, lastClipOutputIndex], "vae": ["5", 2], "image1": ["93", 0] }, "class_type": "TextEncodeQwenImageEditPlus" };
     
+    // --- Stage 1 KSampler ---
     workflow["3"] = {
       "inputs": {
         "seed": Math.floor(Math.random() * 4294967295),
@@ -926,13 +947,18 @@ export const generateAriaImage = async (
       "class_type": "KSampler"
     };
 
+    // Decode Stage 1 output back to pixels
     workflow["8"] = { "inputs": { "samples": ["3", 0], "vae": ["5", 2] }, "class_type": "VAEDecode" };
 
+    // --- STAGE 2 (BigLust Refiner) ---
+    // Encode pixels from Stage 1 into SDXL format using BigLust's VAE
     workflow["200"] = { "inputs": { "pixels": ["8", 0], "vae": ["100", 2] }, "class_type": "VAEEncode" };
 
-    workflow["202"] = { "inputs": { "text": "masterpiece, best quality, ultra detailed, highly realistic, biglust style, " + finalPromptText, "clip": ["100", 1] }, "class_type": "CLIPTextEncode" };
+    // Standard CLIP encoders for BigLust (SDXL) - Explicitly forcing "biglust style"
+    workflow["202"] = { "inputs": { "text": "masterpiece, best quality, ultra detailed, highly realistic, biglust style, " + promptText, "clip": ["100", 1] }, "class_type": "CLIPTextEncode" };
     workflow["203"] = { "inputs": { "text": negativeText, "clip": ["100", 1] }, "class_type": "CLIPTextEncode" };
 
+    // Refiner KSampler
     workflow["201"] = {
       "inputs": {
         "seed": Math.floor(Math.random() * 1000000), 
@@ -949,8 +975,10 @@ export const generateAriaImage = async (
       "class_type": "KSampler"
     };
 
+    // Final Stage 2 Decode
     workflow["300"] = { "inputs": { "samples": ["201", 0], "vae": ["100", 2] }, "class_type": "VAEDecode" };
     
+    // Output Save Node
     workflow["19"] = { "inputs": { "filename_prefix": "ARIA_QWEN_I2I_REFINED", "images": ["300", 0] }, "class_type": "SaveImage" };
 
     let base64String = character.avatarImage;
@@ -975,7 +1003,8 @@ export const generateAriaImage = async (
     console.log("🧬 Using Biglust Text-to-Image");
     if (activeLoraFile) console.log(`🧬 Active LoRA: ${activeLoraFile}.safetensors (Weight: ${activeWeight})`);
     
-    const fusedDescription = `(${visualState?.clothing || 'casual outfit'}:1.35), (${visualState?.location || 'candid setting'}:1.3), ${baseDescription}${visualContext ? `, (${visualContext}:${contextWeight})` : ''}`; 
+    // The vision extraction has now been shifted up, we just inject it here
+    const fusedDescription = `(${visualState?.clothing || 'casual outfit'}:1.25), (${visualState?.location || 'candid setting'}:1.2), ${baseDescription}${visualContext ? `, (${visualContext}:1.2)` : ''}`; 
     
     const promptText = [
       fusedDescription,
@@ -983,16 +1012,6 @@ export const generateAriaImage = async (
       "masterpiece, high quality, realistic",
       "unfiltered raw candid cinematic photo, extremely detailed skin texture, photorealistic, natural subsurface scattering, film grain, dslr look, 8k uhd"
     ].filter(Boolean).join(", ").replace(/\s+/g, " ").trim();
-
-    // === FORCE FRAMING OVERRIDE (Critical) ===
-    let finalPromptText = promptText;
-    if (userWantsFace && userWantsTits) {
-        // Override any "extreme closeup portrait" with chest-up shot
-        finalPromptText = finalPromptText
-            .replace(/extreme closeup portrait[^,]+/i, "medium closeup from chest up showing face and tits")
-            .replace(/extreme closeup[^,]+/i, "medium closeup from chest up");
-        finalPromptText += ", tits out, breasts fully visible, topless, laying on bed";
-    }
 
     const negativeText = [
       safetyNegatives,
@@ -1003,10 +1022,10 @@ export const generateAriaImage = async (
       "airbrushed skin, plastic skin, porcelain skin, doll-like skin, flawless smooth skin",
       "beauty filter, over-smoothed, heavy retouch, instagram filter",
       "cartoon, anime, 3d render, illustration, painting",
-      "low quality, blurry, bad anatomy, deformed, extra limbs, mutated hands, missing limbs, floating limbs, disconnected limbs, mutated fingers, fused fingers, messy background, incoherent scene"
+      "low quality, blurry, bad anatomy, deformed, extra limbs, mutated hands"
     ].filter(Boolean).join(", ");
     
-    console.log("📝 [RunPod BigLust Prompt]:", finalPromptText);
+    console.log("📝 [RunPod BigLust Prompt]:", promptText);
     console.log("🚫 [RunPod BigLust Negative]:", negativeText);
 
     workflow = {
@@ -1032,7 +1051,7 @@ export const generateAriaImage = async (
       };
     }
 
-    workflow["6"] = { "inputs": { "text": finalPromptText, "clip": clipSource }, "class_type": "CLIPTextEncode" };
+    workflow["6"] = { "inputs": { "text": promptText, "clip": clipSource }, "class_type": "CLIPTextEncode" };
     workflow["7"] = { "inputs": { "text": negativeText, "clip": clipSource }, "class_type": "CLIPTextEncode" };
 
     workflow["10"] = {
@@ -1059,6 +1078,7 @@ export const generateAriaImage = async (
   try {
     const payload = imagesPayload ? { workflow, images: imagesPayload } : { workflow };
     
+    // === CONSOLE LOG ADDED HERE ===
     console.log("🚀 Payload being sent to RunPod (Workflow built from Grok's prompt):", JSON.stringify(workflow, null, 2));
 
     const runResponse = await fetch('/api/generate', {
@@ -1077,6 +1097,8 @@ export const generateAriaImage = async (
 
     if (!jobId) throw new Error("No Job ID returned from Proxy");
 
+    // ✅ TIMEOUT PROTECTION UPGRADE: Extended polling cycles from 60 to 120 attempts 
+    // to give the server a 6-minute window to handle model swapping between Qwen and SDXL.
     let attempts = 0;
     while (attempts < 120) {
       const statusResponse = await fetch(`/api/generate?id=${jobId}`, { method: "GET" });
