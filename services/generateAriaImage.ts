@@ -736,27 +736,26 @@ export const generateAriaImage = async (
   // === IMPROVED SITUATIONAL TAGS LOGIC ===
   const userWantsFace = sceneLower.includes("face") ||
                         sceneLower.includes("moan") ||
+                        sceneLower.includes("moaning") ||
                         sceneLower.includes("looking") ||
                         sceneLower.includes("eyes");
   const userWantsTits = sceneLower.includes("tits") ||
                         sceneLower.includes("boobs") ||
                         sceneLower.includes("cleavage") ||
-                        sceneLower.includes("chest");
+                        sceneLower.includes("chest") ||
+                        sceneLower.includes("topless");
   const userWantsPussy = sceneLower.includes("pussy") ||
-                         sceneLower.includes("vulva") ||
-                         sceneLower.includes("crotch") ||
-                         sceneLower.includes("ass") ||
-                         sceneLower.includes("butt");
+                         sceneLower.includes("vulva");
 
   let situationalTags: string[] = [];
-  if (userWantsFace && (userWantsTits || userWantsPussy)) {
-      situationalTags = [`medium closeup showing face and upper body of ${botIdentity}, moaning expression, looking at viewer`, character.ethnicity, faceTags, hairTags, bodyTags];
+  if (userWantsFace && userWantsTits) {
+      situationalTags = [`medium closeup from chest up showing face and tits of ${botIdentity}, tits out, topless, moaning expression, half-lidded eyes, looking at viewer, breasts visible`, character.ethnicity, faceTags, hairTags, bodyTags];
   } else if (userWantsFace) {
       situationalTags = [`extreme closeup portrait of ${botIdentity}, moaning, half-lidded eyes looking at viewer`, character.ethnicity, faceTags, hairTags, bodyTags];
   } else if (userWantsPussy && !userWantsFace) {
-      situationalTags = [`detailed faceless extreme closeup on pussy only, tight crop excluding mouth and face completely`, character.ethnicity, bodyTags];
+      situationalTags = [`detailed faceless extreme closeup on pussy only, tight crop excluding face`, character.ethnicity, bodyTags];
   } else if (userWantsTits) {
-      situationalTags = [`closeup on tits, cleavage, upper body`, character.ethnicity, bodyTags];
+      situationalTags = [`closeup on tits, cleavage, topless`, character.ethnicity, bodyTags];
   } else {
       situationalTags = [`raw candid photo of ${botIdentity}`, character.ethnicity, bodyTags, hairTags, faceTags];
   }
@@ -810,15 +809,23 @@ export const generateAriaImage = async (
 
     const isFirstImage = !visualState || (!visualState.lastVisualDescription && !visualState.pose) || (visualState.lastVisualDescription === "current moment" && !visualState.pose);
     
-    const poseInstruction = isFirstImage 
-        ? "(completely new dynamic pose:1.5), (fresh natural stance:1.55), (different body posture from reference:1.6)"
-        : visualState?.pose 
-            ? `(doing action: ${visualState.pose}:1.55)` 
-            : "(natural candid pose:1.3)";
+    // --- ✅ QWEN POSE/CLOTHING INSTRUCTIONS INJECTED ---
+    let poseInstruction = "(completely new dynamic pose:1.5), (fresh natural stance:1.55), (different body posture from reference:1.6), (varied angle:1.4)";
+    
+    if (sceneLower.includes("lay") || sceneLower.includes("bed")) {
+        poseInstruction = "(laying on bed:1.5), (on back:1.4), (moaning while laying down:1.45)";
+    } else if (!isFirstImage && visualState?.pose) {
+        poseInstruction = `(doing action: ${visualState.pose}:1.55)`;
+    }
 
-    const clothingInstruction = isSameOutfit
+    let clothingInstruction = isSameOutfit
         ? "wearing exact same clothing and style as reference image"
         : `(${targetClothing}:1.35)`;
+
+    // Conditionally force the top off if the user explicitly asked for tits
+    if (userWantsTits) {
+        clothingInstruction = "tits out, topless, breasts exposed, wearing exact same clothing style as reference but top pulled down or removed";
+    }
 
     const fusedDescription = `${poseInstruction}, ${clothingInstruction}, (${visualState?.location || 'candid setting'}:1.3), ${baseDescription}${visualContext ? `, (${visualContext}:${contextWeight})` : ''}`;
     
@@ -840,6 +847,8 @@ export const generateAriaImage = async (
       "beauty filter, over-smoothed, heavy retouch, instagram filter",
       "cartoon, anime, 3d render, illustration, painting",
       "low quality, blurry, bad anatomy, deformed, extra limbs, mutated hands, missing limbs, floating limbs, disconnected limbs, mutated fingers, fused fingers, messy background, incoherent scene",
+      "replicated structure, mirroring original file composition, duplicate layout, frozen pose anchor",
+      "replicated pose from reference, same pose as input image, frozen posture, identical composition, copied layout, exact same angle as reference"
     ].filter(Boolean).join(", ");
     
     const runpodModel = character.runpodModel || "Qwen-Rapid-AIO-NSFW-v23.safetensors";
