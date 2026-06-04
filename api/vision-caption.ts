@@ -61,7 +61,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             content: [
               {
                 type: "text",
-                text: "Analyze this image and write a highly detailed visual description for an AI image generation prompt. Focus strictly on physical features (hair style and color, facial structure, skin tone), body type, exact clothing, and the current pose. Do not describe the background. Keep it to one concise, comma-separated paragraph."
+                text: "Analyze this image and write a highly detailed visual description for an AI image generation prompt. Focus strictly on physical features (hair style and color, facial structure, skin tone), body type, exact clothing, the current pose, and the detailed background and environment setting. Keep it to one concise, comma-separated paragraph."
               },
               {
                 type: "image_url",
