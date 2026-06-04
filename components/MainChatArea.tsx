@@ -210,8 +210,7 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
     }
   };
 
-  
-/**
+  /**
    * CORE INTERACTION: HANDLE SEND
    */
   const handleSend = async () => {
@@ -243,12 +242,39 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
         };
       });
 
-      // ✅ CALL BRAIN PROXY (Now passing currentVisualState!)
+      // ✅ CALL BRAIN PROXY
       const rawResponse = await generateAriaResponse(userText, history, character, userData?.uid, botId, currentVisualState);
       
+      // Safety check: ensure rawResponse is stringified if it came back as an object from the backend
+      const responseString = typeof rawResponse === 'string' ? rawResponse : (rawResponse?.content || rawResponse?.text || JSON.stringify(rawResponse));
+
       // Extract Context
-      let { cleanText, contextPrompt, memoryText, gifSearchTerm, youtubeSearchTerm, spicySearchTerm } = extractContextPrompt(rawResponse);
+      let { cleanText, contextPrompt, memoryText, gifSearchTerm, youtubeSearchTerm, spicySearchTerm } = extractContextPrompt(responseString);
       
+      // 🚨 CRITICAL FIX: Aggressive Failsafe Check for Visual Tags
+      // If the extractor missed it, manually hunt for [[VISUAL: ...]] or [SCENE_IMAGE: ...]
+      if (!contextPrompt) {
+          const visualRegex = /\[\[VISUAL:\s*([\s\S]*?)\s*\]\]/i;
+          const sceneRegex = /\[SCENE_IMAGE:\s*([\s\S]*?)\]/i;
+          
+          let match = cleanText.match(visualRegex) || responseString.match(visualRegex);
+          if (match) {
+              contextPrompt = match[1].trim();
+              cleanText = cleanText.replace(visualRegex, '').trim();
+          } else {
+              match = cleanText.match(sceneRegex) || responseString.match(sceneRegex);
+              if (match) {
+                  contextPrompt = match[1].trim();
+                  cleanText = cleanText.replace(sceneRegex, '').trim();
+              }
+          }
+          
+          // Final fallback if backend stripped it into aria_meta
+          if (!contextPrompt && typeof rawResponse === 'object' && (rawResponse as any)?.aria_meta?.has_visual) {
+              contextPrompt = (rawResponse as any).aria_meta.visual_description;
+          }
+      }
+
       if (memoryText && userData?.uid) {
         storeMemory(memoryText, userData.uid, botId);
       }
@@ -274,10 +300,9 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
       }
 
       // 3. CHECK: SPICY CONTENT (Adult)
-      // Double check regex just in case extraction didn't catch it
       if (!spicySearchTerm) {
         const spicyRegex = /[\[\{]{2}\s*SPICY\s*:\s*([\s\S]*?)\s*[\]\}]{2}/i;
-        const spicyMatch = cleanText.match(spicyRegex) || rawResponse.match(spicyRegex);
+        const spicyMatch = cleanText.match(spicyRegex) || responseString.match(spicyRegex);
         if (spicyMatch) {
             spicySearchTerm = spicyMatch[1].trim();
             cleanText = cleanText.replace(spicyRegex, '').trim(); 
@@ -291,7 +316,7 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
           } catch(e) { console.error("Spicy search failed", e); }
       }
 
-      // ✅ CRITICAL FIX: "The Standoff"
+      // ✅ FIX: "The Standoff"
       // Only set isImageLoading to TRUE if we have a prompt AND we did NOT find a video/gif.
       const shouldGenerateImage = !!contextPrompt && !finalVideoUrl && !finalImageUrl;
 
@@ -355,7 +380,7 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
     }
   };
 
-  // ✅ UPDATED: Download Media (Safety Check for Embeds)
+  // ✅ Download Media (Safety Check for Embeds)
   const downloadMedia = async (url: string, type: string) => {
     if (isDownloading) return;
     
