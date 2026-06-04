@@ -270,8 +270,8 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
               {(mediaType === 'video_file' || (!message.videoUrl && message.imageUrl)) && (
                   <>
                     {/* HOVER OVERLAY: Neural Motion Button & Fullscreen */}
-                    {!message.videoUrl && !message.isVideoLoading && !isUser && (
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-center gap-3 backdrop-blur-[2px] pointer-events-none hidden md:flex">
+                    {!message.videoUrl && !message.isVideoLoading && (
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-center gap-3 backdrop-blur-[2px] pointer-events-none">
                             <button 
                                 onClick={(e) => { e.stopPropagation(); onAnimateRequest(message); }} 
                                 className="pointer-events-auto flex items-center gap-2 px-5 py-2.5 bg-white text-black rounded-full font-black text-[10px] uppercase tracking-tighter hover:bg-purple-500 hover:text-white transition-all active:scale-95 shadow-xl"
@@ -367,4 +367,14 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
   );
 };
 
-export default ChatMessage;
+export default React.memo(ChatMessage, (prevProps, nextProps) => {
+  return (
+    prevProps.message.id === nextProps.message.id &&
+    prevProps.message.text === nextProps.message.text &&
+    prevProps.message.imageUrl === nextProps.message.imageUrl &&
+    prevProps.message.videoUrl === nextProps.message.videoUrl &&
+    prevProps.message.isImageLoading === nextProps.message.isImageLoading &&
+    prevProps.message.isVideoLoading === nextProps.message.isVideoLoading &&
+    prevProps.characterName === nextProps.characterName
+  );
+});
