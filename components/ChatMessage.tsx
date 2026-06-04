@@ -34,6 +34,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
   const isUser = message.role === 'user';
   const [viewMode, setViewMode] = useState<'video' | 'image'>('video');
   const [isDownloading, setIsDownloading] = useState(false);
+  const [showMobileOverlay, setShowMobileOverlay] = useState(false); // Mobile tap state
 
   // --- TYPEWRITER STATE ---
   const [shouldAnimate] = useState(() => {
@@ -261,7 +262,15 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
                   key={message.imageUrl}
                   src={message.imageUrl} 
                   alt="Visual" 
-                  onClick={() => onMediaClick(message.imageUrl!, 'image')} 
+                  onClick={(e) => {
+                    // Tap toggle for mobile, instant click for desktop
+                    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+                      e.stopPropagation();
+                      setShowMobileOverlay(prev => !prev);
+                    } else {
+                      onMediaClick(message.imageUrl!, 'image');
+                    }
+                  }} 
                   className={`w-[280px] md:w-[360px] h-auto min-h-[100px] object-cover block bg-zinc-900 transition-all duration-700 cursor-pointer ${message.isVideoLoading ? 'blur-xl scale-110 brightness-50' : 'group-hover:scale-105'}`}
                 />
               )}
@@ -271,15 +280,15 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
                   <>
                     {/* HOVER OVERLAY: Neural Motion Button & Fullscreen */}
                     {!message.videoUrl && !message.isVideoLoading && (
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-center gap-3 backdrop-blur-[2px] pointer-events-none">
+                        <div className={`absolute inset-0 flex flex-col items-center justify-center gap-3 backdrop-blur-[2px] transition-all duration-300 pointer-events-none ${showMobileOverlay ? 'bg-black/40 opacity-100' : 'bg-black/40 opacity-0 group-hover:opacity-100'}`}>
                             <button 
-                                onClick={(e) => { e.stopPropagation(); onAnimateRequest(message); }} 
+                                onClick={(e) => { e.stopPropagation(); setShowMobileOverlay(false); onAnimateRequest(message); }} 
                                 className="pointer-events-auto flex items-center gap-2 px-5 py-2.5 bg-white text-black rounded-full font-black text-[10px] uppercase tracking-tighter hover:bg-purple-500 hover:text-white transition-all active:scale-95 shadow-xl"
                             >
                                 <Film className="w-3.5 h-3.5" /> Neural Motion
                             </button>
                             <button 
-                                onClick={(e) => { e.stopPropagation(); onMediaClick(message.imageUrl!, 'image'); }} 
+                                onClick={(e) => { e.stopPropagation(); setShowMobileOverlay(false); onMediaClick(message.imageUrl!, 'image'); }} 
                                 className="pointer-events-auto text-white/70 hover:text-white text-[9px] uppercase tracking-[0.2em] font-bold py-1"
                             >
                                 View Fullscreen
@@ -302,7 +311,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
                     
                     {/* ZOOM ICON (Top Right) */}
                     {!message.isVideoLoading && (
-                        <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                        <div className={`absolute top-3 right-3 transition-opacity pointer-events-none ${showMobileOverlay ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
                             <div className="bg-black/50 backdrop-blur-md p-1.5 rounded-lg border border-white/10">
                                 {message.videoUrl && viewMode === 'video' ? <Maximize2 className="w-3.5 h-3.5 text-white" /> : <ZoomIn className="w-3.5 h-3.5 text-white" />}
                             </div>
