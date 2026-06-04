@@ -61,7 +61,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             content: [
               {
                 type: "text",
-                text: "Analyze this image and write a highly detailed visual description for an AI image generation prompt. Focus strictly on physical features (hair style and color, facial structure, skin tone), body type, exact clothing, the current pose, and the detailed background and environment setting. Keep it to one concise, comma-separated paragraph."
+                text: "Analyze this image and write a highly detailed visual description for an AI image generation prompt. Capture the scene to the exact tee. Describe the exact color, style, and fabric of the clothing. Describe the specific pose and camera angle. Crucially, describe the background environment in extreme detail, including the exact colors of furniture, walls, lighting conditions, time of day, and any notable background objects. Keep it to one densely packed, comma-separated paragraph."
               },
               {
                 type: "image_url",
@@ -73,7 +73,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             ]
           }
         ],
-        max_tokens: 150,
+        max_tokens: 250, // Increased to allow for the extra color/furniture details
         temperature: 0.2
       })
     });
