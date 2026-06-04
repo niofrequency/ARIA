@@ -154,26 +154,6 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
     (!message.videoUrl && message.imageUrl)
   );
 
-  // --- FORMAT TEXT HELPER (Italics for feelings) ---
-  const renderFormattedText = (text: string) => {
-    if (!text) return null;
-    // Split the text by asterisks, keeping the matching segments
-    const parts = text.split(/(\*[^*]+\*)/g);
-    
-    return parts.map((part, index) => {
-      // If the part is enclosed in asterisks (and has content), render as italic
-      if (part.startsWith('*') && part.endsWith('*') && part.length > 2) {
-        return (
-          <em key={index} className="italic opacity-80">
-            {part.slice(1, -1)}
-          </em>
-        );
-      }
-      // Otherwise, return standard text
-      return <span key={index}>{part}</span>;
-    });
-  };
-
   return (
     <div className={`flex w-full mb-8 ${isUser ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2 duration-300`}>
       <div className={`flex flex-col max-w-[85%] md:max-w-[75%] ${isUser ? 'items-end' : 'items-start'}`}>
@@ -196,7 +176,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
               }`}>
             {!isUser && <div className="absolute -inset-0.5 bg-purple-500/10 rounded-2xl blur-md -z-10"></div>}
             <p className="relative z-10 font-light tracking-wide whitespace-pre-wrap">
-              {renderFormattedText(displayedText)}
+              {displayedText}
               {!isTypingComplete && !isUser && <span className="inline-block w-1.5 h-3.5 ml-1 bg-purple-400 align-middle animate-pulse" />}
             </p>
           </div>
