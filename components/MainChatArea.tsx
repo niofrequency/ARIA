@@ -55,6 +55,9 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
   // ✅ TTS States
   const [autoTTS, setAutoTTS] = useState(true);
   const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(null);
+
+  // ✅ CONNECTION ERROR STATE
+  const [connectionError, setConnectionError] = useState(false);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -100,47 +103,47 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
   /**
    * AUDIO/TTS HANDLERS
    */
-const stopAudio = () => {
-  stopAriaSpeech();           // now works because ttsService exports it
-  setCurrentlyPlayingId(null);
-};
+  const stopAudio = () => {
+    stopAriaSpeech();           // now works because ttsService exports it
+    setCurrentlyPlayingId(null);
+  };
 
-const playTTS = async (text: string, messageId: string) => {
-  if (currentlyPlayingId === messageId) {
-    stopAudio();           // uses the stopAudio function you already have
-    return;
-  }
-  stopAudio();
-  setCurrentlyPlayingId(messageId);
-  // Clean text + remove emojis + keep TTS tags
-  const cleanedText = text
-    .replace(/\*.*?\*/g, '')
-    .replace(/```[\s\S]*?```/g, ' [Code block omitted] ')
-    .replace(/`.*?`/g, '')
-    .replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu, '') // ← removes emojis
-    .trim();
-  if (!cleanedText) {
-    setCurrentlyPlayingId(null);
-    return;
-  }
-  // ✅ CONSOLE LOG — shows exactly what is sent to TTS (you can see the tags here)
-  console.log('🗣️ TTS Payload (tags should be visible):', cleanedText);
-  try {
-    const result = await playAriaSpeech(cleanedText, character.voiceId || 'ara');
-    if (result.success && currentAudio) {
-      currentAudio.addEventListener('ended', () => setCurrentlyPlayingId(null));
-      currentAudio.addEventListener('error', () => setCurrentlyPlayingId(null));
-    } else {
-      const fallbackDelay = Math.max(2000, cleanedText.split(' ').length * 350);
-      setTimeout(() => {
-        setCurrentlyPlayingId((current) => current === messageId ? null : current);
-      }, fallbackDelay);
+  const playTTS = async (text: string, messageId: string) => {
+    if (currentlyPlayingId === messageId) {
+      stopAudio();           // uses the stopAudio function you already have
+      return;
     }
-  } catch (error) {
-    console.error('TTS execution failed:', error);
-    setCurrentlyPlayingId(null);
-  }
-};
+    stopAudio();
+    setCurrentlyPlayingId(messageId);
+    // Clean text + remove emojis + keep TTS tags
+    const cleanedText = text
+      .replace(/\*.*?\*/g, '')
+      .replace(/```[\s\S]*?```/g, ' [Code block omitted] ')
+      .replace(/`.*?`/g, '')
+      .replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu, '') // ← removes emojis
+      .trim();
+    if (!cleanedText) {
+      setCurrentlyPlayingId(null);
+      return;
+    }
+    // ✅ CONSOLE LOG — shows exactly what is sent to TTS (you can see the tags here)
+    console.log('🗣️ TTS Payload (tags should be visible):', cleanedText);
+    try {
+      const result = await playAriaSpeech(cleanedText, character.voiceId || 'ara');
+      if (result.success && currentAudio) {
+        currentAudio.addEventListener('ended', () => setCurrentlyPlayingId(null));
+        currentAudio.addEventListener('error', () => setCurrentlyPlayingId(null));
+      } else {
+        const fallbackDelay = Math.max(2000, cleanedText.split(' ').length * 350);
+        setTimeout(() => {
+          setCurrentlyPlayingId((current) => current === messageId ? null : current);
+        }, fallbackDelay);
+      }
+    } catch (error) {
+      console.error('TTS execution failed:', error);
+      setCurrentlyPlayingId(null);
+    }
+  };
 
   /**
    * REGENERATE IMAGE HANDLER
@@ -264,8 +267,7 @@ const playTTS = async (text: string, messageId: string) => {
     }
   };
 
-  
-/**
+  /**
    * CORE INTERACTION: HANDLE SEND
    */
   const handleSend = async () => {
@@ -285,6 +287,9 @@ const playTTS = async (text: string, messageId: string) => {
     });
 
     try {
+      // ✅ Reset error state when attempting a new message
+      setConnectionError(false);
+
       // REINJECT TAGS INTO HISTORY
       const history = (messages || []).map(m => {
         let content = m.text || '';
@@ -328,7 +333,6 @@ const playTTS = async (text: string, messageId: string) => {
       }
 
       // 3. CHECK: SPICY CONTENT (Adult)
-      // Double check regex just in case ariaService didn't catch it
       if (!spicySearchTerm) {
         const spicyRegex = /[\[\{]{2}\s*SPICY\s*:\s*([\s\S]*?)\s*[\]\}]{2}/i;
         const spicyMatch = cleanText.match(spicyRegex) || rawResponse.match(spicyRegex);
@@ -346,8 +350,6 @@ const playTTS = async (text: string, messageId: string) => {
       }
 
       // ✅ CRITICAL FIX: "The Standoff"
-      // Only set isImageLoading to TRUE if we have a prompt AND we did NOT find a video/gif.
-      // This prevents the infinite "Imaging Protocol" loader when sending links.
       const shouldGenerateImage = !!contextPrompt && !finalVideoUrl && !finalImageUrl;
 
       // 4. SEND BOT RESPONSE
@@ -363,14 +365,13 @@ const playTTS = async (text: string, messageId: string) => {
 
       // ✅ 🗣️ TRIGGER TEXT TO SPEECH (Auto-Speech)
       if (cleanText && autoTTS) {
-        // Strip out asterisk actions (e.g., *smiles*) so she doesn't read them aloud
         const speechText = cleanText.replace(/\*.*?\*/g, '').trim();
         if (speechText.length > 0) {
           playTTS(speechText, responseMessageId); 
         }
       }
 
-      // 5. TRIGGER AI IMAGE GENERATION (Only if explicitly needed)
+      // 5. TRIGGER AI IMAGE GENERATION
       if (shouldGenerateImage) {
         try {
           const promptToUse = contextPrompt || userText;
@@ -393,6 +394,8 @@ const playTTS = async (text: string, messageId: string) => {
 
     } catch (error) {
       console.error("❌ Aria Interaction Error:", error);
+      // ✅ Trigger Error State
+      setConnectionError(true);
       onSendMessage({ 
         id: generateId('err'), 
         role: 'model', 
@@ -413,11 +416,9 @@ const playTTS = async (text: string, messageId: string) => {
     }
   };
 
-  // ✅ UPDATED: Download Media (Safety Check for Embeds)
   const downloadMedia = async (url: string, type: string) => {
     if (isDownloading) return;
     
-    // Don't try to download embeds/youtube (CORS/Safety)
     if (type === 'embed' || type === 'youtube') {
         window.open(url, '_blank');
         return;
@@ -476,13 +477,20 @@ const playTTS = async (text: string, messageId: string) => {
           <div>
             <h1 className="text-sm font-black text-white tracking-wide uppercase">{character.name}</h1>
             <div className="flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse"></span>
-              <span className="text-[10px] text-purple-400 uppercase tracking-widest font-bold font-mono">Neural Link Active</span>
+              {/* ✅ Dynamic Status Indicator logic */}
+              <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${
+                connectionError ? 'bg-red-500' : 'bg-emerald-500'
+              }`}></span>
+              <span className={`text-[10px] uppercase tracking-widest font-bold font-mono ${
+                connectionError ? 'text-red-400' : 'text-emerald-400'
+              }`}>
+                {connectionError ? 'Error' : 'Online'}
+              </span>
             </div>
           </div>
         </div>
         
-        {/* ✅ Header Action Items (Includes new TTS Toggle) */}
+        {/* ✅ Header Action Items */}
         <div className="flex items-center gap-2">
           <button 
             onClick={() => setAutoTTS(!autoTTS)} 
