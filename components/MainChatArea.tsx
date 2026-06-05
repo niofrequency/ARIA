@@ -9,6 +9,8 @@ import { storeMemory } from '../services/memoryService';
 import { fetchGiphyUrl } from '../services/giphyService';
 import { fetchYoutubeUrl } from '../services/youtubeService';
 import { generateAriaResponse } from '../services/ariaService';
+// Add or update this import line at the top of components/MainChatArea.tsx
+import { generateAriaResponse, extractContextPrompt } from '../services/ariaService';
 import { fetchSpicyLink } from '../services/spicyService';
 
 interface MainChatAreaProps {
