@@ -10,7 +10,8 @@ import { fetchGiphyUrl } from '../services/giphyService';
 import { fetchYoutubeUrl } from '../services/youtubeService';
 import { generateAriaResponse, extractContextPrompt } from '../services/ariaService';
 import { fetchSpicyLink } from '../services/spicyService';
-import { playAriaSpeech } from '../services/ttsService'; // ✅ ADDED TTS IMPORT
+// ✅ IMPORTED NEW TTS SERVICE FUNCTIONS
+import { playAriaSpeech, stopAriaSpeech, currentAudio } from '../services/ttsService'; 
 
 interface MainChatAreaProps {
   character: CharacterProfile;
@@ -54,7 +55,6 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
   // ✅ TTS States
   const [autoTTS, setAutoTTS] = useState(true);
   const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -65,13 +65,10 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Audio stream lifecycle cleanup
+  // ✅ Audio stream lifecycle cleanup using the global service
   useEffect(() => {
     return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
-      }
+      stopAriaSpeech();
     };
   }, []);
 
@@ -104,10 +101,7 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
    * AUDIO/TTS HANDLERS
    */
   const stopAudio = () => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current = null;
-    }
+    stopAriaSpeech(); // ✅ Uses central TTS service
     setCurrentlyPlayingId(null);
   };
 
@@ -132,16 +126,15 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
     }
 
     try {
-      // Execute playback using the existing ttsService method
+      // ✅ Execute playback using the caching ttsService method
       const result = await playAriaSpeech(cleanedText, character.voiceId || 'ara');
       
-      // If the service returns the active HTMLAudioElement, bind it for UI tracking
-      if (result && typeof (result as HTMLAudioElement).pause === 'function') {
-        audioRef.current = result as HTMLAudioElement;
-        (result as HTMLAudioElement).onended = () => setCurrentlyPlayingId(null);
-        (result as HTMLAudioElement).onerror = () => setCurrentlyPlayingId(null);
+      if (result.success && currentAudio) {
+        // Track the audio lifecycle to reset the UI button when it naturally finishes
+        currentAudio.addEventListener('ended', () => setCurrentlyPlayingId(null));
+        currentAudio.addEventListener('error', () => setCurrentlyPlayingId(null));
       } else {
-        // Fallback: Clear playing state after an estimated reading duration if service hides the audio object
+        // Fallback: Clear playing state after an estimated reading duration if audio fails to bind
         const fallbackDelay = Math.max(2000, cleanedText.split(' ').length * 350);
         setTimeout(() => {
           setCurrentlyPlayingId((current) => current === messageId ? null : current);
