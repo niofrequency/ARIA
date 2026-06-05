@@ -8,6 +8,7 @@ import { Loader2, X, Download, Menu, Settings, Cpu, ArrowUp, PanelLeft } from 'l
 import { storeMemory } from '../services/memoryService';
 import { fetchGiphyUrl } from '../services/giphyService';
 import { fetchYoutubeUrl } from '../services/youtubeService';
+import { generateAriaResponse } from '../services/ariaService';
 import { fetchSpicyLink } from '../services/spicyService';
 
 interface MainChatAreaProps {
