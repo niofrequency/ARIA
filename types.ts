@@ -2,6 +2,7 @@ export interface Message {
   id: string;
   role: 'user' | 'model' | 'assistant';
   text?: string;
+  speechText?: string; // ✅ ADDED: Holds the hidden TTS tags for audio generation
   imageUrl?: string;
   videoUrl?: string; // Final normalized video path from storage
   isImageLoading?: boolean;
@@ -32,6 +33,7 @@ export interface CharacterProfile {
   runpodModel?: string;
   activeRunpodLoras?: { id: string; name: string; strength: number }[];
   favoriteLoras?: string[];
+  voiceId?: string;    // ✅ TTS Voice Selection
 }
 
 export interface UserData {
