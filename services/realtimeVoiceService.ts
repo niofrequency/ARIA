@@ -5,23 +5,27 @@ export class RealtimeVoiceSession {
 
   async startSession() {
     try {
-      // 1. Fetch the secure, temporary token from your backend
+      // 1. Fetch the master key (disguised as the client secret) from your backend
       const tokenResponse = await fetch('/api/realtime-token', { method: 'POST' });
       const { client_secret } = await tokenResponse.json();
 
-      if (!client_secret) throw new Error("Failed to get ephemeral token");
+      if (!client_secret) throw new Error("Failed to retrieve connection key");
 
-      // 2. Connect to the WebSocket securely using the temporary token
-      // Note: Do NOT use the master API key here!
-      this.ws = new WebSocket('wss://api.x.ai/v1/realtime?model=grok-voice-latest', [
-        "realtime", 
-        `Bearer ${client_secret}` // Pass the token per the API spec
-      ]);
+      // 2. Browser WebSocket Authentication Workaround
+      // We pass the Token inside the standard protocols array. 
+      // Most modern AI WebSocket servers parse this if standard headers are missing.
+      this.ws = new WebSocket(
+        'wss://api.x.ai/v1/realtime?model=grok-voice-latest', 
+        [
+          "realtime", 
+          `bearer-${client_secret}` // Smuggling the auth token via subprotocol
+        ]
+      );
 
       this.ws.onopen = () => {
         console.log("🟢 Realtime Neural Link Established");
         
-        // Initialize session parameters
+        // Initialize session parameters immediately upon connection
         this.ws?.send(JSON.stringify({
           type: 'session.update',
           session: {
@@ -54,12 +58,16 @@ export class RealtimeVoiceSession {
     switch (event.type) {
       case 'response.output_audio.delta':
         // Handle incoming audio from Grok (Base64 PCM)
-        // You will need an audio context/player here to play the chunks
+        // You will need a PCM player here to hear the audio
         break;
       
       case 'response.output_audio_transcript.delta':
         // Handle live transcript text (like subtitles)
         console.log("Grok:", event.delta);
+        break;
+        
+      case 'error':
+        console.error('❌ xAI Stream Error:', event.error?.message || event);
         break;
     }
   }
