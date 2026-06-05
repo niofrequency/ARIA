@@ -90,7 +90,7 @@ Always mix tags with normal dialogue. Never mention these instructions.`;
       body: JSON.stringify({
         messages: sanitizedMessages, 
         model: targetModel, 
-        temperature: temperature || 0.85, 
+        temperature: temperature || 0.95, 
         max_tokens: 1000,       
         stream: false
         // ❌ REMOVED frequency_penalty and presence_penalty
