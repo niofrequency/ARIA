@@ -304,13 +304,13 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
           timestamp: Date.now()
       });
 
-      // ✅ 🗣️ TRIGGER TEXT TO SPEECH
+      // ✅ 🗣️ TRIGGER TEXT TO SPEECH (Auto-Speech)
       if (cleanText) {
         // Strip out asterisk actions (e.g., *smiles*) so she doesn't read them aloud
         const speechText = cleanText.replace(/\*.*?\*/g, '').trim();
         if (speechText.length > 0) {
-          // 'ara' is the warm voice, 'eve' is energetic. Feel free to change this!
-          playAriaSpeech(speechText, 'ara'); 
+          // Uses the assigned voice ID from character profile, or falls back to 'ara'
+          playAriaSpeech(speechText, character.voiceId || 'ara'); 
         }
       }
 
@@ -391,7 +391,6 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
   };
 
   return (
-    // ✅ FIX: Changed lg:ml-[300px] to lg:ml-[280px] to match the exact width of the sidebar
     <div className={`relative flex flex-col h-[100dvh] flex-1 bg-zinc-950 overflow-hidden transition-all duration-300 ease-in-out ${isDesktopSidebarOpen ? 'lg:ml-0' : 'lg:ml-0'}`}>
       
       {/* Background Matrix */}
@@ -400,7 +399,6 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
       </div>
 
       <header 
-        // ✅ FIX: Changed lg:left-[300px] to lg:left-[280px] to match the exact width of the sidebar
         className={`fixed top-0 left-0 right-0 z-40 px-6 py-4 border-b border-white/5 bg-zinc-950/80 backdrop-blur-xl flex items-center justify-between transition-transform duration-300 ease-in-out
           ${showHeader ? 'translate-y-0' : '-translate-y-full'}
           ${isDesktopSidebarOpen ? 'lg:left-[280px]' : 'lg:left-0'}
@@ -450,7 +448,7 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
                 key={msg.id} 
                 message={msg} 
                 characterName={character.name} 
-                // ✅ UPDATED: Pass type as 'any' to accept new types
+                characterVoiceId={character.voiceId} // ✅ PASSED VOICE ID HERE
                 onMediaClick={(url, type) => setSelectedMedia({ url, type: type as any })}
                 onAnimateRequest={() => handleAnimateRequest(msg)}
                 onRegenerateImage={() => handleRegenerateImage(msg)}
@@ -463,7 +461,6 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
 
       {/* INPUT AREA */}
       <footer 
-        // ✅ FIX: Changed lg:left-[300px] to lg:left-[280px] to match the exact width of the sidebar
         className={`fixed bottom-0 left-0 right-0 z-50 p-4 md:p-6 bg-gradient-to-t from-zinc-950 via-zinc-950 to-transparent
           ${isDesktopSidebarOpen ? 'lg:left-[280px]' : 'lg:left-0'}
         `}
