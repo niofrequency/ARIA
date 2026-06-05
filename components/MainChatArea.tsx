@@ -4,7 +4,7 @@ import { Message, CharacterProfile, UserData } from '../types';
 import { generateAriaImage } from '../services/generateAriaImage'; 
 import { initiateNeuralMotion, pollNeuralMotionStatus } from '../services/neuralMotionService';
 import { uploadImageToStorage, deleteMediaFromStorage } from '../services/firebaseService';
-import { Loader2, X, Download, Menu, Settings, Cpu, ArrowUp, PanelLeft } from 'lucide-react';
+import { Loader2, X, Download, Menu, Settings, Cpu, ArrowUp, PanelLeft, Volume2, VolumeX } from 'lucide-react';
 import { storeMemory } from '../services/memoryService';
 import { fetchGiphyUrl } from '../services/giphyService';
 import { fetchYoutubeUrl } from '../services/youtubeService';
@@ -51,6 +51,11 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
   const [lastScrollY, setLastScrollY] = useState(0);
   const [isDownloading, setIsDownloading] = useState(false);
   
+  // ✅ TTS States
+  const [autoTTS, setAutoTTS] = useState(true);
+  const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -59,6 +64,16 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Audio stream lifecycle cleanup
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, []);
 
   // --- UI: SCROLL DRIVEN HEADER ---
   const handleScroll = () => {
@@ -83,6 +98,59 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
       u8arr[n] = bstr.charCodeAt(n);
     }
     return new Blob([u8arr], { type: mime });
+  };
+
+  /**
+   * AUDIO/TTS HANDLERS
+   */
+  const stopAudio = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+    setCurrentlyPlayingId(null);
+  };
+
+  const playTTS = async (text: string, messageId: string) => {
+    if (currentlyPlayingId === messageId) {
+      stopAudio();
+      return;
+    }
+
+    stopAudio();
+    setCurrentlyPlayingId(messageId);
+
+    const cleanedText = text
+      .replace(/\*.*?\*/g, '')
+      .replace(/```[\s\S]*?```/g, ' [Code block omitted] ')
+      .replace(/`.*?`/g, '')
+      .trim();
+
+    if (!cleanedText) {
+      setCurrentlyPlayingId(null);
+      return;
+    }
+
+    try {
+      // Execute playback using the existing ttsService method
+      const result = await playAriaSpeech(cleanedText, character.voiceId || 'ara');
+      
+      // If the service returns the active HTMLAudioElement, bind it for UI tracking
+      if (result && typeof (result as HTMLAudioElement).pause === 'function') {
+        audioRef.current = result as HTMLAudioElement;
+        (result as HTMLAudioElement).onended = () => setCurrentlyPlayingId(null);
+        (result as HTMLAudioElement).onerror = () => setCurrentlyPlayingId(null);
+      } else {
+        // Fallback: Clear playing state after an estimated reading duration if service hides the audio object
+        const fallbackDelay = Math.max(2000, cleanedText.split(' ').length * 350);
+        setTimeout(() => {
+          setCurrentlyPlayingId((current) => current === messageId ? null : current);
+        }, fallbackDelay);
+      }
+    } catch (error) {
+      console.error('TTS execution failed:', error);
+      setCurrentlyPlayingId(null);
+    }
   };
 
   /**
@@ -300,17 +368,16 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
           text: cleanText,
           imageUrl: finalImageUrl,
           videoUrl: finalVideoUrl,
-          isImageLoading: shouldGenerateImage, // ✅ Uses the corrected flag
+          isImageLoading: shouldGenerateImage, 
           timestamp: Date.now()
       });
 
       // ✅ 🗣️ TRIGGER TEXT TO SPEECH (Auto-Speech)
-      if (cleanText) {
+      if (cleanText && autoTTS) {
         // Strip out asterisk actions (e.g., *smiles*) so she doesn't read them aloud
         const speechText = cleanText.replace(/\*.*?\*/g, '').trim();
         if (speechText.length > 0) {
-          // Uses the assigned voice ID from character profile, or falls back to 'ara'
-          playAriaSpeech(speechText, character.voiceId || 'ara'); 
+          playTTS(speechText, responseMessageId); 
         }
       }
 
@@ -426,9 +493,20 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
           </div>
         </div>
         
-        <button onClick={() => onOpenBotCustomization(botId)} className="p-2.5 bg-white/5 text-zinc-400 hover:text-purple-400 hover:bg-white/10 rounded-xl transition-all">
-          <Settings className="w-5 h-5" />
-        </button>
+        {/* ✅ Header Action Items (Includes new TTS Toggle) */}
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={() => setAutoTTS(!autoTTS)} 
+            className={`p-2.5 rounded-xl transition-all ${autoTTS ? 'bg-purple-500/20 text-purple-400' : 'bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10'}`}
+            title={autoTTS ? "Auto-TTS Enabled" : "Auto-TTS Disabled"}
+          >
+            {autoTTS ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
+          </button>
+
+          <button onClick={() => onOpenBotCustomization(botId)} className="p-2.5 bg-white/5 text-zinc-400 hover:text-purple-400 hover:bg-white/10 rounded-xl transition-all">
+            <Settings className="w-5 h-5" />
+          </button>
+        </div>
       </header>
 
       <main 
@@ -452,6 +530,9 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
                 onMediaClick={(url, type) => setSelectedMedia({ url, type: type as any })}
                 onAnimateRequest={() => handleAnimateRequest(msg)}
                 onRegenerateImage={() => handleRegenerateImage(msg)}
+                // ✅ ADDED TTS PROPS
+                isCurrentlyPlaying={currentlyPlayingId === msg.id}
+                onToggleTTS={(text, id) => playTTS(text, id)}
               />
             ))
           )}
