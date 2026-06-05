@@ -10,6 +10,7 @@ import { fetchGiphyUrl } from '../services/giphyService';
 import { fetchYoutubeUrl } from '../services/youtubeService';
 import { generateAriaResponse, extractContextPrompt } from '../services/ariaService';
 import { fetchSpicyLink } from '../services/spicyService';
+import { playAriaSpeech } from '../services/ttsService'; // ✅ ADDED TTS IMPORT
 
 interface MainChatAreaProps {
   character: CharacterProfile;
@@ -303,6 +304,16 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
           timestamp: Date.now()
       });
 
+      // ✅ 🗣️ TRIGGER TEXT TO SPEECH
+      if (cleanText) {
+        // Strip out asterisk actions (e.g., *smiles*) so she doesn't read them aloud
+        const speechText = cleanText.replace(/\*.*?\*/g, '').trim();
+        if (speechText.length > 0) {
+          // 'ara' is the warm voice, 'eve' is energetic. Feel free to change this!
+          playAriaSpeech(speechText, 'ara'); 
+        }
+      }
+
       // 5. TRIGGER AI IMAGE GENERATION (Only if explicitly needed)
       if (shouldGenerateImage) {
         try {
@@ -439,6 +450,7 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
                 key={msg.id} 
                 message={msg} 
                 characterName={character.name} 
+                // ✅ UPDATED: Pass type as 'any' to accept new types
                 onMediaClick={(url, type) => setSelectedMedia({ url, type: type as any })}
                 onAnimateRequest={() => handleAnimateRequest(msg)}
                 onRegenerateImage={() => handleRegenerateImage(msg)}
@@ -451,6 +463,7 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
 
       {/* INPUT AREA */}
       <footer 
+        // ✅ FIX: Changed lg:left-[300px] to lg:left-[280px] to match the exact width of the sidebar
         className={`fixed bottom-0 left-0 right-0 z-50 p-4 md:p-6 bg-gradient-to-t from-zinc-950 via-zinc-950 to-transparent
           ${isDesktopSidebarOpen ? 'lg:left-[280px]' : 'lg:left-0'}
         `}
