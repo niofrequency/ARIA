@@ -20,7 +20,7 @@ const RUNPOD_MODELS = [
 
 const LORA_OPTIONS = [
   // Core Image Adjustment LoRAs
-  { id: "yarn_qwen.safetensors", name: "YARN" }, { id: "hmfemme_qwen.safetensors", name: "HMFEM" },  { id: "shavedpussyv1.safetensors", name: "PSY1" }, 
+  { id: "yarn_qwen.safetensors", name: "YARN" }, { id: "hmfemme_qwen.safetensors", name: "HMFEM" },  { id: "shavedpussyv1.safetensors", name: "PSY1" },  
   { id: "hairypussyv5.safetensors", name: "HRYPSY5" },{ id: "hairypussyv6.safetensors", name: "HRYPSY6" },{ id: "hairypussyv7.safetensors", name: "HRYPSY7" },{ id: "hairypussyv8.safetensors", name: "HRYPSY8" },{ id: "hairypussyv9.safetensors", name: "HRYPSY9" },
   { id: "qwen4play.safetensors", name: "QWEN4PLAY" }, { id: "FemNde.safetensors", name: "FEMNUDE" },
   { id: "ENZOM_BJ.safetensors", name: "ENZOM_BJ" }, { id: "ZOOTALLURES_BJ.safetensors", name: "ZOOTALLURES_BJ" },
@@ -32,45 +32,45 @@ const LORA_OPTIONS = [
   { id: "NATURALSKIN.safetensors", name: "NATURALSKIN" }
 ];
 
-// ✅ ADDED: Massive Voice Library
+// ✅ UPDATED: Massive Voice Library with Age Categories added
 const TTS_VOICES = [
   // Base English Voices
-  { id: 'eve', name: 'Eve (Energetic)', gender: 'female' },
-  { id: 'ara', name: 'Ara (Warm)', gender: 'female' },
-  { id: 'rex', name: 'Rex (Professional)', gender: 'male' },
-  { id: 'leo', name: 'Leo (Authoritative)', gender: 'male' },
-  { id: 'sal', name: 'Sal (Versatile)', gender: 'male' },
+  { id: 'eve', name: 'Eve (Energetic)', gender: 'female', age: 'young' },
+  { id: 'ara', name: 'Ara (Warm)', gender: 'female', age: 'young' },
+  { id: 'rex', name: 'Rex (Professional)', gender: 'male', age: 'middle' },
+  { id: 'leo', name: 'Leo (Authoritative)', gender: 'male', age: 'middle' },
+  { id: 'sal', name: 'Sal (Versatile)', gender: 'male', age: 'young' },
 
   // Middle Aged Woman
-  { id: '458705c07139', name: 'Clara (German)', gender: 'female' },
-  { id: '247783ebdd51', name: 'Noor (Dutch)', gender: 'female' },
-  { id: '34fd4dce1ba3', name: 'Elina (Finnish)', gender: 'female' },
-  { id: '58d27475085e', name: 'Femke (Dutch)', gender: 'female' },
-  { id: '6da5baee46d0', name: 'Beatriz (Portuguese)', gender: 'female' },
-  { id: '79f3a8b96d43', name: 'Claire (English)', gender: 'female' },
-  { id: '97fabd54445f', name: 'Katarzyna (Polish)', gender: 'female' },
-  { id: 'd0cb9ff07d95', name: 'Sakura (Japanese)', gender: 'female' },
-  { id: '97zmdc6s', name: 'Ida (Danish)', gender: 'female' },
-  { id: '69smp8rm', name: 'Camille (French)', gender: 'female' },
-  { id: 'hqxr4yub', name: 'Luca (Italian)', gender: 'female' },
-  { id: '33g9t0jl', name: 'Xia (Chinese)', gender: 'female' },
+  { id: '458705c07139', name: 'Clara (German)', gender: 'female', age: 'middle' },
+  { id: '247783ebdd51', name: 'Noor (Dutch)', gender: 'female', age: 'middle' },
+  { id: '34fd4dce1ba3', name: 'Elina (Finnish)', gender: 'female', age: 'middle' },
+  { id: '58d27475085e', name: 'Femke (Dutch)', gender: 'female', age: 'middle' },
+  { id: '6da5baee46d0', name: 'Beatriz (Portuguese)', gender: 'female', age: 'middle' },
+  { id: '79f3a8b96d43', name: 'Claire (English)', gender: 'female', age: 'middle' },
+  { id: '97fabd54445f', name: 'Katarzyna (Polish)', gender: 'female', age: 'middle' },
+  { id: 'd0cb9ff07d95', name: 'Sakura (Japanese)', gender: 'female', age: 'middle' },
+  { id: '97zmdc6s', name: 'Ida (Danish)', gender: 'female', age: 'middle' },
+  { id: '69smp8rm', name: 'Camille (French)', gender: 'female', age: 'middle' },
+  { id: 'hqxr4yub', name: 'Luca (Italian)', gender: 'female', age: 'middle' },
+  { id: '33g9t0jl', name: 'Xia (Chinese)', gender: 'female', age: 'middle' },
 
   // Old Woman
-  { id: 'd634b6da3d3b', name: 'Aylin (Turkish)', gender: 'female' },
+  { id: 'd634b6da3d3b', name: 'Aylin (Turkish)', gender: 'female', age: 'old' },
 
   // Young Woman
-  { id: 'd18jlf6v', name: 'Hao (Chinese)', gender: 'female' },
-  { id: 'om17cury', name: 'Irina (Russian)', gender: 'female' },
-  { id: '73xd5dum', name: 'Ananya (Hindi)', gender: 'female' },
-  { id: 'f8cf5c2c78d4', name: 'Grace (English)', gender: 'female' },
-  { id: 'c3a2c594479e', name: 'Heimi (Finnish)', gender: 'female' },
-  { id: 'a0401c9101f8', name: 'Seo-yeon (Korean)', gender: 'female' },
-  { id: '490ea3be50b1', name: 'Saga (Swedish)', gender: 'female' },
-  { id: '3a7889066fa2', name: 'Lena (German)', gender: 'female' },
-  { id: '35c8d7f60dc8', name: 'Layla (Arabic)', gender: 'female' },
-  { id: '23be42535a45', name: 'Ji-yeon (Korean)', gender: 'female' },
-  { id: '1b12d5daee6b', name: 'Aleksandra (Polish)', gender: 'female' },
-  { id: '0895a5b8ce5c', name: 'Mai (Vietnamese)', gender: 'female' },
+  { id: 'd18jlf6v', name: 'Hao (Chinese)', gender: 'female', age: 'young' },
+  { id: 'om17cury', name: 'Irina (Russian)', gender: 'female', age: 'young' },
+  { id: '73xd5dum', name: 'Ananya (Hindi)', gender: 'female', age: 'young' },
+  { id: 'f8cf5c2c78d4', name: 'Grace (English)', gender: 'female', age: 'young' },
+  { id: 'c3a2c594479e', name: 'Heimi (Finnish)', gender: 'female', age: 'young' },
+  { id: 'a0401c9101f8', name: 'Seo-yeon (Korean)', gender: 'female', age: 'young' },
+  { id: '490ea3be50b1', name: 'Saga (Swedish)', gender: 'female', age: 'young' },
+  { id: '3a7889066fa2', name: 'Lena (German)', gender: 'female', age: 'young' },
+  { id: '35c8d7f60dc8', name: 'Layla (Arabic)', gender: 'female', age: 'young' },
+  { id: '23be42535a45', name: 'Ji-yeon (Korean)', gender: 'female', age: 'young' },
+  { id: '1b12d5daee6b', name: 'Aleksandra (Polish)', gender: 'female', age: 'young' },
+  { id: '0895a5b8ce5c', name: 'Mai (Vietnamese)', gender: 'female', age: 'young' },
 ];
 
 const TOTAL_STEPS = 10;
@@ -104,6 +104,9 @@ const CompanionCreationModal: React.FC<CompanionCreationModalProps> = ({
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
   const [isLoraDropdownOpen, setIsLoraDropdownOpen] = useState(false);
   const [isVoiceDropdownOpen, setIsVoiceDropdownOpen] = useState(false); // ✅ Voice Dropdown State
+
+  // ✅ New Filter State for Voices
+  const [voiceAgeFilter, setVoiceAgeFilter] = useState<'all' | 'young' | 'middle' | 'old'>('all');
 
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
@@ -265,34 +268,58 @@ const CompanionCreationModal: React.FC<CompanionCreationModalProps> = ({
     </div>
   );
 
-  // ✅ UPDATED: Dynamic Voice Selector with Custom Dropdown & Preview Button
+  // ✅ UPDATED: Dynamic Voice Selector with Custom Dropdown, Age Filter Tabs & Preview Button
   const renderVoiceSelect = () => {
     const genderText = (formData.gender || '').toLowerCase();
     const isFemale = genderText.includes('female') || genderText === 'f' || genderText.includes('woman') || genderText.includes('girl');
     const isMale = !isFemale && (genderText.includes('male') || genderText === 'm' || genderText.includes('man') || genderText.includes('boy'));
     
     const filteredVoices = TTS_VOICES.filter(v => {
-      if (isFemale) return v.gender === 'female';
-      if (isMale) return v.gender === 'male';
-      return true; 
+      // 1. Gender Filter (Automatic)
+      let matchesGender = true;
+      if (isFemale) matchesGender = v.gender === 'female';
+      if (isMale) matchesGender = v.gender === 'male';
+      if (!matchesGender) return false;
+
+      // 2. Age Filter (Manual)
+      if (voiceAgeFilter === 'all') return true;
+      return v.age === voiceAgeFilter;
     });
 
     const selectedVoice = TTS_VOICES.find(v => v.id === formData.voiceId);
 
     return (
       <div className="w-full mt-6 text-left">
-        <label className="flex items-center gap-1 text-[11px] uppercase tracking-widest font-bold ml-1 text-zinc-500 mb-2">
-          <Volume2 className="w-4 h-4 text-purple-400" /> Vocal Synthesis
+        <label className="flex items-center justify-between text-[11px] uppercase tracking-widest font-bold ml-1 text-zinc-500 mb-2">
+          <span className="flex items-center gap-1"><Volume2 className="w-4 h-4 text-purple-400" /> Vocal Synthesis</span>
         </label>
         
+        {/* ✅ AGE FILTER TABS */}
+        <div className="flex gap-2 mb-2 overflow-x-auto custom-scrollbar pb-1">
+          {['all', 'young', 'middle', 'old'].map((filter) => (
+            <button
+              key={filter}
+              type="button"
+              onClick={() => setVoiceAgeFilter(filter as any)}
+              className={`px-3 py-1.5 rounded-lg text-[10px] uppercase tracking-widest font-bold transition-all whitespace-nowrap ${
+                voiceAgeFilter === filter 
+                  ? 'bg-purple-500 text-white shadow-[0_0_10px_rgba(147,51,234,0.3)]' 
+                  : 'bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10'
+              }`}
+            >
+              {filter}
+            </button>
+          ))}
+        </div>
+
         <div className="flex gap-2 items-center">
           <div className="relative flex-1">
             <div 
               onClick={() => setIsVoiceDropdownOpen(!isVoiceDropdownOpen)}
               className="w-full p-4 bg-purple-500/5 border border-purple-500/20 rounded-2xl text-sm uppercase tracking-widest outline-none hover:border-purple-500/50 text-purple-300 shadow-inner cursor-pointer flex items-center justify-between transition-colors"
             >
-              <span>{selectedVoice ? selectedVoice.name : 'Default Voice (Auto-Selected)'}</span>
-              <ChevronDown className={`w-4 h-4 text-purple-500/50 transition-transform ${isVoiceDropdownOpen ? 'rotate-180' : ''}`} />
+              <span className="truncate pr-4">{selectedVoice ? selectedVoice.name : 'Default Voice (Auto-Selected)'}</span>
+              <ChevronDown className={`w-4 h-4 shrink-0 text-purple-500/50 transition-transform ${isVoiceDropdownOpen ? 'rotate-180' : ''}`} />
             </div>
 
             {isVoiceDropdownOpen && (
@@ -309,6 +336,11 @@ const CompanionCreationModal: React.FC<CompanionCreationModalProps> = ({
                   >
                     Default (Auto-Selected)
                   </button>
+                  {filteredVoices.length === 0 && (
+                    <div className="px-4 py-6 text-xs text-center font-mono text-zinc-500 italic">
+                      No voices found for this category.
+                    </div>
+                  )}
                   {filteredVoices.map(v => (
                     <button
                       key={v.id}
@@ -612,7 +644,7 @@ const CompanionCreationModal: React.FC<CompanionCreationModalProps> = ({
                         />
                         <span className="text-xs font-mono text-zinc-500 w-8 text-right">{lora.strength.toFixed(1)}</span>
                         <button type="button" onClick={() => removeRunpodLora(lora.id)} className="text-zinc-600 hover:text-red-400 p-1.5 transition-colors">
-                          <Plus className="w-4 h-4 rotate-45" />
+                          <X className="w-4 h-4" />
                         </button>
                       </div>
                     ))}
