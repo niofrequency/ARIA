@@ -1,56 +1,53 @@
-// api/tts.ts
-import type { VercelRequest, VercelResponse } from '@vercel/node';
+// services/ttsService.ts
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // CORS Setup
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
-  if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-
-  const apiKey = process.env.XAI_API_KEY;
-  if (!apiKey) {
-    return res.status(500).json({ error: 'Missing XAI_API_KEY' });
-  }
-
+/**
+ * Plays text-to-speech audio for Aria, preserving all expressive special characters,
+ * punctuation markers, and custom formatting cues passed into the text payload.
+ * * @param text The expressive text string containing punctuation or special cues.
+ * @param voiceId The identifier for the voice model target (defaults to 'ara').
+ */
+export const playAriaSpeech = async (text: string, voiceId: string = 'ara'): Promise<void> => {
   try {
-    const { text, voice_id = 'ara' } = req.body; // 'ara' is a warm voice, 'eve' is energetic
-
-    if (!text) {
-      return res.status(400).json({ error: 'Text is required' });
-    }
-
-    const response = await fetch("https://api.x.ai/v1/tts", {
-      method: "POST",
+    const response = await fetch('/api/tts', {
+      method: 'POST',
       headers: {
-        "Authorization": `Bearer ${apiKey}`,
-        "Content-Type": "application/json"
+        'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        text,
-        voice_id,
-        language: "en"
-      })
+      body: JSON.stringify({ 
+        text, // Retains full Unicode characters, punctuation, and expressive symbols
+        voice_id: voiceId 
+      }),
     });
 
     if (!response.ok) {
-      const errText = await response.text();
-      console.error("❌ TTS API Error:", errText);
-      return res.status(response.status).json({ error: errText });
+      throw new Error(`TTS Failed: ${response.statusText}`);
     }
 
-    // Convert the response to a Buffer and send it back as an audio file
-    const arrayBuffer = await response.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
+    // Convert the binary response to an audio Blob
+    const audioBlob = await response.blob();
+    
+    // Create a temporary object URL for the browser's native Audio playback
+    const audioUrl = URL.createObjectURL(audioBlob);
+    const audio = new Audio(audioUrl);
+    
+    // Play the audio and return a promise tracking completion or failure
+    await audio.play();
 
-    res.setHeader('Content-Type', 'audio/mpeg');
-    res.setHeader('Content-Length', buffer.length);
-    return res.send(buffer);
+    return new Promise<void>((resolve) => {
+      audio.onended = () => {
+        URL.revokeObjectURL(audioUrl);
+        resolve();
+      };
 
-  } catch (error: any) {
-    console.error("❌ TTS Proxy Failure:", error);
-    return res.status(500).json({ error: error.message });
+      audio.onerror = (err) => {
+        console.error("❌ Audio element encountered an error during playback:", err);
+        URL.revokeObjectURL(audioUrl);
+        resolve(); // Resolve to prevent hanging up upstream call stacks
+      };
+    });
+
+  } catch (error) {
+    console.error("❌ Audio playback failed:", error);
+    throw error;
   }
-}
+};
