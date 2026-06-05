@@ -32,14 +32,45 @@ const LORA_OPTIONS = [
   { id: "NATURALSKIN.safetensors", name: "NATURALSKIN" }
 ];
 
-// ✅ ADDED: TTS Voices mapping for the dropdown (including Clara)
+// ✅ ADDED: Massive Voice Library
 const TTS_VOICES = [
+  // Base English Voices
   { id: 'eve', name: 'Eve (Energetic)', gender: 'female' },
   { id: 'ara', name: 'Ara (Warm)', gender: 'female' },
-  { id: 'clara', name: 'Clara (German)', gender: 'female' },
   { id: 'rex', name: 'Rex (Professional)', gender: 'male' },
   { id: 'leo', name: 'Leo (Authoritative)', gender: 'male' },
   { id: 'sal', name: 'Sal (Versatile)', gender: 'male' },
+
+  // Middle Aged Woman
+  { id: '458705c07139', name: 'Clara (German)', gender: 'female' },
+  { id: '247783ebdd51', name: 'Noor (Dutch)', gender: 'female' },
+  { id: '34fd4dce1ba3', name: 'Elina (Finnish)', gender: 'female' },
+  { id: '58d27475085e', name: 'Femke (Dutch)', gender: 'female' },
+  { id: '6da5baee46d0', name: 'Beatriz (Portuguese)', gender: 'female' },
+  { id: '79f3a8b96d43', name: 'Claire (English)', gender: 'female' },
+  { id: '97fabd54445f', name: 'Katarzyna (Polish)', gender: 'female' },
+  { id: 'd0cb9ff07d95', name: 'Sakura (Japanese)', gender: 'female' },
+  { id: '97zmdc6s', name: 'Ida (Danish)', gender: 'female' },
+  { id: '69smp8rm', name: 'Camille (French)', gender: 'female' },
+  { id: 'hqxr4yub', name: 'Luca (Italian)', gender: 'female' },
+  { id: '33g9t0jl', name: 'Xia (Chinese)', gender: 'female' },
+
+  // Old Woman
+  { id: 'd634b6da3d3b', name: 'Aylin (Turkish)', gender: 'female' },
+
+  // Young Woman
+  { id: 'd18jlf6v', name: 'Hao (Chinese)', gender: 'female' },
+  { id: 'om17cury', name: 'Irina (Russian)', gender: 'female' },
+  { id: '73xd5dum', name: 'Ananya (Hindi)', gender: 'female' },
+  { id: 'f8cf5c2c78d4', name: 'Grace (English)', gender: 'female' },
+  { id: 'c3a2c594479e', name: 'Heimi (Finnish)', gender: 'female' },
+  { id: 'a0401c9101f8', name: 'Seo-yeon (Korean)', gender: 'female' },
+  { id: '490ea3be50b1', name: 'Saga (Swedish)', gender: 'female' },
+  { id: '3a7889066fa2', name: 'Lena (German)', gender: 'female' },
+  { id: '35c8d7f60dc8', name: 'Layla (Arabic)', gender: 'female' },
+  { id: '23be42535a45', name: 'Ji-yeon (Korean)', gender: 'female' },
+  { id: '1b12d5daee6b', name: 'Aleksandra (Polish)', gender: 'female' },
+  { id: '0895a5b8ce5c', name: 'Mai (Vietnamese)', gender: 'female' },
 ];
 
 const TOTAL_STEPS = 10;
@@ -300,9 +331,19 @@ const CompanionCreationModal: React.FC<CompanionCreationModalProps> = ({
             type="button"
             disabled={!formData.voiceId || isSaving || isForging}
             onClick={() => {
-              const text = formData.voiceId === 'clara' 
-                ? "Hallo! Ich bin Clara. Wie gefällt dir meine Stimme?"
-                : "Hello! This is a preview of my voice.";
+              // Localized preview snippets
+              const previews: Record<string, string> = {
+                '458705c07139': "Hallo! Ich bin Clara. Wie gefällt dir meine Stimme?",
+                '3a7889066fa2': "Hallo! Ich bin Lena. Wie gefällt dir meine Stimme?",
+                'd18jlf6v': "你好！这是我的声音预览。", // Hao (Chinese)
+                '33g9t0jl': "你好！这是我的声音预览。", // Xia (Chinese)
+                'om17cury': "Привет! Это превью моего голоса.", // Irina (Russian)
+                'd0cb9ff07d95': "こんにちは！これは私の声のプレビューです。", // Sakura (Japanese)
+                'a0401c9101f8': "안녕하세요! 제 목소리 미리보기입니다.", // Seo-yeon (Korean)
+                '23be42535a45': "안녕하세요! 제 목소리 미리보기입니다.", // Ji-yeon (Korean)
+                '69smp8rm': "Bonjour! Voici un aperçu de ma voix.", // Camille (French)
+              };
+              const text = previews[formData.voiceId || ''] || "Hello! This is a preview of my voice. How do I sound?";
               playAriaSpeech(text, formData.voiceId);
             }}
             className="flex items-center justify-center w-[54px] h-[54px] bg-purple-600 hover:bg-purple-500 text-white rounded-2xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0 shadow-[0_0_15px_rgba(147,51,234,0.3)]"
