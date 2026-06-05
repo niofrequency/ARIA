@@ -13,8 +13,10 @@ import {
   Wand2,          
   ExternalLink,   
   Youtube,
-  Play            
+  Play,
+  Volume2 // ✅ ADDED VOLUME ICON
 } from 'lucide-react';
+import { playAriaSpeech } from '../services/ttsService'; // ✅ ADDED TTS SERVICE
 
 interface ChatMessageProps {
   message: Message;
@@ -34,7 +36,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
   const isUser = message.role === 'user';
   const [viewMode, setViewMode] = useState<'video' | 'image'>('video');
   const [isDownloading, setIsDownloading] = useState(false);
-  const [showMobileOverlay, setShowMobileOverlay] = useState(false); // Mobile tap state
+  const [showMobileOverlay, setShowMobileOverlay] = useState(false);
 
   // --- TYPEWRITER STATE ---
   const [shouldAnimate] = useState(() => {
@@ -327,18 +329,15 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
                 
                 {/* LEFT BUTTONS: THEATER MODE or NATIVE CONTROLS */}
                 {mediaType === 'embed' || mediaType === 'youtube' ? (
-                   // ✅ Theater Mode for Embeds
                    <button onClick={() => onMediaClick(message.videoUrl!, mediaType as any)} className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-purple-400 hover:text-white transition-colors">
                      <Maximize2 className="w-3 h-3" /> Theater Mode
                    </button>
                 ) : message.videoUrl ? (
-                  // ✅ Switch View for Native Videos
                   <button onClick={() => setViewMode(prev => prev === 'video' ? 'image' : 'video')} className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-zinc-500 hover:text-white transition-colors">
                     {viewMode === 'video' ? <ImageIcon className="w-3 h-3" /> : <Film className="w-3 h-3" />}
                     {viewMode === 'video' ? 'Show Static' : 'Show Motion'}
                   </button>
                 ) : (
-                   // ✅ Animate Button for Images
                    <button onClick={() => onAnimateRequest(message)} className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-purple-400 hover:text-purple-300 transition-colors animate-pulse">
                     <Wand2 className="w-3 h-3" />
                     <span className="md:hidden">Animate</span>
@@ -349,11 +348,9 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
                 {/* RIGHT BUTTONS: DOWNLOAD / REFRESH (Only for Native Files) */}
                 {mediaType !== 'embed' && mediaType !== 'youtube' && (
                     <div className="flex items-center gap-3">
-                        {/* Refresh Button */}
                         <button onClick={() => { if (message.videoUrl && viewMode === 'video') onAnimateRequest(message); else onRegenerateImage(message); }} className="text-zinc-600 hover:text-purple-400 transition-all hover:rotate-180 duration-500">
                             <RefreshCw className="w-3.5 h-3.5" />
                         </button>
-                        {/* Download Button */}
                         <button onClick={handleDownload} disabled={isDownloading} className={`flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider transition-colors ${isDownloading ? 'text-zinc-600 cursor-wait' : 'text-zinc-500 hover:text-purple-400'}`}>
                             {isDownloading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
                             {isDownloading ? 'Saving...' : (viewMode === 'video' && message.videoUrl ? 'Save MP4' : 'Save PNG')}
@@ -365,11 +362,29 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
           </div>
         )}
         
-        {/* TIMESTAMP */}
-        <div className="flex items-center gap-2 mt-2 px-1 text-[9px] text-zinc-600 font-mono tracking-tighter uppercase">
+        {/* TIMESTAMP & TTS CONTROLS */}
+        <div className="flex items-center gap-3 mt-2 px-1 text-[9px] text-zinc-600 font-mono tracking-tighter uppercase">
           <span>[{new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}]</span>
-          {mediaType === 'youtube' && <span className="text-red-500 font-bold ml-2 flex items-center gap-1"><Youtube className="w-3 h-3"/> YouTube</span>}
-          {mediaType === 'embed' && <span className="text-purple-500 font-bold ml-2 flex items-center gap-1"><Play className="w-3 h-3 fill-current"/> Video Feed</span>}
+          
+          {mediaType === 'youtube' && <span className="text-red-500 font-bold flex items-center gap-1"><Youtube className="w-3 h-3"/> YouTube</span>}
+          {mediaType === 'embed' && <span className="text-purple-500 font-bold flex items-center gap-1"><Play className="w-3 h-3 fill-current"/> Video Feed</span>}
+
+          {/* ✅ TTS MANUAL PLAY BUTTON FOR AI MESSAGES */}
+          {!isUser && message.text && (
+              <>
+                  <span className="text-zinc-700">•</span>
+                  <button 
+                      onClick={() => {
+                          const speechText = message.text?.replace(/\*.*?\*/g, '').trim();
+                          if (speechText) playAriaSpeech(speechText, 'ara');
+                      }}
+                      className="flex items-center gap-1 font-bold hover:text-purple-400 transition-colors cursor-pointer"
+                      title="Read Aloud"
+                  >
+                      <Volume2 className="w-3 h-3" /> Read Aloud
+                  </button>
+              </>
+          )}
         </div>
       </div>
     </div>
