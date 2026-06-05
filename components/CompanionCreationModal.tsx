@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { CharacterProfile } from '../types';
 import { generateAriaImage } from '../services/generateAriaImage';
-import { Sparkles, Cpu, Fingerprint, Activity, Loader2, Plus, Box, Camera, Upload, Server, ArrowRight, ArrowLeft, CheckCircle2, Menu, PanelLeft, ChevronDown, Volume2, Play } from 'lucide-react';
+import { 
+  Sparkles, Cpu, Fingerprint, Activity, Loader2, Plus, Box, Camera, Upload, Server, ArrowRight, ArrowLeft, CheckCircle2, Menu, PanelLeft, ChevronDown, Volume2, Play, X } from 'lucide-react';
+
 import { playAriaSpeech } from '../services/ttsService'; // ✅ ADDED TTS IMPORT
 
 interface CompanionCreationModalProps {
