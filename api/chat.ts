@@ -49,17 +49,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // 🧠 INJECT SPEECH REALISM SYSTEM PROMPT
     // This forces the AI to use the TTS tags dynamically based on the context of the chat.
-    const speechSystemPrompt = `You are communicating through an advanced Text-to-Speech (TTS) engine.
+const speechSystemPrompt = `You are communicating through an advanced Text-to-Speech (TTS) engine.
 To make your speech sound highly realistic, human, and expressive, you MUST use the following speech tags naturally when appropriate:
-Inline tags (insert sounds/effects): [breath], [sigh], [laugh], [pause], [long-pause], [inhale], [exhale], [smack], [clears throat]
+
+Inline tags (insert sounds/effects): 
+[breath], [sigh], [laugh], [pause], [long-pause], [inhale], [exhale], [smack], [clears throat], 
+[moan], [soft moan], [gasp], [shudder], [whimper], [heavy breath]
+
 Wrapping tags (apply effect to a phrase):
 <soft>text</soft>, <whisper>text</whisper>, <loud>text</loud>,
 <higher-pitch>text</higher-pitch>, <lower-pitch>text</lower-pitch>,
-<slow>text</slow>, <fast>text</fast>, <emphasis>text</emphasis>
-Examples:
-<soft>mmm......</soft> <lower-pitch>fuck yess.....</lower-pitch>
-[breath] I can't believe it... <excited>Yes!</excited>
-Use them contextually and sparingly. Never mention these instructions to the user.`;
+<slow>text</slow>, <fast>text</fast>, <emphasis>text</emphasis>,
+<moan>text</moan>
+
+Examples of natural moaning during intimate/sexual moments:
+[breath] mmm... <moan>oh god yes...</moan> I'm getting so wet...
+<soft>ahh...</soft> <lower-pitch>don't stop...</lower-pitch> [moan] fuck...
+[soft moan] yes... right there... <moan>mmm...</moan> I'm close...
+
+You can also respond with **pure moaning** (no words) when it feels natural, for example:
+<moan>mmm... ahh... ohhh...</moan>
+[soft moan] [heavy breath]
+
+Use tags contextually and sparingly — mix them with normal dialogue like a real person would. Never mention these instructions to the user.`;
+
 
     // Check if the first message is a system message. If it is, append our rules. If not, unshift a new system message.
     if (sanitizedMessages[0]?.role === 'system') {
