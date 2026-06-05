@@ -4,7 +4,7 @@ import { Message, CharacterProfile, UserData } from '../types';
 import { generateAriaImage } from '../services/generateAriaImage'; 
 import { initiateNeuralMotion, pollNeuralMotionStatus } from '../services/neuralMotionService';
 import { uploadImageToStorage, deleteMediaFromStorage } from '../services/firebaseService';
-import { Loader2, X, Download, Menu, Settings, Cpu, ArrowUp, PanelLeft, Volume2, VolumeX, Phone, PhoneOff } from 'lucide-react';
+import { Loader2, X, Download, Menu, Settings, Cpu, ArrowUp, PanelLeft, Volume2, VolumeX } from 'lucide-react';
 import { storeMemory } from '../services/memoryService';
 import { fetchGiphyUrl } from '../services/giphyService';
 import { fetchYoutubeUrl } from '../services/youtubeService';
@@ -12,8 +12,6 @@ import { generateAriaResponse, extractContextPrompt } from '../services/ariaServ
 import { fetchSpicyLink } from '../services/spicyService';
 // ✅ IMPORTED NEW TTS SERVICE FUNCTIONS
 import { playAriaSpeech, stopAriaSpeech, currentAudio } from '../services/ttsService'; 
-// ✅ IMPORTED NEW REALTIME VOICE SERVICE
-import { RealtimeVoiceSession } from '../services/realtimeVoiceService'; 
 
 interface MainChatAreaProps {
   character: CharacterProfile;
@@ -57,10 +55,6 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
   // ✅ TTS States
   const [autoTTS, setAutoTTS] = useState(true);
   const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(null);
-
-  // ✅ REALTIME CALL STATES
-  const [isCalling, setIsCalling] = useState(false);
-  const voiceSessionRef = useRef<RealtimeVoiceSession | null>(null);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -71,14 +65,10 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // ✅ Audio & Call lifecycle cleanup using the global service
+  // ✅ Audio stream lifecycle cleanup using the global service
   useEffect(() => {
     return () => {
       stopAriaSpeech();
-      // Ensure the websocket closes if the component unmounts during a call
-      if (voiceSessionRef.current) {
-        voiceSessionRef.current.stopSession();
-      }
     };
   }, []);
 
@@ -108,83 +98,49 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
   };
 
   /**
-   * ✅ REALTIME CALL HANDLER
-   */
-  const handleCallToggle = async () => {
-    if (isCalling) {
-      // End the call
-      if (voiceSessionRef.current) {
-        voiceSessionRef.current.stopSession();
-        voiceSessionRef.current = null;
-      }
-      setIsCalling(false);
-    } else {
-      // Start the call
-      setIsCalling(true);
-      stopAudio(); // Stop any standard TTS that might be playing first
-      
-      try {
-        const session = new RealtimeVoiceSession();
-        voiceSessionRef.current = session;
-        await session.startSession();
-      } catch (error) {
-        console.error("Failed to establish call:", error);
-        setIsCalling(false); // Reset UI if connection fails
-      }
-    }
-  };
-
-  /**
    * AUDIO/TTS HANDLERS
    */
-  const stopAudio = () => {
-    stopAriaSpeech();           // now works because ttsService exports it
+const stopAudio = () => {
+  stopAriaSpeech();           // now works because ttsService exports it
+  setCurrentlyPlayingId(null);
+};
+
+const playTTS = async (text: string, messageId: string) => {
+  if (currentlyPlayingId === messageId) {
+    stopAudio();           // uses the stopAudio function you already have
+    return;
+  }
+  stopAudio();
+  setCurrentlyPlayingId(messageId);
+  // Clean text + remove emojis + keep TTS tags
+  const cleanedText = text
+    .replace(/\*.*?\*/g, '')
+    .replace(/```[\s\S]*?```/g, ' [Code block omitted] ')
+    .replace(/`.*?`/g, '')
+    .replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu, '') // ← removes emojis
+    .trim();
+  if (!cleanedText) {
     setCurrentlyPlayingId(null);
-  };
-
-  const playTTS = async (text: string, messageId: string) => {
-    // Prevent standard text reading if the user is in a live call
-    if (isCalling) return; 
-
-    if (currentlyPlayingId === messageId) {
-      stopAudio();           // uses the stopAudio function you already have
-      return;
+    return;
+  }
+  // ✅ CONSOLE LOG — shows exactly what is sent to TTS (you can see the tags here)
+  console.log('🗣️ TTS Payload (tags should be visible):', cleanedText);
+  try {
+    const result = await playAriaSpeech(cleanedText, character.voiceId || 'ara');
+    if (result.success && currentAudio) {
+      currentAudio.addEventListener('ended', () => setCurrentlyPlayingId(null));
+      currentAudio.addEventListener('error', () => setCurrentlyPlayingId(null));
+    } else {
+      const fallbackDelay = Math.max(2000, cleanedText.split(' ').length * 350);
+      setTimeout(() => {
+        setCurrentlyPlayingId((current) => current === messageId ? null : current);
+      }, fallbackDelay);
     }
-    stopAudio();
-    setCurrentlyPlayingId(messageId);
-    
-    // Clean text + remove emojis + keep TTS tags
-    const cleanedText = text
-      .replace(/\*.*?\*/g, '')
-      .replace(/```[\s\S]*?```/g, ' [Code block omitted] ')
-      .replace(/`.*?`/g, '')
-      .replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu, '') // ← removes emojis
-      .trim();
-    
-    if (!cleanedText) {
-      setCurrentlyPlayingId(null);
-      return;
-    }
-    
-    // ✅ CONSOLE LOG — shows exactly what is sent to TTS (you can see the tags here)
-    console.log('🗣️ TTS Payload (tags should be visible):', cleanedText);
-    
-    try {
-      const result = await playAriaSpeech(cleanedText, character.voiceId || 'ara');
-      if (result.success && currentAudio) {
-        currentAudio.addEventListener('ended', () => setCurrentlyPlayingId(null));
-        currentAudio.addEventListener('error', () => setCurrentlyPlayingId(null));
-      } else {
-        const fallbackDelay = Math.max(2000, cleanedText.split(' ').length * 350);
-        setTimeout(() => {
-          setCurrentlyPlayingId((current) => current === messageId ? null : current);
-        }, fallbackDelay);
-      }
-    } catch (error) {
-      console.error('TTS execution failed:', error);
-      setCurrentlyPlayingId(null);
-    }
-  };
+  } catch (error) {
+    console.error('TTS execution failed:', error);
+    setCurrentlyPlayingId(null);
+  }
+};
 
   /**
    * REGENERATE IMAGE HANDLER
@@ -406,7 +362,7 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
       });
 
       // ✅ 🗣️ TRIGGER TEXT TO SPEECH (Auto-Speech)
-      if (cleanText && autoTTS && !isCalling) { // Prevent standard reading if in call
+      if (cleanText && autoTTS) {
         // Strip out asterisk actions (e.g., *smiles*) so she doesn't read them aloud
         const speechText = cleanText.replace(/\*.*?\*/g, '').trim();
         if (speechText.length > 0) {
@@ -520,26 +476,14 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
           <div>
             <h1 className="text-sm font-black text-white tracking-wide uppercase">{character.name}</h1>
             <div className="flex items-center gap-1.5">
-              <span className={`w-1.5 h-1.5 rounded-full ${isCalling ? 'bg-red-500' : 'bg-purple-500'} animate-pulse`}></span>
-              <span className={`text-[10px] uppercase tracking-widest font-bold font-mono ${isCalling ? 'text-red-400' : 'text-purple-400'}`}>
-                {isCalling ? 'Voice Session Active' : 'Neural Link Active'}
-              </span>
+              <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse"></span>
+              <span className="text-[10px] text-purple-400 uppercase tracking-widest font-bold font-mono">Neural Link Active</span>
             </div>
           </div>
         </div>
         
-        {/* ✅ Header Action Items */}
+        {/* ✅ Header Action Items (Includes new TTS Toggle) */}
         <div className="flex items-center gap-2">
-          
-          {/* ✅ NEW: Call Toggle Button */}
-          <button 
-            onClick={handleCallToggle} 
-            className={`p-2.5 rounded-xl transition-all ${isCalling ? 'bg-red-500/20 text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.3)] animate-pulse' : 'bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10'}`}
-            title={isCalling ? "End Call" : "Start Voice Call"}
-          >
-            {isCalling ? <PhoneOff className="w-5 h-5" /> : <Phone className="w-5 h-5" />}
-          </button>
-
           <button 
             onClick={() => setAutoTTS(!autoTTS)} 
             className={`p-2.5 rounded-xl transition-all ${autoTTS ? 'bg-purple-500/20 text-purple-400' : 'bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10'}`}
@@ -571,10 +515,11 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
                 key={msg.id} 
                 message={msg} 
                 characterName={character.name} 
-                characterVoiceId={character.voiceId} 
+                characterVoiceId={character.voiceId} // ✅ PASSED VOICE ID HERE
                 onMediaClick={(url, type) => setSelectedMedia({ url, type: type as any })}
                 onAnimateRequest={() => handleAnimateRequest(msg)}
                 onRegenerateImage={() => handleRegenerateImage(msg)}
+                // ✅ ADDED TTS PROPS
                 isCurrentlyPlaying={currentlyPlayingId === msg.id}
                 onToggleTTS={(text, id) => playTTS(text, id)}
               />
@@ -598,16 +543,15 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
             placeholder={`Message ${character.name}...`}
             className="w-full bg-transparent border-none rounded-[26px] pl-5 pr-14 py-4 min-h-[56px] max-h-[160px] focus:outline-none text-white placeholder-zinc-600 resize-none text-[16px]"
             rows={1}
-            disabled={isCalling} // Optionally disable typing while in a voice call
           />
           <div className="absolute right-2 bottom-2">
             <button 
               type="button"
               onPointerDown={(e) => e.preventDefault()}
               onClick={handleSend} 
-              disabled={!input.trim() || isLoadingResponse || isCalling} 
+              disabled={!input.trim() || isLoadingResponse} 
               className={`flex items-center justify-center w-10 h-10 rounded-full transition-all duration-200 active:scale-90
-                  ${(!input.trim() || isLoadingResponse || isCalling)
+                  ${!input.trim() || isLoadingResponse 
                   ? 'bg-zinc-800 text-zinc-600' 
                   : 'bg-white text-black hover:bg-zinc-200'}`}
             >
