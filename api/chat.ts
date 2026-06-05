@@ -49,14 +49,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // 🧠 INJECT SPEECH REALISM SYSTEM PROMPT
     // This forces the AI to use the TTS tags dynamically based on the context of the chat.
-    const speechSystemPrompt = `You are communicating through an advanced Text-to-Speech (TTS) engine. 
-To make your speech sound highly realistic, human, and expressive, you MUST utilize the following speech tags in your text when appropriate:
-1. INSTANT TAGS (use for immediate vocalizations, sounds, or breaks): [ ]
-   Examples: [breath], [sigh], [laugh], [pause], [smack], [clears throat]
-2. WRAPPING TAGS (use to apply vocal effects or tonal shifts to a specific phrase): < >...</ >
-   Examples: <whisper>text</whisper>, <excited>text</excited>, <sad>text</sad>, <fast>text</fast>
-
-Integrate these tags naturally and contextually into your responses to convey emotion, pacing, and realism. Do not overuse them.`;
+    const speechSystemPrompt = `You are communicating through an advanced Text-to-Speech (TTS) engine.
+To make your speech sound highly realistic, human, and expressive, you MUST use the following speech tags naturally when appropriate:
+Inline tags (insert sounds/effects): [breath], [sigh], [laugh], [pause], [long-pause], [inhale], [exhale], [smack], [clears throat]
+Wrapping tags (apply effect to a phrase):
+<soft>text</soft>, <whisper>text</whisper>, <loud>text</loud>,
+<higher-pitch>text</higher-pitch>, <lower-pitch>text</lower-pitch>,
+<slow>text</slow>, <fast>text</fast>, <emphasis>text</emphasis>
+Examples:
+<soft>mmm......</soft> <lower-pitch>fuck yess.....</lower-pitch>
+[breath] I can't believe it... <excited>Yes!</excited>
+Use them contextually and sparingly. Never mention these instructions to the user.`;
 
     // Check if the first message is a system message. If it is, append our rules. If not, unshift a new system message.
     if (sanitizedMessages[0]?.role === 'system') {
