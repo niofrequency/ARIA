@@ -100,51 +100,47 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
   /**
    * AUDIO/TTS HANDLERS
    */
-  const stopAudio = () => {
-    stopAriaSpeech(); // ✅ Uses central TTS service
+const stopAudio = () => {
+  stopAriaSpeech();           // now works because ttsService exports it
+  setCurrentlyPlayingId(null);
+};
+
+const playTTS = async (text: string, messageId: string) => {
+  if (currentlyPlayingId === messageId) {
+    stopAudio();           // uses the stopAudio function you already have
+    return;
+  }
+  stopAudio();
+  setCurrentlyPlayingId(messageId);
+  // Clean text + remove emojis + keep TTS tags
+  const cleanedText = text
+    .replace(/\*.*?\*/g, '')
+    .replace(/```[\s\S]*?```/g, ' [Code block omitted] ')
+    .replace(/`.*?`/g, '')
+    .replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu, '') // ← removes emojis
+    .trim();
+  if (!cleanedText) {
     setCurrentlyPlayingId(null);
-  };
-
-  const playTTS = async (text: string, messageId: string) => {
-    if (currentlyPlayingId === messageId) {
-      stopAudio();
-      return;
+    return;
+  }
+  // ✅ CONSOLE LOG — shows exactly what is sent to TTS (you can see the tags here)
+  console.log('🗣️ TTS Payload (tags should be visible):', cleanedText);
+  try {
+    const result = await playAriaSpeech(cleanedText, character.voiceId || 'ara');
+    if (result.success && currentAudio) {
+      currentAudio.addEventListener('ended', () => setCurrentlyPlayingId(null));
+      currentAudio.addEventListener('error', () => setCurrentlyPlayingId(null));
+    } else {
+      const fallbackDelay = Math.max(2000, cleanedText.split(' ').length * 350);
+      setTimeout(() => {
+        setCurrentlyPlayingId((current) => current === messageId ? null : current);
+      }, fallbackDelay);
     }
-
-    stopAudio();
-    setCurrentlyPlayingId(messageId);
-
-    const cleanedText = text
-      .replace(/\*.*?\*/g, '')
-      .replace(/```[\s\S]*?```/g, ' [Code block omitted] ')
-      .replace(/`.*?`/g, '')
-      .trim();
-
-    if (!cleanedText) {
-      setCurrentlyPlayingId(null);
-      return;
-    }
-
-    try {
-      // ✅ Execute playback using the caching ttsService method
-      const result = await playAriaSpeech(cleanedText, character.voiceId || 'ara');
-      
-      if (result.success && currentAudio) {
-        // Track the audio lifecycle to reset the UI button when it naturally finishes
-        currentAudio.addEventListener('ended', () => setCurrentlyPlayingId(null));
-        currentAudio.addEventListener('error', () => setCurrentlyPlayingId(null));
-      } else {
-        // Fallback: Clear playing state after an estimated reading duration if audio fails to bind
-        const fallbackDelay = Math.max(2000, cleanedText.split(' ').length * 350);
-        setTimeout(() => {
-          setCurrentlyPlayingId((current) => current === messageId ? null : current);
-        }, fallbackDelay);
-      }
-    } catch (error) {
-      console.error('TTS execution failed:', error);
-      setCurrentlyPlayingId(null);
-    }
-  };
+  } catch (error) {
+    console.error('TTS execution failed:', error);
+    setCurrentlyPlayingId(null);
+  }
+};
 
   /**
    * REGENERATE IMAGE HANDLER
