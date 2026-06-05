@@ -14,26 +14,32 @@ import {
   ExternalLink,   
   Youtube,
   Play,
-  Volume2 // ✅ ADDED VOLUME ICON
+  Volume2,
+  VolumeX // ✅ ADDED VOLUMEX ICON FOR STOP STATE
 } from 'lucide-react';
-import { playAriaSpeech } from '../services/ttsService'; // ✅ ADDED TTS SERVICE
+import { playAriaSpeech } from '../services/ttsService';
 
 interface ChatMessageProps {
   message: Message;
   characterName: string;
-  characterVoiceId?: string; // ✅ Added Voice ID Prop
+  characterVoiceId?: string;
   onMediaClick: (url: string, type: 'image' | 'video' | 'embed' | 'youtube') => void;
   onAnimateRequest: (message: Message) => void;
   onRegenerateImage: (message: Message) => void;
+  // ✅ ADDED TTS STATE PROPS FROM MAINCHATAREA
+  isCurrentlyPlaying?: boolean;
+  onToggleTTS?: (text: string, messageId: string) => void;
 }
 
 const ChatMessage: React.FC<ChatMessageProps> = ({ 
   message, 
   characterName, 
-  characterVoiceId, // ✅ Extracted Voice ID Prop
+  characterVoiceId,
   onMediaClick,
   onAnimateRequest,
-  onRegenerateImage
+  onRegenerateImage,
+  isCurrentlyPlaying = false, // ✅ Default to false
+  onToggleTTS // ✅ Extracted prop
 }) => {
   const isUser = message.role === 'user';
   const [viewMode, setViewMode] = useState<'video' | 'image'>('video');
@@ -371,20 +377,28 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
           {mediaType === 'youtube' && <span className="text-red-500 font-bold flex items-center gap-1"><Youtube className="w-3 h-3"/> YouTube</span>}
           {mediaType === 'embed' && <span className="text-purple-500 font-bold flex items-center gap-1"><Play className="w-3 h-3 fill-current"/> Video Feed</span>}
 
-          {/* ✅ TTS MANUAL PLAY BUTTON FOR AI MESSAGES */}
+          {/* ✅ DYNAMIC TTS CONTROL BUTTON FOR AI MESSAGES */}
           {!isUser && message.text && (
               <>
                   <span className="text-zinc-700">•</span>
                   <button 
                       onClick={() => {
                           const speechText = message.text?.replace(/\*.*?\*/g, '').trim();
-                          // ✅ Plays using the dynamically passed Voice ID, or defaults to ara
-                          if (speechText) playAriaSpeech(speechText, characterVoiceId || 'ara');
+                          if (speechText) {
+                              if (onToggleTTS) {
+                                  // Pass to central tracker in MainChatArea
+                                  onToggleTTS(speechText, message.id);
+                              } else {
+                                  // Fallback for standalone usage
+                                  playAriaSpeech(speechText, characterVoiceId || 'ara');
+                              }
+                          }
                       }}
-                      className="flex items-center gap-1 font-bold hover:text-purple-400 transition-colors cursor-pointer"
-                      title="Read Aloud"
+                      className={`flex items-center gap-1 font-bold transition-colors cursor-pointer ${isCurrentlyPlaying ? 'text-purple-400 animate-pulse' : 'hover:text-purple-400'}`}
+                      title={isCurrentlyPlaying ? "Stop Playing" : "Read Aloud"}
                   >
-                      <Volume2 className="w-3 h-3" /> Read Aloud
+                      {isCurrentlyPlaying ? <VolumeX className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />} 
+                      {isCurrentlyPlaying ? 'Playing...' : 'Read Aloud'}
                   </button>
               </>
           )}
@@ -403,6 +417,7 @@ export default React.memo(ChatMessage, (prevProps, nextProps) => {
     prevProps.message.isImageLoading === nextProps.message.isImageLoading &&
     prevProps.message.isVideoLoading === nextProps.message.isVideoLoading &&
     prevProps.characterName === nextProps.characterName &&
-    prevProps.characterVoiceId === nextProps.characterVoiceId // ✅ Add to memo check
+    prevProps.characterVoiceId === nextProps.characterVoiceId &&
+    prevProps.isCurrentlyPlaying === nextProps.isCurrentlyPlaying // ✅ Add TTS state to memo check
   );
 });
