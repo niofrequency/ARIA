@@ -1,9 +1,17 @@
 // services/ttsService.ts
 
 /**
+ * CACHE MEMORY
+ * Stores generated audio URLs. Key: voiceId + text, Value: Blob URL
+ */
+const audioCache = new Map<string, string>();
+
+// Track the currently playing audio so we can stop it if the user toggles it off
+export let currentAudio: HTMLAudioElement | null = null;
+
+/**
  * Strips TTS control tags for clean UI display.
  * Keeps the spoken text intact.
- * Export this and use it in your UI components (e.g., ChatMessage.tsx) to clean the text before rendering.
  */
 export function stripTTSTags(text: string): string {
   if (!text) return '';
@@ -19,6 +27,9 @@ export interface PlaySpeechResult {
   error?: string;
 }
 
+/**
+ * Plays the audio. If it's already been generated, it instantly replays the cached file.
+ */
 export const playAriaSpeech = async (
   text: string, 
   voiceId: string = 'ara'
@@ -27,45 +38,63 @@ export const playAriaSpeech = async (
     return { success: false, error: 'Empty text' };
   }
 
-  let audioUrl: string | null = null;
+  // 1. Stop any currently playing audio before starting a new one
+  stopAriaSpeech();
+
+  // 2. Create a unique cache key based on the voice and the text
+  const cacheKey = `${voiceId}-${text}`;
 
   try {
-    // 1. Send the FULL text (WITH tags) to xAI TTS so the voice acting applies
-    const response = await fetch('/api/tts', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ text, voice_id: voiceId }),
-    });
+    // Check if we already have this audio generated in memory
+    let audioUrl = audioCache.get(cacheKey);
 
-    if (!response.ok) {
-      throw new Error(`TTS request failed: ${response.status}`);
+    // 3. If we haven't generated this audio yet, fetch it from the API
+    if (!audioUrl) {
+      const response = await fetch('/api/tts', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ text, voice_id: voiceId }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`TTS request failed: ${response.status}`);
+      }
+
+      const audioBlob = await response.blob();
+      audioUrl = URL.createObjectURL(audioBlob);
+      
+      // Save it to our memory cache so we never fetch this exact text again
+      audioCache.set(cacheKey, audioUrl);
     }
 
-    // Convert the binary response to a Blob
-    const audioBlob = await response.blob();
-    
-    // Create a temporary URL for the browser's Audio object
-    audioUrl = URL.createObjectURL(audioBlob);
-    const audio = new Audio(audioUrl);
-    
-    // Play the audio
-    await audio.play();
+    // 4. Play the audio (either fresh or from the cache)
+    currentAudio = new Audio(audioUrl);
+    await currentAudio.play();
 
-    // Clean up the URL from memory after it finishes playing
-    audio.onended = () => {
-      if (audioUrl) URL.revokeObjectURL(audioUrl);
+    // ⚠️ CRITICAL CHANGE: Do NOT use URL.revokeObjectURL(audioUrl) here anymore.
+    // If we revoke it, the cached URL will be permanently broken the next time the user clicks play!
+    currentAudio.onended = () => {
+      currentAudio = null;
     };
 
     return { success: true };
 
   } catch (error: any) {
     console.error("❌ Audio playback failed:", error);
-    
-    // Ensure memory is cleared even if playback fails after Blob creation
-    if (audioUrl) URL.revokeObjectURL(audioUrl);
-    
     return { success: false, error: error.message };
+  }
+};
+
+/**
+ * Instantly stops any currently playing TTS audio.
+ * You can call this from MainChatArea.tsx when a user clicks the "Stop Playing" button.
+ */
+export const stopAriaSpeech = () => {
+  if (currentAudio) {
+    currentAudio.pause();
+    currentAudio.currentTime = 0;
+    currentAudio = null;
   }
 };
