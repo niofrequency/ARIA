@@ -8,8 +8,6 @@ import { Loader2, X, Download, Menu, Settings, Cpu, ArrowUp, PanelLeft } from 'l
 import { storeMemory } from '../services/memoryService';
 import { fetchGiphyUrl } from '../services/giphyService';
 import { fetchYoutubeUrl } from '../services/youtubeService';
-import { generateAriaResponse } from '../services/ariaService';
-// Add or update this import line at the top of components/MainChatArea.tsx
 import { generateAriaResponse, extractContextPrompt } from '../services/ariaService';
 import { fetchSpicyLink } from '../services/spicyService';
 
@@ -441,7 +439,6 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
                 key={msg.id} 
                 message={msg} 
                 characterName={character.name} 
-                // ✅ UPDATED: Pass type as 'any' to accept new types
                 onMediaClick={(url, type) => setSelectedMedia({ url, type: type as any })}
                 onAnimateRequest={() => handleAnimateRequest(msg)}
                 onRegenerateImage={() => handleRegenerateImage(msg)}
@@ -454,7 +451,6 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
 
       {/* INPUT AREA */}
       <footer 
-        // ✅ FIX: Changed lg:left-[300px] to lg:left-[280px] to match the exact width of the sidebar
         className={`fixed bottom-0 left-0 right-0 z-50 p-4 md:p-6 bg-gradient-to-t from-zinc-950 via-zinc-950 to-transparent
           ${isDesktopSidebarOpen ? 'lg:left-[280px]' : 'lg:left-0'}
         `}
