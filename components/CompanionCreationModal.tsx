@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { CharacterProfile } from '../types';
 import { generateAriaImage } from '../services/generateAriaImage';
-import { Sparkles, Cpu, Fingerprint, Activity, Loader2, Plus, Box, Camera, Upload, Server, ArrowRight, ArrowLeft, CheckCircle2, Menu, PanelLeft, ChevronDown } from 'lucide-react';
+import { Sparkles, Cpu, Fingerprint, Activity, Loader2, Plus, Box, Camera, Upload, Server, ArrowRight, ArrowLeft, CheckCircle2, Menu, PanelLeft, ChevronDown, Volume2 } from 'lucide-react';
 
 interface CompanionCreationModalProps {
   onSave: (newCharacter: CharacterProfile) => void;
@@ -31,6 +31,15 @@ const LORA_OPTIONS = [
   { id: "NATURALSKIN.safetensors", name: "NATURALSKIN" }
 ];
 
+// ✅ ADDED: TTS Voices mapping for the dropdown
+const TTS_VOICES = [
+  { id: 'eve', name: 'Eve (Energetic)', gender: 'female' },
+  { id: 'ara', name: 'Ara (Warm)', gender: 'female' },
+  { id: 'rex', name: 'Rex (Professional)', gender: 'male' },
+  { id: 'leo', name: 'Leo (Authoritative)', gender: 'male' },
+  { id: 'sal', name: 'Sal (Versatile)', gender: 'male' },
+];
+
 const TOTAL_STEPS = 10;
 
 const CompanionCreationModal: React.FC<CompanionCreationModalProps> = ({ 
@@ -47,7 +56,8 @@ const CompanionCreationModal: React.FC<CompanionCreationModalProps> = ({
     hair: [], face: [], body: [], outfit: '',
     runpodModel: 'Qwen-Rapid-AIO-NSFW-v23.safetensors',
     activeRunpodLoras: [], avatarImage: null, vibe: '',
-    negativePrompt: 'glasses, hat, extra fingers, low quality, distorted anatomy, text, watermark'
+    negativePrompt: 'glasses, hat, extra fingers, low quality, distorted anatomy, text, watermark',
+    voiceId: '' // ✅ ADDED: Voice ID state
   });
   
   const [ageError, setAgeError] = useState<string | null>(null);
@@ -221,6 +231,44 @@ const CompanionCreationModal: React.FC<CompanionCreationModalProps> = ({
     </div>
   );
 
+  // ✅ ADDED: Dynamic Voice Selector based on user's Gender input
+  const renderVoiceSelect = () => {
+    const genderText = (formData.gender || '').toLowerCase();
+    const isFemale = genderText.includes('female') || genderText === 'f' || genderText.includes('woman') || genderText.includes('girl');
+    const isMale = !isFemale && (genderText.includes('male') || genderText === 'm' || genderText.includes('man') || genderText.includes('boy'));
+    
+    const filteredVoices = TTS_VOICES.filter(v => {
+      if (isFemale) return v.gender === 'female';
+      if (isMale) return v.gender === 'male';
+      return true; 
+    });
+
+    return (
+      <div className="w-full mt-6 text-left">
+        <label htmlFor="voiceId" className="flex items-center gap-1 text-[11px] uppercase tracking-widest font-bold ml-1 text-zinc-500 mb-2">
+          <Volume2 className="w-4 h-4 text-purple-400" /> Vocal Synthesis
+        </label>
+        <div className="relative">
+          <select
+            id="voiceId"
+            name="voiceId"
+            value={formData.voiceId || ''}
+            onChange={handleChange}
+            className="w-full bg-white/[0.02] border border-white/10 rounded-3xl px-6 py-5 text-base text-white focus:outline-none focus:border-purple-500/50 transition-all appearance-none cursor-pointer shadow-inner"
+          >
+            <option value="" className="bg-zinc-900 text-zinc-500">Default Voice (Auto-Selected)</option>
+            {filteredVoices.map(v => (
+              <option key={v.id} value={v.id} className="bg-zinc-900 text-white">{v.name}</option>
+            ))}
+          </select>
+          <div className="absolute inset-y-0 right-6 flex items-center pointer-events-none">
+            <ChevronDown className="w-5 h-5 text-zinc-500" />
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const renderStep = () => {
     switch (currentStep) {
       case 1:
@@ -350,12 +398,13 @@ const CompanionCreationModal: React.FC<CompanionCreationModalProps> = ({
               <Activity className="w-8 h-8 text-purple-400" />
             </div>
             <h2 className="text-3xl font-light text-white tracking-tight mb-3">Cognitive Persona Matrix</h2>
-            <p className="text-base text-zinc-400 mb-10 max-w-md">Describe their personality, tone, quirks, and how they should interact with you.</p>
+            <p className="text-base text-zinc-400 mb-6 max-w-md">Describe their personality, tone, quirks, and how they should interact with you.</p>
             <textarea
               name="vibe" value={formData.vibe || ''} onChange={handleChange}
-              placeholder="e.g., Highly intelligent, deeply sarcastic but caring, uses dry humor..." rows={5}
+              placeholder="e.g., Highly intelligent, deeply sarcastic but caring, uses dry humor..." rows={4}
               className="w-full bg-purple-900/5 border border-purple-500/20 focus:border-purple-500/60 rounded-3xl px-6 py-5 text-base text-purple-100 placeholder-purple-900/40 outline-none transition-all resize-none shadow-inner custom-scrollbar"
             />
+            {renderVoiceSelect()} {/* ✅ ADDED TTS DROPDOWN HERE */}
           </div>
         );
 
