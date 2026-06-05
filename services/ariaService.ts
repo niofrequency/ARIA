@@ -1,4 +1,4 @@
-import { CharacterProfile } from "../types";
+import { CharacterProfile, VisualState } from "../types";
 import { generateAriaImage } from "./generateAriaImage";
 import { retrieveMemories } from "./memoryService";
 
@@ -32,7 +32,6 @@ export const buildVisualAwarenessJson = (visualDescription: string) => {
   };
 };
 
-
 /**
  * EXTRACT CONTEXT PROMPT
  * Parses the AI response to separate chat text from Visual tags, Memory tags, GIFs, Links, and YouTube.
@@ -63,18 +62,24 @@ export const extractContextPrompt = (text: string) => {
   const linkMatch = text.match(linkRegex);
   const externalLink = linkMatch ? linkMatch[1].trim() : null;
 
-// ✅ Extract Spicy Term
+  // Extract Spicy Term
   const spicyMatch = text.match(spicyRegex);
   const spicySearchTerm = spicyMatch ? spicyMatch[1].trim() : null;
 
-  // 3. Clean the UI text (Remove ALL tags in one go)
-  let cleanText = text
+  // 3. SPEECH TEXT (Keeps TTS tags, removes system tags)
+  let speechText = text
     .replace(visualRegex, '')
     .replace(memoryRegex, '')
     .replace(gifRegex, '')
     .replace(youtubeRegex, '')
     .replace(linkRegex, '')
-    .replace(spicyRegex, '') // ✅ Remove Spicy Tag
+    .replace(spicyRegex, '')
+    .trim();
+
+  // 4. UI TEXT (Strips TTS Wrappers & Converts brackets to roleplay asterisks)
+  let cleanText = speechText
+    .replace(/<\/?(whisper|shout|nervous|crying|joyous|angry|sad|surprised|disgusted|fearful|confident|thoughtful|sarcastic|sleepy|drunken)>/gi, '')
+    .replace(/\[(breaths|clears throat|sighs|laughs|gasps|clicks tongue|swallows|inhales|exhales|lipsmack)\]/gi, '*$1*') // Converts [laughs] to *laughs* for UI
     .replace(/\*\s*sends\s+.*?\*/gi, '') // Removes "*sends giggle emoji*"
     .trim();
 
@@ -96,28 +101,28 @@ export const extractContextPrompt = (text: string) => {
       }
   }
 
-  // 4. Emoji Sanitization for RunPod
+  // Emoji Sanitization for RunPod
   if (contextPrompt) {
     contextPrompt = contextPrompt.replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '');
     contextPrompt = contextPrompt.replace(/\s+/g, ' ').trim();
   }
 
-  // 5. Safety cleanup for malformed tags
+  // Safety cleanup for malformed tags
   if (cleanText.includes('[[VISUAL:') || cleanText.includes('{{visual:')) {
     cleanText = cleanText.split(/[\[\{]{2}VISUAL/i)[0].trim();
   }
 
   return {
     cleanText: cleanText || "...",
+    speechText: speechText || "...", // ✅ Passed to TTS system
     contextPrompt,
     memoryText,
     gifSearchTerm,
     youtubeSearchTerm,
-    spicySearchTerm, // ✅ Return this new field
+    spicySearchTerm, 
     externalLink
   };
 };
-
 
 /**
  * BUILD SYSTEM INSTRUCTION
@@ -146,6 +151,20 @@ const buildSystemInstruction = (character: CharacterProfile): string => {
     - DO NOT use emoji every message. Use it when only necessary.
     - NO EMOJI ACTIONS: Never describe the act of sending an emoji using asterisks (e.g., strictly avoid "*sends giggle emoji*" or "*sends 🤭*").
     
+   ### VOCAL SYNTHESIS (TTS) TAGS (CRITICAL)
+   You have access to native Text-To-Speech tags to add realistic emotion and sound effects to your spoken voice. 
+   You MUST use these tags naturally in your dialogue to enhance realism.
+   
+   1. INSTANT SOUNDS (Use these standalone anywhere in the text):
+   [breaths], [clears throat], [sighs], [laughs], [gasps], [clicks tongue], [swallows], [inhales], [exhales], [lipsmack]
+   
+   2. EMOTIONAL WRAPPERS (Wrap spoken sentences or phrases in these):
+   <whisper>text</whisper>, <shout>text</shout>, <nervous>text</nervous>, <crying>text</crying>, <joyous>text</joyous>, <angry>text</angry>, <sad>text</sad>, <surprised>text</surprised>, <disgusted>text</disgusted>, <fearful>text</fearful>, <confident>text</confident>, <thoughtful>text</thoughtful>, <sarcastic>text</sarcastic>, <sleepy>text</sleepy>, <drunken>text</drunken>
+   
+   Example usage:
+   "[sighs] I don't know... <whisper>Come a little closer.</whisper>"
+   "<joyous>I am so happy to see you!</joyous> [laughs]"
+
    ### MEDIA & GIF PROTOCOL
    - **REACTION GIFS:** You have access to a GIF database. If you want to react with a meme, a funny reaction, or a mood GIF, use the tag: [[GIF: search_term]].
    - **EXAMPLE:** User: "I tripped." -> You: "Oh no! [[GIF: trying not to laugh]]"
