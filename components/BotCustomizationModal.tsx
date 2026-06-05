@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { CharacterProfile } from '../types';
-import { X, Save, Cpu, Fingerprint, Activity, Loader2, Plus, Box, Camera, Upload, Server, ChevronDown } from 'lucide-react';
+import { X, Save, Cpu, Fingerprint, Activity, Loader2, Plus, Box, Camera, Upload, Server, ChevronDown, Volume2 } from 'lucide-react';
 
 export interface ActiveLora { 
   id: string; 
@@ -33,6 +33,15 @@ const LORA_OPTIONS = [
   { id: "NATURALSKIN.safetensors", name: "NATURALSKIN" }
 ];
 
+// ✅ ADDED: TTS Voices mapping for the dropdown
+const TTS_VOICES = [
+  { id: 'eve', name: 'Eve (Energetic)', gender: 'female' },
+  { id: 'ara', name: 'Ara (Warm)', gender: 'female' },
+  { id: 'rex', name: 'Rex (Professional)', gender: 'male' },
+  { id: 'leo', name: 'Leo (Authoritative)', gender: 'male' },
+  { id: 'sal', name: 'Sal (Versatile)', gender: 'male' },
+];
+
 const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({ character, onSave, onClose }) => {
   const [formData, setFormData] = useState<CharacterProfile>({
     ...character,
@@ -43,6 +52,7 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({ character
     runpodModel: character.runpodModel || 'Qwen-Rapid-AIO-NSFW-v23.safetensors',
     activeRunpodLoras: Array.isArray(character.activeRunpodLoras) ? character.activeRunpodLoras : [],
     avatarImage: character.avatarImage || null,
+    voiceId: character.voiceId || '', // ✅ ENSURE VOICE ID IS INITIALIZED
   });
   
   const [ageError, setAgeError] = useState<string | null>(null);
@@ -239,6 +249,46 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({ character
     </div>
   );
 
+  // ✅ ADDED: Dynamic Voice Selector based on user's Gender input
+  const renderVoiceSelect = () => {
+    const genderText = (formData.gender || '').toLowerCase();
+    // 'female' contains 'male', so check female variants first
+    const isFemale = genderText.includes('female') || genderText === 'f' || genderText.includes('woman') || genderText.includes('girl');
+    const isMale = !isFemale && (genderText.includes('male') || genderText === 'm' || genderText.includes('man') || genderText.includes('boy'));
+    
+    const filteredVoices = TTS_VOICES.filter(v => {
+      if (isFemale) return v.gender === 'female';
+      if (isMale) return v.gender === 'male';
+      return true; // Show all if ambiguous or not set
+    });
+
+    return (
+      <div className="space-y-1.5 md:col-span-2">
+        <label htmlFor="voiceId" className="flex items-center gap-1 text-[10px] uppercase tracking-[0.2em] font-bold ml-1 text-zinc-500">
+          <Volume2 className="w-3 h-3" /> Vocal Synthesis (Voice)
+        </label>
+        <div className="relative">
+          <select
+            id="voiceId"
+            name="voiceId"
+            disabled={isSaving}
+            value={formData.voiceId || ''}
+            onChange={handleChange}
+            className="w-full bg-white/[0.02] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/50 transition-all disabled:opacity-50 appearance-none cursor-pointer"
+          >
+            <option value="" className="bg-zinc-900 text-zinc-500">Default (Auto-Selected)</option>
+            {filteredVoices.map(v => (
+              <option key={v.id} value={v.id} className="bg-zinc-900 text-white">{v.name}</option>
+            ))}
+          </select>
+          <div className="absolute inset-y-0 right-4 flex items-center pointer-events-none">
+            <ChevronDown className="w-4 h-4 text-zinc-500" />
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 backdrop-blur-sm p-2 sm:p-4 animate-in fade-in duration-300" onClick={onClose}>
       <div 
@@ -283,6 +333,7 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({ character
                 </div>
                 {renderInput('gender', 'Biological Blueprint', 'female, male, etc.')}
                 {renderInput('ethnicity', 'Ethnicity', 'Latina, Asian, Caucasian, etc.')}
+                {renderVoiceSelect()} {/* ✅ ADDED DYNAMIC VOICE DROPDOWN HERE */}
             </div>
           </div>
 
