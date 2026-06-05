@@ -21,6 +21,7 @@ import { playAriaSpeech } from '../services/ttsService'; // ✅ ADDED TTS SERVIC
 interface ChatMessageProps {
   message: Message;
   characterName: string;
+  characterVoiceId?: string; // ✅ Added Voice ID Prop
   onMediaClick: (url: string, type: 'image' | 'video' | 'embed' | 'youtube') => void;
   onAnimateRequest: (message: Message) => void;
   onRegenerateImage: (message: Message) => void;
@@ -29,6 +30,7 @@ interface ChatMessageProps {
 const ChatMessage: React.FC<ChatMessageProps> = ({ 
   message, 
   characterName, 
+  characterVoiceId, // ✅ Extracted Voice ID Prop
   onMediaClick,
   onAnimateRequest,
   onRegenerateImage
@@ -376,7 +378,8 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
                   <button 
                       onClick={() => {
                           const speechText = message.text?.replace(/\*.*?\*/g, '').trim();
-                          if (speechText) playAriaSpeech(speechText, 'ara');
+                          // ✅ Plays using the dynamically passed Voice ID, or defaults to ara
+                          if (speechText) playAriaSpeech(speechText, characterVoiceId || 'ara');
                       }}
                       className="flex items-center gap-1 font-bold hover:text-purple-400 transition-colors cursor-pointer"
                       title="Read Aloud"
@@ -399,6 +402,7 @@ export default React.memo(ChatMessage, (prevProps, nextProps) => {
     prevProps.message.videoUrl === nextProps.message.videoUrl &&
     prevProps.message.isImageLoading === nextProps.message.isImageLoading &&
     prevProps.message.isVideoLoading === nextProps.message.isVideoLoading &&
-    prevProps.characterName === nextProps.characterName
+    prevProps.characterName === nextProps.characterName &&
+    prevProps.characterVoiceId === nextProps.characterVoiceId // ✅ Add to memo check
   );
 });
