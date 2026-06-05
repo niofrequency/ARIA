@@ -5,7 +5,8 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
  * Logic:
  * 1. Secures the XAI_API_KEY on the server side.
  * 2. Proxies the "Brain" dialogue to Grok.
- * 3. INTELLIGENT PARSING: Detects [[VISUAL]] tags server-side to flag the frontend.
+ * 3. SPEECH REALISM: Injects system instructions for TTS tags ([ ] and < >).
+ * 4. INTELLIGENT PARSING: Detects [[VISUAL]] tags server-side to flag the frontend.
  */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // 1. CORS CONFIGURATION
@@ -46,10 +47,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Message payload is empty after sanitization.' });
     }
 
+    // 🧠 INJECT SPEECH REALISM SYSTEM PROMPT
+    // This forces the AI to use the TTS tags dynamically based on the context of the chat.
+    const speechSystemPrompt = `You are communicating through an advanced Text-to-Speech (TTS) engine. 
+To make your speech sound highly realistic, human, and expressive, you MUST utilize the following speech tags in your text when appropriate:
+1. INSTANT TAGS (use for immediate vocalizations, sounds, or breaks): [ ]
+   Examples: [breath], [sigh], [laugh], [pause], [smack], [clears throat]
+2. WRAPPING TAGS (use to apply vocal effects or tonal shifts to a specific phrase): < >...</ >
+   Examples: <whisper>text</whisper>, <excited>text</excited>, <sad>text</sad>, <fast>text</fast>
+
+Integrate these tags naturally and contextually into your responses to convey emotion, pacing, and realism. Do not overuse them.`;
+
+    // Check if the first message is a system message. If it is, append our rules. If not, unshift a new system message.
+    if (sanitizedMessages[0]?.role === 'system') {
+      sanitizedMessages[0].content += `\n\n${speechSystemPrompt}`;
+    } else {
+      sanitizedMessages.unshift({ role: 'system', content: speechSystemPrompt });
+    }
+
     const targetModel = model || "grok-3"; // Note: Ensure your API tier supports the literal string "grok-3"
     console.log(`🧠 Proxying request to xAI: ${targetModel}`);
     
-// 3. EXECUTE NEURAL REQUEST
+    // 3. EXECUTE NEURAL REQUEST
     const response = await fetch("https://api.x.ai/v1/chat/completions", {
       method: "POST",
       headers: {
