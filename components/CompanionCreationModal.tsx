@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { CharacterProfile } from '../types';
 import { generateAriaImage } from '../services/generateAriaImage';
-import { Sparkles, Cpu, Fingerprint, Activity, Loader2, Plus, Box, Camera, Upload, Server, ArrowRight, ArrowLeft, CheckCircle2, Menu, PanelLeft, ChevronDown, Volume2 } from 'lucide-react';
+import { Sparkles, Cpu, Fingerprint, Activity, Loader2, Plus, Box, Camera, Upload, Server, ArrowRight, ArrowLeft, CheckCircle2, Menu, PanelLeft, ChevronDown, Volume2, Play } from 'lucide-react';
+import { playAriaSpeech } from '../services/ttsService'; // ✅ ADDED TTS IMPORT
 
 interface CompanionCreationModalProps {
   onSave: (newCharacter: CharacterProfile) => void;
@@ -31,10 +32,11 @@ const LORA_OPTIONS = [
   { id: "NATURALSKIN.safetensors", name: "NATURALSKIN" }
 ];
 
-// ✅ ADDED: TTS Voices mapping for the dropdown
+// ✅ ADDED: TTS Voices mapping for the dropdown (including Clara)
 const TTS_VOICES = [
   { id: 'eve', name: 'Eve (Energetic)', gender: 'female' },
   { id: 'ara', name: 'Ara (Warm)', gender: 'female' },
+  { id: 'clara', name: 'Clara (German)', gender: 'female' },
   { id: 'rex', name: 'Rex (Professional)', gender: 'male' },
   { id: 'leo', name: 'Leo (Authoritative)', gender: 'male' },
   { id: 'sal', name: 'Sal (Versatile)', gender: 'male' },
@@ -70,6 +72,7 @@ const CompanionCreationModal: React.FC<CompanionCreationModalProps> = ({
   // Custom Dropdown States
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
   const [isLoraDropdownOpen, setIsLoraDropdownOpen] = useState(false);
+  const [isVoiceDropdownOpen, setIsVoiceDropdownOpen] = useState(false); // ✅ Voice Dropdown State
 
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
@@ -231,7 +234,7 @@ const CompanionCreationModal: React.FC<CompanionCreationModalProps> = ({
     </div>
   );
 
-  // ✅ ADDED: Dynamic Voice Selector based on user's Gender input
+  // ✅ UPDATED: Dynamic Voice Selector with Custom Dropdown & Preview Button
   const renderVoiceSelect = () => {
     const genderText = (formData.gender || '').toLowerCase();
     const isFemale = genderText.includes('female') || genderText === 'f' || genderText.includes('woman') || genderText.includes('girl');
@@ -243,27 +246,70 @@ const CompanionCreationModal: React.FC<CompanionCreationModalProps> = ({
       return true; 
     });
 
+    const selectedVoice = TTS_VOICES.find(v => v.id === formData.voiceId);
+
     return (
       <div className="w-full mt-6 text-left">
-        <label htmlFor="voiceId" className="flex items-center gap-1 text-[11px] uppercase tracking-widest font-bold ml-1 text-zinc-500 mb-2">
+        <label className="flex items-center gap-1 text-[11px] uppercase tracking-widest font-bold ml-1 text-zinc-500 mb-2">
           <Volume2 className="w-4 h-4 text-purple-400" /> Vocal Synthesis
         </label>
-        <div className="relative">
-          <select
-            id="voiceId"
-            name="voiceId"
-            value={formData.voiceId || ''}
-            onChange={handleChange}
-            className="w-full bg-white/[0.02] border border-white/10 rounded-3xl px-6 py-5 text-base text-white focus:outline-none focus:border-purple-500/50 transition-all appearance-none cursor-pointer shadow-inner"
-          >
-            <option value="" className="bg-zinc-900 text-zinc-500">Default Voice (Auto-Selected)</option>
-            {filteredVoices.map(v => (
-              <option key={v.id} value={v.id} className="bg-zinc-900 text-white">{v.name}</option>
-            ))}
-          </select>
-          <div className="absolute inset-y-0 right-6 flex items-center pointer-events-none">
-            <ChevronDown className="w-5 h-5 text-zinc-500" />
+        
+        <div className="flex gap-2 items-center">
+          <div className="relative flex-1">
+            <div 
+              onClick={() => setIsVoiceDropdownOpen(!isVoiceDropdownOpen)}
+              className="w-full p-4 bg-purple-500/5 border border-purple-500/20 rounded-2xl text-sm uppercase tracking-widest outline-none hover:border-purple-500/50 text-purple-300 shadow-inner cursor-pointer flex items-center justify-between transition-colors"
+            >
+              <span>{selectedVoice ? selectedVoice.name : 'Default Voice (Auto-Selected)'}</span>
+              <ChevronDown className={`w-4 h-4 text-purple-500/50 transition-transform ${isVoiceDropdownOpen ? 'rotate-180' : ''}`} />
+            </div>
+
+            {isVoiceDropdownOpen && (
+              <>
+                <div className="fixed inset-0 z-[110]" onClick={() => setIsVoiceDropdownOpen(false)} />
+                <div className="absolute top-full mt-2 left-0 right-0 z-[120] bg-zinc-900 border border-purple-500/20 rounded-xl shadow-[0_0_30px_rgba(0,0,0,0.8)] max-h-[250px] overflow-y-auto custom-scrollbar">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormData(prev => ({ ...prev, voiceId: '' }));
+                      setIsVoiceDropdownOpen(false);
+                    }}
+                    className="w-full text-left px-4 py-3 text-xs font-mono text-zinc-300 hover:bg-purple-500/20 hover:text-purple-300 transition-colors border-b border-white/5"
+                  >
+                    Default (Auto-Selected)
+                  </button>
+                  {filteredVoices.map(v => (
+                    <button
+                      key={v.id}
+                      type="button"
+                      onClick={() => {
+                        setFormData(prev => ({ ...prev, voiceId: v.id }));
+                        setIsVoiceDropdownOpen(false);
+                      }}
+                      className={`w-full text-left px-4 py-3 text-xs font-mono transition-colors border-b border-white/5 last:border-0 ${formData.voiceId === v.id ? 'bg-purple-500/20 text-purple-300' : 'text-zinc-300 hover:bg-purple-500/20 hover:text-purple-300'}`}
+                    >
+                      {v.name}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
+
+          <button
+            type="button"
+            disabled={!formData.voiceId || isSaving || isForging}
+            onClick={() => {
+              const text = formData.voiceId === 'clara' 
+                ? "Hallo! Ich bin Clara. Wie gefällt dir meine Stimme?"
+                : "Hello! This is a preview of my voice.";
+              playAriaSpeech(text, formData.voiceId);
+            }}
+            className="flex items-center justify-center w-[54px] h-[54px] bg-purple-600 hover:bg-purple-500 text-white rounded-2xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0 shadow-[0_0_15px_rgba(147,51,234,0.3)]"
+            title="Preview Voice"
+          >
+            <Play className="w-5 h-5 fill-current ml-1" />
+          </button>
         </div>
       </div>
     );
