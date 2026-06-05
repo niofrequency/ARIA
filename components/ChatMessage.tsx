@@ -84,6 +84,19 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
     }
   };
 
+  // --- HELPER: FORMAT TEXT FOR ITALICS ---
+  const formatMessageText = (text: string) => {
+    if (!text) return null;
+    const parts = text.split('*');
+    return parts.map((part, index) => {
+      // Every odd index means the text was inside an asterisk pair
+      if (index % 2 === 1) {
+        return <em key={index} className="italic opacity-80">{part}</em>;
+      }
+      return <span key={index}>{part}</span>;
+    });
+  };
+
   // --- TYPING EFFECT LOGIC ---
   useEffect(() => {
     if (!shouldAnimate) {
@@ -187,7 +200,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
               }`}>
             {!isUser && <div className="absolute -inset-0.5 bg-purple-500/10 rounded-2xl blur-md -z-10"></div>}
             <p className="relative z-10 font-light tracking-wide whitespace-pre-wrap">
-              {displayedText}
+              {formatMessageText(displayedText)}
               {!isTypingComplete && !isUser && <span className="inline-block w-1.5 h-3.5 ml-1 bg-purple-400 align-middle animate-pulse" />}
             </p>
           </div>
