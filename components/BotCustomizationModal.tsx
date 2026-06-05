@@ -34,14 +34,45 @@ const LORA_OPTIONS = [
   { id: "NATURALSKIN.safetensors", name: "NATURALSKIN" }
 ];
 
-// ✅ ADDED: TTS Voices mapping (Clara added back)
+// ✅ UPDATED: Massive Voice Library
 const TTS_VOICES = [
+  // Original Base Voices
   { id: 'eve', name: 'Eve (Energetic)', gender: 'female' },
   { id: 'ara', name: 'Ara (Warm)', gender: 'female' },
-  { id: 'clara', name: 'Clara (German)', gender: 'female' },
   { id: 'rex', name: 'Rex (Professional)', gender: 'male' },
   { id: 'leo', name: 'Leo (Authoritative)', gender: 'male' },
   { id: 'sal', name: 'Sal (Versatile)', gender: 'male' },
+
+  // Added Female Voices (Middle Aged)
+  { id: '458705c07139', name: 'Clara (German)', gender: 'female' },
+  { id: '247783ebdd51', name: 'Noor (Dutch)', gender: 'female' },
+  { id: '34fd4dce1ba3', name: 'Elina (Finnish)', gender: 'female' },
+  { id: '58d27475085e', name: 'Femke (Dutch)', gender: 'female' },
+  { id: '6da5baee46d0', name: 'Beatriz (Portuguese)', gender: 'female' },
+  { id: '79f3a8b96d43', name: 'Claire (English)', gender: 'female' },
+  { id: '97fabd54445f', name: 'Katarzyna (Polish)', gender: 'female' },
+  { id: 'd0cb9ff07d95', name: 'Sakura (Japanese)', gender: 'female' },
+  { id: '97zmdc6s', name: 'Ida (Danish)', gender: 'female' },
+  { id: '69smp8rm', name: 'Camille (French)', gender: 'female' },
+  { id: 'hqxr4yub', name: 'Luca (Italian)', gender: 'female' },
+  { id: '33g9t0jl', name: 'Xia (Chinese)', gender: 'female' },
+
+  // Added Female Voices (Old Woman)
+  { id: 'd634b6da3d3b', name: 'Aylin (Turkish)', gender: 'female' },
+
+  // Added Female Voices (Young Woman)
+  { id: 'd18jlf6v', name: 'Hao (Chinese)', gender: 'female' },
+  { id: 'om17cury', name: 'Irina (Russian)', gender: 'female' },
+  { id: '73xd5dum', name: 'Ananya (Hindi)', gender: 'female' },
+  { id: 'f8cf5c2c78d4', name: 'Grace (English)', gender: 'female' },
+  { id: 'c3a2c594479e', name: 'Heimi (Finnish)', gender: 'female' },
+  { id: 'a0401c9101f8', name: 'Seo-yeon (Korean)', gender: 'female' },
+  { id: '490ea3be50b1', name: 'Saga (Swedish)', gender: 'female' },
+  { id: '3a7889066fa2', name: 'Lena (German)', gender: 'female' },
+  { id: '35c8d7f60dc8', name: 'Layla (Arabic)', gender: 'female' },
+  { id: '23be42535a45', name: 'Ji-yeon (Korean)', gender: 'female' },
+  { id: '1b12d5daee6b', name: 'Aleksandra (Polish)', gender: 'female' },
+  { id: '0895a5b8ce5c', name: 'Mai (Vietnamese)', gender: 'female' },
 ];
 
 const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({ character, onSave, onClose }) => {
@@ -65,7 +96,7 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({ character
   // Custom Dropdown States
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
   const [isLoraDropdownOpen, setIsLoraDropdownOpen] = useState(false);
-  const [isVoiceDropdownOpen, setIsVoiceDropdownOpen] = useState(false); // ✅ Voice Dropdown State
+  const [isVoiceDropdownOpen, setIsVoiceDropdownOpen] = useState(false); 
 
   useEffect(() => {
     const originalStyle = window.getComputedStyle(document.body).overflow;
@@ -252,7 +283,6 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({ character
     </div>
   );
 
-  // ✅ UPDATED: Dynamic Voice Selector with Custom Dropdown & Preview Button
   const renderVoiceSelect = () => {
     const genderText = (formData.gender || '').toLowerCase();
     const isFemale = genderText.includes('female') || genderText === 'f' || genderText.includes('woman') || genderText.includes('girl');
@@ -276,9 +306,9 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({ character
           <div className="relative flex-1">
             <div 
               onClick={() => setIsVoiceDropdownOpen(!isVoiceDropdownOpen)}
-              className="w-full p-3 md:p-4 bg-purple-500/5 border border-purple-500/20 rounded-2xl text-xs uppercase tracking-widest outline-none hover:border-purple-500/50 text-purple-300 shadow-inner cursor-pointer flex items-center justify-between transition-colors"
+              className="w-full p-4 bg-purple-500/5 border border-purple-500/20 rounded-2xl text-sm uppercase tracking-widest outline-none hover:border-purple-500/50 text-purple-300 shadow-inner cursor-pointer flex items-center justify-between transition-colors"
             >
-              <span>{selectedVoice ? selectedVoice.name : 'Default (Auto-Selected)'}</span>
+              <span>{selectedVoice ? selectedVoice.name : 'Default Voice (Auto-Selected)'}</span>
               <ChevronDown className={`w-4 h-4 text-purple-500/50 transition-transform ${isVoiceDropdownOpen ? 'rotate-180' : ''}`} />
             </div>
 
@@ -318,15 +348,13 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({ character
             type="button"
             disabled={!formData.voiceId || isSaving}
             onClick={() => {
-              const text = formData.voiceId === 'clara' 
-                ? "Hallo! Ich bin Clara. Wie gefällt dir meine Stimme?"
-                : "Hello! This is a preview of my voice.";
+              const text = "Hello! This is a preview of my voice. How do I sound?";
               playAriaSpeech(text, formData.voiceId);
             }}
-            className="flex items-center justify-center w-[44px] h-[44px] md:w-[52px] md:h-[52px] bg-purple-600 hover:bg-purple-500 text-white rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0 shadow-[0_0_15px_rgba(147,51,234,0.3)]"
+            className="flex items-center justify-center w-[54px] h-[54px] bg-purple-600 hover:bg-purple-500 text-white rounded-2xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0 shadow-[0_0_15px_rgba(147,51,234,0.3)]"
             title="Preview Voice"
           >
-            <Play className="w-4 h-4 md:w-5 md:h-5 fill-current ml-1" />
+            <Play className="w-5 h-5 fill-current ml-1" />
           </button>
         </div>
       </div>
@@ -377,7 +405,7 @@ const BotCustomizationModal: React.FC<BotCustomizationModalProps> = ({ character
                 </div>
                 {renderInput('gender', 'Biological Blueprint', 'female, male, etc.')}
                 {renderInput('ethnicity', 'Ethnicity', 'Latina, Asian, Caucasian, etc.')}
-                {renderVoiceSelect()} {/* ✅ ADDED DYNAMIC VOICE DROPDOWN HERE */}
+                {renderVoiceSelect()} 
             </div>
           </div>
 
