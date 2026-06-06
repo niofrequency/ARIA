@@ -438,7 +438,7 @@ export const generateAriaResponse = async (
     const stateContext = currentVisualState ? `
     ### CURRENT PHYSICAL STATE (CRITICAL)
     You are currently wearing: ${currentVisualState.clothing}.
-    You are currently located in: ${currentVisualState.location}.
+    You are currently located in: ${currentVisualState.location || 'the same setting as your reference image'}.
     Your current physical pose/action is: ${currentVisualState.pose}.
     
     If the user asks for a new photo, you MUST incorporate these exact details into your new [[VISUAL]] tag to maintain physical continuity, unless the user specifically asks you to change them.
@@ -705,11 +705,16 @@ export const generateAriaImage = async (
   // VISION BRIDGE INJECTION (AVAILABLE FOR BOTH)
   // ==========================================
   let visualContext = "";
+  let detectedBackground = ""; // ✅ NEW: Store extracted background
   if (character.avatarImage) {
     console.log("👁️ Extracting visual context from reference image...");
     visualContext = await getVisualDescription(character.avatarImage);
     if (visualContext) {
        console.log("👁️ Visual Context Extracted:", visualContext);
+       
+       // ✅ NEW: Simple background extraction
+       const bgMatch = visualContext.match(/(bedroom|bathroom|living room|kitchen|hotel room|balcony|beach|office|car|outdoors|studio|bed|couch|mirror|window|neon lights|dim lighting)/i);
+       if (bgMatch) detectedBackground = bgMatch[0];
     }
   }
 
@@ -868,14 +873,16 @@ export const generateAriaImage = async (
           ? `(doing action: ${visualState.pose}:1.4)` 
           : "(natural candid pose:1.3)";
           
-    const locationInstruction = visualState?.location || 'candid setting';
+    // ✅ NEW: Uses detectedBackground as fallback
+    const locationInstruction = visualState?.location || detectedBackground || 'candid setting';
     
     // === FUSED PROMPT (stronger exposure weighting) ===
     const exposureBoost = wantsExposure 
       ? ", (breasts fully exposed and perky:1.55), (hands squeezing breasts firmly:1.45), (nipples visible)"
       : "";
       
-    const fusedDescription = `${poseInstruction}, ${clothingInstruction}, (${locationInstruction}:1.2)${exposureBoost}, ${baseDescription}${visualContext ? `, (${visualContext}:1.2)` : ''}`;
+    // ✅ NEW: Incorporates the background with 1.25 weight and exposure boost
+    const fusedDescription = `${poseInstruction}, ${clothingInstruction}, (${locationInstruction}:1.25)${exposureBoost}, ${baseDescription}${visualContext ? `, (${visualContext}:1.2)` : ''}`;
     
     const promptText = [
       fusedDescription,
@@ -1025,8 +1032,8 @@ export const generateAriaImage = async (
     console.log("🧬 Using Biglust Text-to-Image");
     if (activeLoraFile) console.log(`🧬 Active LoRA: ${activeLoraFile}.safetensors (Weight: ${activeWeight})`);
     
-    // The vision extraction has now been shifted up, we just inject it here
-    const fusedDescription = `(${visualState?.clothing || 'casual outfit'}:1.25), (${visualState?.location || 'candid setting'}:1.2), ${baseDescription}${visualContext ? `, (${visualContext}:1.2)` : ''}`; 
+    // ✅ NEW: Inject the detected background properly into the Text-To-Image branch as well
+    const fusedDescription = `(${visualState?.clothing || 'casual outfit'}:1.25), (${visualState?.location || detectedBackground || 'candid setting'}:1.2), ${baseDescription}${visualContext ? `, (${visualContext}:1.2)` : ''}`; 
     
     const promptText = [
       fusedDescription,
