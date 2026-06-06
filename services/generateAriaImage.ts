@@ -685,14 +685,16 @@ export const generateAriaImage = async (
   const cleanScene = sceneLower
   .replace(/\[[^\]]+\]/g, '')
   .replace(/<[^>]+>/g, '');
-  const wantsExposure = cleanScene.includes('exposed') || 
+const wantsExposure = cleanScene.includes('exposed') || 
                       cleanScene.includes('topless') || 
                       cleanScene.includes('tits out') || 
                       cleanScene.includes('breasts out') || 
                       cleanScene.includes('pull') || 
                       cleanScene.includes('squeeze') || 
                       cleanScene.includes('naked') || 
-                      cleanScene.includes('no bra');
+                      cleanScene.includes('no bra') ||
+                      cleanScene.includes('squeezing') ||     // extra
+                      cleanScene.includes('squeezed');  
 
   // --- 1. LORA DETECTION (Determine Identity BEFORE Model Choice) ---
   let activeLoraFile = "";
@@ -874,14 +876,13 @@ export const generateAriaImage = async (
     console.log("🧠 Using Qwen FaceID Workflow + Biglust Refiner");
 
     let clothingInstruction: string;
-    if (wantsExposure) {
-      // Allow exposure even when using reference outfit
-      clothingInstruction = "wearing exact same clothing and style as reference image but top pulled down / breasts fully exposed";
-    } else if (targetClothing.includes('same as') || targetClothing.includes('input') || targetClothing.includes('reference')) {
-      clothingInstruction = "wearing exact same clothing and style as reference image";
-    } else {
-      clothingInstruction = `(${targetClothing}:1.25)`;
-    }
+if (wantsExposure) {
+  clothingInstruction = "wearing exact same clothing and style as reference image but top pulled down / breasts fully exposed";
+} else if (targetClothing.includes('same as') || targetClothing.includes('input') || targetClothing.includes('reference')) {
+  clothingInstruction = "wearing exact same clothing and style as reference image";
+} else {
+  clothingInstruction = `(${targetClothing}:1.25)`;
+}
     
     const isFirstImage = !visualState || 
       (!visualState.lastVisualDescription && !visualState.pose) || 
