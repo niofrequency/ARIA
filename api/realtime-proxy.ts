@@ -1,4 +1,4 @@
-// api/realtime-proxy.ts
+// api/realtime-token.ts // FOR CALLING TO BOT
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { WebSocketServer, WebSocket } from 'ws';
 
