@@ -685,20 +685,25 @@ export const generateAriaImage = async (
 const cleanScene = sceneLower
   .replace(/\[[^\]]+\]/g, '')
   .replace(/<[^>]+>/g, '');
-const wantsExposure = cleanScene.includes('exposed') || 
-                      cleanScene.includes('topless') || 
-                      cleanScene.includes('tits out') || 
-                      cleanScene.includes('breasts out') || 
-                      cleanScene.includes('pull') || 
-                      cleanScene.includes('squeeze') || 
-                      cleanScene.includes('naked') || 
-                      cleanScene.includes('no bra') ||
-                      cleanScene.includes('squeezing') ||
-                      cleanScene.includes('squeezed') ||
-                      // New: face + breast closeup requests
-                      (cleanScene.includes('closeup') && 
-                       cleanScene.includes('face') && 
-                       (cleanScene.includes('tits') || cleanScene.includes('breasts') || cleanScene.includes('squeeze') || cleanScene.includes('chest')));
+
+// Combine both the visual context AND the user's request
+const combined = `${cleanScene} ${userPrompt?.toLowerCase() || ''}`;
+
+const wantsExposure = combined.includes('exposed') || 
+                      combined.includes('topless') || 
+                      combined.includes('tits out') || 
+                      combined.includes('breasts out') || 
+                      combined.includes('pull') || 
+                      combined.includes('squeeze') || 
+                      combined.includes('naked') || 
+                      combined.includes('no bra') ||
+                      combined.includes('squeezing') ||
+                      combined.includes('squeezed') ||
+                      combined.includes('drooling') ||
+                      combined.includes('tongue out') ||
+                      (combined.includes('closeup') && 
+                       combined.includes('face') && 
+                       (combined.includes('tits') || combined.includes('breasts') || combined.includes('squeeze') || combined.includes('chest')));
 
   // --- 1. LORA DETECTION (Determine Identity BEFORE Model Choice) ---
   let activeLoraFile = "";
