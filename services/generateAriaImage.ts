@@ -171,12 +171,9 @@ export const extractContextPrompt = (text: string) => {
     .replace(gifRegex, '')
     .replace(youtubeRegex, '')
     .replace(linkRegex, '')
-    .replace(spicyRegex, '')
-    .replace(/\*\s*sends\s+.*?\*/gi, '')
-    .replace(/\[[^\]]+\]/g, '')     // ← add this
-    .replace(/<[^>]+>/g, '')        // ← add this
+    .replace(spicyRegex, '') // ✅ Remove Spicy Tag
+    .replace(/\*\s*sends\s+.*?\*/gi, '') // Removes "*sends giggle emoji*"
     .trim();
-
 
   // ✅ HALLUCINATION PATCH (IMPROVED)
   if (!contextPrompt && !gifSearchTerm && !externalLink && !youtubeSearchTerm && !spicySearchTerm) {
@@ -198,14 +195,6 @@ export const extractContextPrompt = (text: string) => {
   if (contextPrompt) {
     contextPrompt = contextPrompt.replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '');
     contextPrompt = contextPrompt.replace(/\s+/g, ' ').trim();
-  }
-  // ✅ STRIP TTS TAGS (critical for image prompts)
-  if (contextPrompt) {
-    contextPrompt = contextPrompt
-      .replace(/\[[^\]]+\]/g, '')     // removes [moan], [breath], [soft], etc.
-      .replace(/<[^>]+>/g, '')        // removes <soft>, <whisper>, etc.
-      .replace(/\s{2,}/g, ' ')
-      .trim();
   }
 
   // 5. Safety cleanup for malformed tags
@@ -433,23 +422,22 @@ export const generateAriaResponse = async (
       }
     }
 
-    // Cheapest useful context: last 15–20 messages
-    const recentMessages = history.slice(-20);
-    // Build a compact visual + clothing state summary from the last 15–20 messages
-    const visualSummary = recentMessages.length > 0 
-      ? `\n### RECENT CHAT CONTEXT (last ${recentMessages.length} messages)\n` +
-        recentMessages.map(m => {
-          const txt = (m.text || m.content || "").trim();
-          // Keep only the important parts for the LLM
-          return txt.length > 300 ? txt.slice(0, 300) + "..." : txt;
-        }).join("\n→ ") + "\n"
-      : "";
+    // 🧠 NEW: Visual History Summarization to prevent context drift
+    const visualHistory = history
+      .filter(m => {
+          const text = m.text || m.content || "";
+          return text.includes('[[VISUAL') || (m.role === 'system' && text.includes('VISUAL_STATE'));
+      })
+      .slice(-8); // Collect the last 8 visual events
+      
+    const visualSummary = visualHistory.length > 0 ? 
+      `\n### RECENT VISUAL CONTEXT (LAST 8)\n${visualHistory.map(m => m.text || m.content).join("\n→ ")}\n` : "";
 
     // ✅ FIX 3: Inject Current State so Grok knows exactly what physical pose to continue from
     const stateContext = currentVisualState ? `
     ### CURRENT PHYSICAL STATE (CRITICAL)
     You are currently wearing: ${currentVisualState.clothing}.
-    You are currently located in: ${currentVisualState.location || 'the same setting as your reference image'}.
+    You are currently located in: ${currentVisualState.location}.
     Your current physical pose/action is: ${currentVisualState.pose}.
     
     If the user asks for a new photo, you MUST incorporate these exact details into your new [[VISUAL]] tag to maintain physical continuity, unless the user specifically asks you to change them.
@@ -660,21 +648,13 @@ export const generateAriaImage = async (
   }
 
   // Cleanup
-   // Cleanup
   enhancedPrompt = enhancedPrompt.replace(/^[\s,]+|[\s,]+$/g, '').replace(/,\s*,/g, ', ');
 
   // === THE FIX IS HERE ===
   // We completely remove userPrompt from this string.
   // Grok already extracted the visual requirements into the context prompt!
   const rawCombined = `${enhancedPrompt}`.trim();
-
-  // === FINAL SAFETY CLEANUP (protects regenerate + normal flow) ===
-  let baseDescription = rawCombined
-    .replace(/\[[^\]]+\]/g, '')     // removes [moan], [breath], etc.
-    .replace(/<[^>]+>/g, '')        // removes <soft>, <whisper>, etc.
-    .replace(/\s{2,}/g, ' ')
-    .trim();
-
+  const baseDescription = rawCombined;
 
   if (!baseDescription) {
     console.warn("No prompt description available for image generation");
@@ -682,28 +662,6 @@ export const generateAriaImage = async (
   }
 
   const sceneLower = baseDescription.toLowerCase();
-const cleanScene = sceneLower
-  .replace(/\[[^\]]+\]/g, '')
-  .replace(/<[^>]+>/g, '');
-
-// Combine both the visual context AND the user's request
-const combined = `${cleanScene} ${userPrompt?.toLowerCase() || ''}`;
-
-const wantsExposure = combined.includes('exposed') || 
-                      combined.includes('topless') || 
-                      combined.includes('tits out') || 
-                      combined.includes('breasts out') || 
-                      combined.includes('pull') || 
-                      combined.includes('squeeze') || 
-                      combined.includes('naked') || 
-                      combined.includes('no bra') ||
-                      combined.includes('squeezing') ||
-                      combined.includes('squeezed') ||
-                      combined.includes('drooling') ||
-                      combined.includes('tongue out') ||
-                      (combined.includes('closeup') && 
-                       combined.includes('face') && 
-                       (combined.includes('tits') || combined.includes('breasts') || combined.includes('squeeze') || combined.includes('chest')));
 
   // --- 1. LORA DETECTION (Determine Identity BEFORE Model Choice) ---
   let activeLoraFile = "";
@@ -746,16 +704,11 @@ const wantsExposure = combined.includes('exposed') ||
   // VISION BRIDGE INJECTION (AVAILABLE FOR BOTH)
   // ==========================================
   let visualContext = "";
-  let detectedBackground = ""; // ✅ NEW: Store extracted background
   if (character.avatarImage) {
     console.log("👁️ Extracting visual context from reference image...");
     visualContext = await getVisualDescription(character.avatarImage);
     if (visualContext) {
        console.log("👁️ Visual Context Extracted:", visualContext);
-       
-       // ✅ NEW: Simple background extraction
-       const bgMatch = visualContext.match(/(bedroom|bathroom|living room|kitchen|hotel room|balcony|beach|office|car|outdoors|studio|bed|couch|mirror|window|neon lights|dim lighting)/i);
-       if (bgMatch) detectedBackground = bgMatch[0];
     }
   }
 
@@ -884,35 +837,22 @@ const wantsExposure = combined.includes('exposed') ||
   if (useQwen && character.avatarImage) {
     console.log("🧠 Using Qwen FaceID Workflow + Biglust Refiner");
 
-    let clothingInstruction: string;
-if (wantsExposure) {
-  clothingInstruction = "wearing exact same clothing and style as reference image but top pulled down / breasts fully exposed";
-} else if (targetClothing.includes('same as') || targetClothing.includes('input') || targetClothing.includes('reference')) {
-  clothingInstruction = "wearing exact same clothing and style as reference image";
-} else {
-  clothingInstruction = `(${targetClothing}:1.25)`;
-}
+    // ✅ FIX 4: Strong pose breaking fix - Only trigger completely new pose if genuinely first image with NO pose history
+    const isFirstImage = !visualState || (!visualState.lastVisualDescription && !visualState.pose) || (visualState.lastVisualDescription === "current moment" && !visualState.pose);
     
-    const isFirstImage = !visualState || 
-      (!visualState.lastVisualDescription && !visualState.pose) || 
-      wantsExposure;   // ← now also triggers stronger pose change on exposure requests
-      
+    // Strong pose breaking for initial generation
     const poseInstruction = isFirstImage 
-      ? "(completely new dynamic pose:1.45), (fresh natural stance:1.5), (different body posture from reference:1.6), (varied angle:1.3)"
-      : visualState?.pose 
-          ? `(doing action: ${visualState.pose}:1.4)` 
-          : "(natural candid pose:1.3)";
-          
-    // ✅ NEW: Uses detectedBackground as fallback
-    const locationInstruction = visualState?.location || detectedBackground || 'candid setting';
-    
-    // === FUSED PROMPT (stronger exposure weighting) ===
-    const exposureBoost = wantsExposure 
-      ? ", (breasts fully exposed and perky:1.55), (hands squeezing breasts firmly:1.45), (nipples visible)"
-      : "";
-      
-    // ✅ NEW: Incorporates the background with 1.25 weight and exposure boost
-    const fusedDescription = `${poseInstruction}, ${clothingInstruction}, (${locationInstruction}:1.25)${exposureBoost}, ${baseDescription}${visualContext ? `, (${visualContext}:1.2)` : ''}`;
+        ? "(completely new dynamic pose:1.45), (fresh natural stance:1.5), (different body posture from reference:1.6), (varied angle:1.3)"
+        : visualState?.pose 
+            ? `(doing action: ${visualState.pose}:1.4)` 
+            : "(natural candid pose:1.3)";
+
+    const clothingInstruction = targetClothing.includes('same as') || targetClothing.includes('input') || targetClothing.includes('reference')
+        ? "wearing exact same clothing and style as reference image"
+        : `(${targetClothing}:1.25)`;
+
+    // Uses Grok's natural language construction like Biglust
+    const fusedDescription = `${poseInstruction}, ${clothingInstruction}, (${visualState?.location || 'candid setting'}:1.2), ${baseDescription}${visualContext ? `, (${visualContext}:1.2)` : ''}`;
     
     const promptText = [
       fusedDescription,
@@ -1062,8 +1002,8 @@ if (wantsExposure) {
     console.log("🧬 Using Biglust Text-to-Image");
     if (activeLoraFile) console.log(`🧬 Active LoRA: ${activeLoraFile}.safetensors (Weight: ${activeWeight})`);
     
-    // ✅ NEW: Inject the detected background properly into the Text-To-Image branch as well
-    const fusedDescription = `(${visualState?.clothing || 'casual outfit'}:1.25), (${visualState?.location || detectedBackground || 'candid setting'}:1.2), ${baseDescription}${visualContext ? `, (${visualContext}:1.2)` : ''}`; 
+    // The vision extraction has now been shifted up, we just inject it here
+    const fusedDescription = `(${visualState?.clothing || 'casual outfit'}:1.25), (${visualState?.location || 'candid setting'}:1.2), ${baseDescription}${visualContext ? `, (${visualContext}:1.2)` : ''}`; 
     
     const promptText = [
       fusedDescription,
