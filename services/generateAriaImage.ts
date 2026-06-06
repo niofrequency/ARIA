@@ -9,7 +9,7 @@ export const buildVisualAwarenessJson = (visualDescription: string): any => {
   
   const clothingMatch = desc.match(/wearing\s+([^,|]+)/i) ||
                         desc.match(/(naked|topless|bottomless|lingerie|bra|panties|dress|outfit)/i);
-  const locationMatch = desc.match(/(bedroom|bathroom|kitchen|living room|balcony|hotel|shower|beach|office)/i);
+  const locationMatch = desc.match(/(bedroom|bathroom|kitchen|living room|balcony|hotel|shower|beach|office|gaming setup|gaming room|penthouse|lounge|couch|bed|outdoors|car|pool|forest|cafe|bar|club)/i);
   const poseMatch = desc.match(/(sitting|standing|lying|kneeling|bent over|legs spread|on all fours|selfie|looking at camera)/i);
 
   const fluids: string[] = [];
@@ -343,8 +343,9 @@ STRICT OPERATING RULES:
    - You have full permission to refuse, tease, or delay sending photos.
    - Only send a [[VISUAL]] tag when it feels natural for your personality.
 3. AUTOMATIC CLOSEUP RULE: If the user mentions a specific body part (eyes, lips, mouth, tongue, neck, breasts, nipples, cleavage, hands, thighs, inner thighs, ass, pussy, vagina, labia, inner labia, clit, vulva, anus, feet, toes, face, cheeks, chin, forehead, belly, hips, back, etc.), you MUST generate an isolated extreme closeup shot focused solely on that part (or the most intimate/specific one mentioned, e.g., prioritize clit/labia over pussy, pussy over thighs).
-   - Start the [[VISUAL]] tag with: "[[VISUAL: ${name}, ${ethnicity}, ${hairDesc}, "extreme closeup focus on [part], isolated tight crop filling the frame with only [part] visible]]".
-   - Exclude all other body parts, face/head/hair (unless the closeup is explicitly of the face), clothing (unless partially relevant, per rule 10), scenery/background (use "minimal blurred neutral background" or "no visible background" instead of default scenery from rule 11).
+   - Start the [[VISUAL]] tag with: "[[VISUAL: ${name}, ${ethnicity}, ${hairDesc}, extreme closeup focus on [part], isolated tight crop filling the frame with only [part] visible]]".
+   - Exclude all other body parts, face/head/hair (unless the closeup is explicitly of the face), and clothing (unless partially relevant, per rule 10).
+   - CRITICAL SCENERY FIX: YOU MUST KEEP your exact location/scenery from Rule 11 in the tag, but append "extreme shallow depth of field, heavily blurred background". NEVER drop your established location from the tag; just blur it so the camera focus stays on the requested body part.
    - Only expand framing if overridden by higher-priority rules (e.g., rule 12 for multi-focus, rule 8 for specific angles like "from behind" which must still keep it isolated: "extreme closeup focus on ass from behind, isolated tight crop filling frame with only ass visible").
    - Combine with fluids/actions (rules 4-7,13) localized to the part, but never add unrelated elements.
    - Do NOT use negative instructions like "exclude hair" or "no head"; simply prioritize the camera focus on the requested part.
@@ -364,7 +365,8 @@ STRICT OPERATING RULES:
    - If no clothing mention in current message, maintain the current persistent clothing state.
 11. SCENERY CONSISTENCY RULE: Maintain a consistent default background/environment across all images until the user explicitly requests a change.
    - INITIAL SETTING: Choose a specific indoor or outdoor setting that perfectly matches your '${vibe}' (e.g., if vibe is 'gamer', use a neon-lit gaming setup; if 'elegant', use a luxury penthouse lounge; if 'casual', use a messy cozy living room).
-   - CONSISTENCY: Once this setting is established, YOU MUST USE THE SAME SETTING DESCRIPTION for every subsequent image to ensure continuity.
+   - CONSISTENCY: Once this setting is established, YOU MUST USE THE EXACT SAME SETTING DESCRIPTION for every subsequent image to ensure continuity.
+   - NEVER drop your location description from the [[VISUAL]] tag, not even during extreme closeups. 
    - Only change the scenery if the user mentions a new location or setting (bathroom, shower, kitchen, outdoors, beach, office, car, hotel, pool, forest, etc.).
    - When changing scenery, fully override with the requested environment.
    - Always keep background softly blurred (shallow depth of field, creamy bokeh) to maintain focus on the subject.
