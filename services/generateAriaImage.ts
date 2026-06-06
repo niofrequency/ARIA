@@ -682,7 +682,7 @@ export const generateAriaImage = async (
   }
 
   const sceneLower = baseDescription.toLowerCase();
-  const cleanScene = sceneLower
+const cleanScene = sceneLower
   .replace(/\[[^\]]+\]/g, '')
   .replace(/<[^>]+>/g, '');
 const wantsExposure = cleanScene.includes('exposed') || 
@@ -693,8 +693,12 @@ const wantsExposure = cleanScene.includes('exposed') ||
                       cleanScene.includes('squeeze') || 
                       cleanScene.includes('naked') || 
                       cleanScene.includes('no bra') ||
-                      cleanScene.includes('squeezing') ||     // extra
-                      cleanScene.includes('squeezed');  
+                      cleanScene.includes('squeezing') ||
+                      cleanScene.includes('squeezed') ||
+                      // New: face + breast closeup requests
+                      (cleanScene.includes('closeup') && 
+                       cleanScene.includes('face') && 
+                       (cleanScene.includes('tits') || cleanScene.includes('breasts') || cleanScene.includes('squeeze') || cleanScene.includes('chest')));
 
   // --- 1. LORA DETECTION (Determine Identity BEFORE Model Choice) ---
   let activeLoraFile = "";
