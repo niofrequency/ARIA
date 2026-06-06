@@ -54,7 +54,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         "Authorization": `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: "grok-vision-beta",
+        model: "grok-2-vision",
         messages: [
           {
             role: "user",
