@@ -682,7 +682,17 @@ export const generateAriaImage = async (
   }
 
   const sceneLower = baseDescription.toLowerCase();
-
+  const cleanScene = sceneLower
+  .replace(/\[[^\]]+\]/g, '')
+  .replace(/<[^>]+>/g, '');
+  const wantsExposure = cleanScene.includes('exposed') || 
+                      cleanScene.includes('topless') || 
+                      cleanScene.includes('tits out') || 
+                      cleanScene.includes('breasts out') || 
+                      cleanScene.includes('pull') || 
+                      cleanScene.includes('squeeze') || 
+                      cleanScene.includes('naked') || 
+                      cleanScene.includes('no bra');
 
   // --- 1. LORA DETECTION (Determine Identity BEFORE Model Choice) ---
   let activeLoraFile = "";
@@ -863,16 +873,6 @@ export const generateAriaImage = async (
   if (useQwen && character.avatarImage) {
     console.log("🧠 Using Qwen FaceID Workflow + Biglust Refiner");
 
-    // === STRONGER PERSISTENT STATE INJECTION (UPDATED) ===
-    const wantsExposure = sceneLower.includes('exposed') || 
-                          sceneLower.includes('topless') || 
-                          sceneLower.includes('tits out') || 
-                          sceneLower.includes('breasts out') || 
-                          sceneLower.includes('pull') || 
-                          sceneLower.includes('squeeze') || 
-                          sceneLower.includes('naked') || 
-                          sceneLower.includes('no bra');
-    
     let clothingInstruction: string;
     if (wantsExposure) {
       // Allow exposure even when using reference outfit
