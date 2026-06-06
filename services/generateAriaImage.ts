@@ -422,16 +422,17 @@ export const generateAriaResponse = async (
       }
     }
 
-    // 🧠 NEW: Visual History Summarization to prevent context drift
-    const visualHistory = history
-      .filter(m => {
-          const text = m.text || m.content || "";
-          return text.includes('[[VISUAL') || (m.role === 'system' && text.includes('VISUAL_STATE'));
-      })
-      .slice(-8); // Collect the last 8 visual events
-      
-    const visualSummary = visualHistory.length > 0 ? 
-      `\n### RECENT VISUAL CONTEXT (LAST 8)\n${visualHistory.map(m => m.text || m.content).join("\n→ ")}\n` : "";
+    // Cheapest useful context: last 15–20 messages
+    const recentMessages = history.slice(-20);
+    // Build a compact visual + clothing state summary from the last 15–20 messages
+    const visualSummary = recentMessages.length > 0 
+      ? `\n### RECENT CHAT CONTEXT (last ${recentMessages.length} messages)\n` +
+        recentMessages.map(m => {
+          const txt = (m.text || m.content || "").trim();
+          // Keep only the important parts for the LLM
+          return txt.length > 300 ? txt.slice(0, 300) + "..." : txt;
+        }).join("\n→ ") + "\n"
+      : "";
 
     // ✅ FIX 3: Inject Current State so Grok knows exactly what physical pose to continue from
     const stateContext = currentVisualState ? `
@@ -837,22 +838,44 @@ export const generateAriaImage = async (
   if (useQwen && character.avatarImage) {
     console.log("🧠 Using Qwen FaceID Workflow + Biglust Refiner");
 
-    // ✅ FIX 4: Strong pose breaking fix - Only trigger completely new pose if genuinely first image with NO pose history
-    const isFirstImage = !visualState || (!visualState.lastVisualDescription && !visualState.pose) || (visualState.lastVisualDescription === "current moment" && !visualState.pose);
+    // === STRONGER PERSISTENT STATE INJECTION (UPDATED) ===
+    const wantsExposure = sceneLower.includes('exposed') || 
+                          sceneLower.includes('topless') || 
+                          sceneLower.includes('tits out') || 
+                          sceneLower.includes('breasts out') || 
+                          sceneLower.includes('pull') || 
+                          sceneLower.includes('squeeze') || 
+                          sceneLower.includes('naked') || 
+                          sceneLower.includes('no bra');
     
-    // Strong pose breaking for initial generation
+    let clothingInstruction: string;
+    if (wantsExposure) {
+      // Allow exposure even when using reference outfit
+      clothingInstruction = "wearing exact same clothing and style as reference image but top pulled down / breasts fully exposed";
+    } else if (targetClothing.includes('same as') || targetClothing.includes('input') || targetClothing.includes('reference')) {
+      clothingInstruction = "wearing exact same clothing and style as reference image";
+    } else {
+      clothingInstruction = `(${targetClothing}:1.25)`;
+    }
+    
+    const isFirstImage = !visualState || 
+      (!visualState.lastVisualDescription && !visualState.pose) || 
+      wantsExposure;   // ← now also triggers stronger pose change on exposure requests
+      
     const poseInstruction = isFirstImage 
-        ? "(completely new dynamic pose:1.45), (fresh natural stance:1.5), (different body posture from reference:1.6), (varied angle:1.3)"
-        : visualState?.pose 
-            ? `(doing action: ${visualState.pose}:1.4)` 
-            : "(natural candid pose:1.3)";
-
-    const clothingInstruction = targetClothing.includes('same as') || targetClothing.includes('input') || targetClothing.includes('reference')
-        ? "wearing exact same clothing and style as reference image"
-        : `(${targetClothing}:1.25)`;
-
-    // Uses Grok's natural language construction like Biglust
-    const fusedDescription = `${poseInstruction}, ${clothingInstruction}, (${visualState?.location || 'candid setting'}:1.2), ${baseDescription}${visualContext ? `, (${visualContext}:1.2)` : ''}`;
+      ? "(completely new dynamic pose:1.45), (fresh natural stance:1.5), (different body posture from reference:1.6), (varied angle:1.3)"
+      : visualState?.pose 
+          ? `(doing action: ${visualState.pose}:1.4)` 
+          : "(natural candid pose:1.3)";
+          
+    const locationInstruction = visualState?.location || 'candid setting';
+    
+    // === FUSED PROMPT (stronger exposure weighting) ===
+    const exposureBoost = wantsExposure 
+      ? ", (breasts fully exposed and perky:1.55), (hands squeezing breasts firmly:1.45), (nipples visible)"
+      : "";
+      
+    const fusedDescription = `${poseInstruction}, ${clothingInstruction}, (${locationInstruction}:1.2)${exposureBoost}, ${baseDescription}${visualContext ? `, (${visualContext}:1.2)` : ''}`;
     
     const promptText = [
       fusedDescription,
