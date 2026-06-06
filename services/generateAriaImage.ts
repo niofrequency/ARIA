@@ -660,13 +660,21 @@ export const generateAriaImage = async (
   }
 
   // Cleanup
+   // Cleanup
   enhancedPrompt = enhancedPrompt.replace(/^[\s,]+|[\s,]+$/g, '').replace(/,\s*,/g, ', ');
 
   // === THE FIX IS HERE ===
   // We completely remove userPrompt from this string.
   // Grok already extracted the visual requirements into the context prompt!
   const rawCombined = `${enhancedPrompt}`.trim();
-  const baseDescription = rawCombined;
+
+  // === FINAL SAFETY CLEANUP (protects regenerate + normal flow) ===
+  let baseDescription = rawCombined
+    .replace(/\[[^\]]+\]/g, '')     // removes [moan], [breath], etc.
+    .replace(/<[^>]+>/g, '')        // removes <soft>, <whisper>, etc.
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+
 
   if (!baseDescription) {
     console.warn("No prompt description available for image generation");
@@ -674,6 +682,7 @@ export const generateAriaImage = async (
   }
 
   const sceneLower = baseDescription.toLowerCase();
+
 
   // --- 1. LORA DETECTION (Determine Identity BEFORE Model Choice) ---
   let activeLoraFile = "";
