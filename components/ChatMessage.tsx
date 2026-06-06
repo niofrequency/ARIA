@@ -46,13 +46,26 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
   const [isDownloading, setIsDownloading] = useState(false);
   const [showMobileOverlay, setShowMobileOverlay] = useState(false);
 
+  // --- HELPER: CLEAN TEXT FOR UI (Hides TTS Tags) ---
+  const cleanMessageForUI = (rawText: string | undefined) => {
+    if (!rawText) return '';
+    return rawText
+      .replace(/<[^>]+>/g, '')      // removes wrapping tags like <whisper>
+      .replace(/\[[^\]]+\]/g, '')   // removes instant tags like [breath]
+      .replace(/\s{2,}/g, ' ')      // cleans up any double spaces left behind
+      .trim();
+  };
+
+  // The clean text that the user will actually see
+  const uiText = cleanMessageForUI(message.text);
+
   // --- TYPEWRITER STATE ---
   const [shouldAnimate] = useState(() => {
     const isHistory = (Date.now() - (message.timestamp || 0)) > 5000;
     return !isUser && !isHistory;
   });
 
-  const [displayedText, setDisplayedText] = useState(shouldAnimate ? '' : message.text);
+  const [displayedText, setDisplayedText] = useState(shouldAnimate ? '' : uiText);
   const [isTypingComplete, setIsTypingComplete] = useState(!shouldAnimate);
 
   // --- HELPER: DETECT LINK TYPE ---
@@ -100,29 +113,27 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
   // --- TYPING EFFECT LOGIC ---
   useEffect(() => {
     if (!shouldAnimate) {
-      if (displayedText !== message.text) setDisplayedText(message.text || '');
+      if (displayedText !== uiText) setDisplayedText(uiText);
       setIsTypingComplete(true);
       return;
     }
-    if (displayedText === message.text) { setIsTypingComplete(true); return; }
+    if (displayedText === uiText) { setIsTypingComplete(true); return; }
     setIsTypingComplete(false);
     
-    let currentIndex = 0;
-    const fullText = message.text || '';
     const typingInterval = setInterval(() => {
       setDisplayedText((prev) => {
-        if (!prev && prev !== '') return fullText.slice(0, 1);
+        if (!prev && prev !== '') return uiText.slice(0, 1);
         const nextIndex = prev ? prev.length + 1 : 1;
-        if (nextIndex > fullText.length) {
+        if (nextIndex > uiText.length) {
             clearInterval(typingInterval);
             setIsTypingComplete(true);
-            return fullText;
+            return uiText;
         }
-        return fullText.slice(0, nextIndex);
+        return uiText.slice(0, nextIndex);
       });
     }, 50);
     return () => clearInterval(typingInterval);
-  }, [message.text, shouldAnimate]);
+  }, [uiText, shouldAnimate]);
   
   // --- MEDIA SYNC ---
   useEffect(() => {
@@ -192,7 +203,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
         </div>
 
         {/* TEXT BUBBLE */}
-        {message.text && (
+        {uiText && (
           <div className={`relative px-5 py-4 rounded-2xl text-sm md:text-[15px] leading-relaxed backdrop-blur-md transition-all
               ${isUser 
                 ? 'bg-white/[0.03] text-zinc-200 rounded-tr-none border border-white/10 shadow-lg' 
@@ -286,7 +297,6 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
                   src={message.imageUrl} 
                   alt="Visual" 
                   onClick={(e) => {
-                    // Tap toggle for mobile, instant click for desktop
                     if (typeof window !== 'undefined' && window.innerWidth < 768) {
                       e.stopPropagation();
                       setShowMobileOverlay(prev => !prev);
@@ -298,26 +308,23 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
                 />
               )}
 
-              {/* === OVERLAYS (Only for Native Video/Image, NOT for Iframe Embeds) === */}
+              {/* === OVERLAYS (Only for Native Video/Image) === */}
               {(mediaType === 'video_file' || (!message.videoUrl && message.imageUrl)) && (
                   <>
-                    {/* HOVER OVERLAY: Neural Motion Button & Fullscreen */}
-                    {!message.videoUrl && !message.isVideoLoading && (
-                        <div className={`absolute inset-0 flex flex-col items-center justify-center gap-3 backdrop-blur-[2px] transition-all duration-300 pointer-events-none ${showMobileOverlay ? 'bg-black/40 opacity-100' : 'bg-black/40 opacity-0 group-hover:opacity-100'}`}>
-                            <button 
-                                onClick={(e) => { e.stopPropagation(); setShowMobileOverlay(false); onAnimateRequest(message); }} 
-                                className="pointer-events-auto flex items-center gap-2 px-5 py-2.5 bg-white text-black rounded-full font-black text-[10px] uppercase tracking-tighter hover:bg-purple-500 hover:text-white transition-all active:scale-95 shadow-xl"
-                            >
-                                <Film className="w-3.5 h-3.5" /> Neural Motion
-                            </button>
-                            <button 
-                                onClick={(e) => { e.stopPropagation(); setShowMobileOverlay(false); onMediaClick(message.imageUrl!, 'image'); }} 
-                                className="pointer-events-auto text-white/70 hover:text-white text-[9px] uppercase tracking-[0.2em] font-bold py-1"
-                            >
-                                View Fullscreen
-                            </button>
-                        </div>
-                    )}
+                    <div className={`absolute inset-0 flex flex-col items-center justify-center gap-3 backdrop-blur-[2px] transition-all duration-300 pointer-events-none ${showMobileOverlay ? 'bg-black/40 opacity-100' : 'bg-black/40 opacity-0 group-hover:opacity-100'}`}>
+                        <button 
+                            onClick={(e) => { e.stopPropagation(); setShowMobileOverlay(false); onAnimateRequest(message); }} 
+                            className="pointer-events-auto flex items-center gap-2 px-5 py-2.5 bg-white text-black rounded-full font-black text-[10px] uppercase tracking-tighter hover:bg-purple-500 hover:text-white transition-all active:scale-95 shadow-xl"
+                        >
+                            <Film className="w-3.5 h-3.5" /> Neural Motion
+                        </button>
+                        <button 
+                            onClick={(e) => { e.stopPropagation(); setShowMobileOverlay(false); onMediaClick(message.imageUrl!, 'image'); }} 
+                            className="pointer-events-auto text-white/70 hover:text-white text-[9px] uppercase tracking-[0.2em] font-bold py-1"
+                        >
+                            View Fullscreen
+                        </button>
+                    </div>
                     
                     {/* LOADING OVERLAY: "Synthesizing" */}
                     {message.isVideoLoading && (
@@ -366,7 +373,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
                   </button>
                 )}
                 
-                {/* RIGHT BUTTONS: DOWNLOAD / REFRESH (Only for Native Files) */}
+                {/* RIGHT BUTTONS: DOWNLOAD / REFRESH */}
                 {mediaType !== 'embed' && mediaType !== 'youtube' && (
                     <div className="flex items-center gap-3">
                         <button onClick={() => { if (message.videoUrl && viewMode === 'video') onAnimateRequest(message); else onRegenerateImage(message); }} className="text-zinc-600 hover:text-purple-400 transition-all hover:rotate-180 duration-500">
@@ -396,13 +403,12 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
                   <span className="text-zinc-700">•</span>
                   <button 
                       onClick={() => {
+                          // The TTS engine STILL GETS the raw tags for speech!
                           const speechText = message.text?.replace(/\*.*?\*/g, '').trim();
                           if (speechText) {
                               if (onToggleTTS) {
-                                  // Pass to central tracker in MainChatArea
                                   onToggleTTS(speechText, message.id);
                               } else {
-                                  // Fallback for standalone usage
                                   playAriaSpeech(speechText, characterVoiceId || 'ara');
                               }
                           }
@@ -431,6 +437,6 @@ export default React.memo(ChatMessage, (prevProps, nextProps) => {
     prevProps.message.isVideoLoading === nextProps.message.isVideoLoading &&
     prevProps.characterName === nextProps.characterName &&
     prevProps.characterVoiceId === nextProps.characterVoiceId &&
-    prevProps.isCurrentlyPlaying === nextProps.isCurrentlyPlaying // ✅ Add TTS state to memo check
+    prevProps.isCurrentlyPlaying === nextProps.isCurrentlyPlaying
   );
 });
