@@ -133,7 +133,7 @@ export const updateVisualState = (
 /**
  * EXTRACT CONTEXT PROMPT
  * Parses the AI response to separate chat text from Visual tags, Memory tags, GIFs, Links, and YouTube.
- * Includes Hallucination Patch and Emoji Sanitization.
+ * Includes Hallucination Patch, Emoji Sanitization, and TTS Leak Protection.
  */
 export const extractContextPrompt = (text: string) => {
   // 1. Define Regex Patterns
@@ -143,6 +143,7 @@ export const extractContextPrompt = (text: string) => {
   const linkRegex = /[\[\{]{2}\s*LINK\s*:\s*([\s\S]*?)\s*[\]\}]{2}/i;
   const youtubeRegex = /[\[\{]{2}\s*YOUTUBE\s*:\s*([\s\S]*?)\s*[\]\}]{2}/i;
   const spicyRegex = /[\[\{]{2}\s*SPICY\s*:\s*([\s\S]*?)\s*[\]\}]{2}/i;
+  const ttsRegex = /[\[\{]{2}\s*TTS\s*:\s*([\s\S]*?)\s*[\]\}]{2}/i; // ✅ Prevents TTS leaking into image prompt
 
   // 2. Extract Data
   const visualMatch = text.match(visualRegex);
@@ -160,7 +161,6 @@ export const extractContextPrompt = (text: string) => {
   const linkMatch = text.match(linkRegex);
   const externalLink = linkMatch ? linkMatch[1].trim() : null;
 
-  // ✅ Extract Spicy Term
   const spicyMatch = text.match(spicyRegex);
   const spicySearchTerm = spicyMatch ? spicyMatch[1].trim() : null;
 
@@ -171,7 +171,8 @@ export const extractContextPrompt = (text: string) => {
     .replace(gifRegex, '')
     .replace(youtubeRegex, '')
     .replace(linkRegex, '')
-    .replace(spicyRegex, '') // ✅ Remove Spicy Tag
+    .replace(spicyRegex, '')
+    .replace(ttsRegex, '') // ✅ Strip TTS from text output to prevent hallucination bleeds
     .replace(/\*\s*sends\s+.*?\*/gi, '') // Removes "*sends giggle emoji*"
     .trim();
 
@@ -208,7 +209,7 @@ export const extractContextPrompt = (text: string) => {
     memoryText,
     gifSearchTerm,
     youtubeSearchTerm,
-    spicySearchTerm, // ✅ Return this new field
+    spicySearchTerm,
     externalLink
   };
 };
@@ -578,12 +579,11 @@ const getVisualDescription = async (base64Image: string): Promise<string> => {
   try {
     if (!base64Image) return "";
     
-    // You will need to create this endpoint (`/api/vision-caption`)
-    // It should use GPT-4o, Grok Vision, or LLaVA to return a short descriptive string.
+    // ✅ MODEL FIX INCLUDED FOR CAPTIONING
     const response = await fetch('/api/vision-caption', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ image: base64Image })
+      body: JSON.stringify({ image: base64Image, model: "gpt-4o" })
     });
     
     if (!response.ok) return "";
@@ -605,7 +605,7 @@ export const generateAriaImage = async (
   userPrompt: string,
   character: any,
   visualState?: VisualState,         // ✅ NEW
-  recentHistorySummary?: string       // ✅ NEW
+  recentHistorySummary?: string      // ✅ NEW
 ): Promise<string | null> => {
 
   let enhancedPrompt = contextPrompt || "";
@@ -718,11 +718,12 @@ export const generateAriaImage = async (
   
   console.log(`🎯 Model Decision → ${useQwen ? '🔵 Qwen AIO NSFW (Image to Image Refiner)' : '🔴 Biglust (Text to Image)'}`);
 
-  // --- 2. SITUATIONAL ANALYSIS ---
-  const isFaceFocus = sceneLower.includes("face") || sceneLower.includes("selfie") || (sceneLower.includes("closeup") && !sceneLower.match(/pussy|ass|butt|rear|boobs|tits|nipples|clit|vulva|anus|feet|toes|armpit|extreme closeup.*(body|lower|intimate)/i));
-  const isUpperBody = /upper body|waist up|chest up|bust shot|shoulders|arms|torso|midriff/i.test(sceneLower);
-  const isLowerBody = /lower body|thighs|legs|feet|waist down|ass|butt|rear|backside|behind|hips|crotch|pussy/i.test(sceneLower);
-  const isPartFocus = /hands|fingers|feet|toes|skin texture|extreme closeup|armpit|underarm|navel|nails|details/i.test(sceneLower);
+  // ✅ FIX: IMPROVED FRAMING & EXPOSURE SITUATIONAL ANALYSIS
+  const wantsFace = /face|selfie|eye contact|look at me|portrait/i.test(sceneLower);
+  const wantsUpper = /boobs|tits|breasts|chest|cleavage|nipples|upper body|waist up/i.test(sceneLower);
+  const wantsLower = /pussy|ass|butt|rear|vulva|clit|crotch|vagina|lower body|thighs/i.test(sceneLower);
+  const wantsFeet = /feet|toes|soles/i.test(sceneLower);
+  const wantsHands = /hands|fingers|nails/i.test(sceneLower);
   const isHorizontal = /landscape|horizontal|wide shot|panoramic/i.test(sceneLower);
 
   const imgWidth = isHorizontal ? 1500 : 1024;
@@ -769,9 +770,8 @@ export const generateAriaImage = async (
     if ((s.includes("frontview") || s.includes("backview") || s.includes("sideview") || s.includes("profile") || s.includes("from above") || s.includes("from below") || s.includes("high angle") || s.includes("low angle") || s.includes("overhead") || s.includes("birdseye") || s.includes("wormseye")) && 
         (t.includes("front") || t.includes("back") || t.includes("side") || t.includes("rear") || t.includes("profile") || t.includes("bottom view") || t.includes("top view"))) return true;
 
-    if (!isFaceFocus && !sceneLower.match(/pussy|ass|butt|rear|boobs|tits|nipples|clit|vulva|anus|feet|toes|armpit|extreme closeup.*(body|lower|intimate)/i) && !isLowerBody) {
+    if (!wantsFace && !wantsLower && !wantsUpper && !wantsFeet) {
         const safeTagRegex = /petite|curvy|thick|slim|skinny|tall|short|slender|thin|athletic|fit|toned|muscular|chubby|voluptuous|freckles|pale|tan|dark|skin|bosom|bust|breast|hips|ass|butt|hairy|armpit/i;
-        
         if (safeTagRegex.test(t)) return true;
         return false;
       }
@@ -784,16 +784,22 @@ export const generateAriaImage = async (
 
   let situationalTags: string[] = [];
 
-  if (isFaceFocus && isLowerBody) {
-    situationalTags = [`medium shot showing face and lower body of ${botIdentity}`, character.ethnicity, faceTags, hairTags, bodyTags];
-  } else if (isFaceFocus) {
+  // ✅ FIX: NEW EXPOSURE COMBINATIONS PREVENTS OVERRIDES
+  if (wantsFace && wantsLower) {
+    situationalTags = [`medium wide shot showing face and lower body of ${botIdentity}`, character.ethnicity, faceTags, hairTags, bodyTags];
+  } else if (wantsFace && wantsUpper) {
+    situationalTags = [`medium shot showing face and upper body of ${botIdentity}`, character.ethnicity, faceTags, hairTags, bodyTags];
+  } else if (wantsFace) {
     situationalTags = [`extreme closeup portrait of ${botIdentity}`, character.ethnicity, faceTags, hairTags, bodyTags];
-  } else if (isLowerBody || sceneLower.match(/pussy|ass|butt|rear|boobs|tits|nipples|clit|vulva|anus|feet|toes|armpit|extreme closeup.*(body|lower|intimate)/i)) {
-  situationalTags = [`detailed faceless extreme closeup on pussy only, tight crop excluding mouth and face completely, pussy focus only`, character.ethnicity, bodyTags];
-  } else if (isPartFocus) {
-    situationalTags = [`macro detailed focus on ${character.name}'s body part`, character.ethnicity, bodyTags];
-  } else if (isPartFocus || isUpperBody) {
-    situationalTags = [`waist-up shot of ${botIdentity}`, character.ethnicity, faceTags, hairTags, bodyTags];
+  } else if (wantsLower && !wantsUpper && !wantsFace) {
+    const focus = /(ass|butt|rear)/i.test(sceneLower) ? "ass" : "pussy";
+    situationalTags = [`detailed faceless extreme closeup on ${focus} only, tight crop excluding mouth and face completely, ${focus} focus only`, character.ethnicity, bodyTags];
+  } else if (wantsUpper && !wantsLower && !wantsFace) {
+    situationalTags = [`detailed faceless extreme closeup on breasts only, tight crop excluding face completely, cleavage focus`, character.ethnicity, bodyTags];
+  } else if (wantsFeet && !wantsFace) {
+    situationalTags = [`detailed faceless extreme closeup on feet and toes only`, character.ethnicity, bodyTags];
+  } else if (wantsHands && !wantsFace) {
+    situationalTags = [`macro detailed focus on hands and fingers`, character.ethnicity, bodyTags];
   } else {
     situationalTags = [`raw candid photo of ${botIdentity}`, character.ethnicity, bodyTags, hairTags, faceTags];
   }
@@ -837,7 +843,6 @@ export const generateAriaImage = async (
   if (useQwen && character.avatarImage) {
     console.log("🧠 Using Qwen FaceID Workflow + Biglust Refiner");
 
-    // ✅ FIX 4: Strong pose breaking fix - Only trigger completely new pose if genuinely first image with NO pose history
     const isFirstImage = !visualState || (!visualState.lastVisualDescription && !visualState.pose) || (visualState.lastVisualDescription === "current moment" && !visualState.pose);
     
     // Strong pose breaking for initial generation
@@ -872,7 +877,7 @@ export const generateAriaImage = async (
       "beauty filter, over-smoothed, heavy retouch, instagram filter",
       "cartoon, anime, 3d render, illustration, painting",
       "low quality, blurry, bad anatomy, deformed, extra limbs, mutated hands",
-     
+      
     ].filter(Boolean).join(", ");
     
     const runpodModel = character.runpodModel || "Qwen-Rapid-AIO-NSFW-v23.safetensors";
