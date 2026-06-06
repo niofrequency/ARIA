@@ -71,7 +71,6 @@ const calculateArousal = (desc: string, current: number) => {
   return current;
 };
 
-// ✅ FIX 1: Prevent defaults from overwriting valid state (Now Context Flexible)
 export const updateVisualState = (
   currentState: VisualState | undefined, 
   newVisualDesc: string, 
@@ -103,7 +102,7 @@ export const updateVisualState = (
     } else if (descLower.includes("outside") || descLower.includes("sun") || descLower.includes("beach")) {
       resolvedLocation = "outdoors";
     } else {
-      resolvedLocation = "candid setting"; // Entirely flexible backdrop
+      resolvedLocation = "candid setting"; 
     }
   }
 
@@ -115,7 +114,7 @@ export const updateVisualState = (
     } else if (descLower.includes("laying") || descLower.includes("lying") || descLower.includes("bed")) {
       resolvedPose = "relaxing comfortably";
     } else {
-      resolvedPose = "natural candid posture"; // Completely leaves it up to Grok's system instructions
+      resolvedPose = "natural candid posture"; 
     }
   }
 
@@ -133,7 +132,6 @@ export const updateVisualState = (
 /**
  * EXTRACT CONTEXT PROMPT
  * Parses the AI response to separate chat text from Visual tags, Memory tags, GIFs, Links, and YouTube.
- * Includes Hallucination Patch, Emoji Sanitization, and TTS Leak Protection.
  */
 export const extractContextPrompt = (text: string) => {
   // 1. Define Regex Patterns
@@ -143,7 +141,7 @@ export const extractContextPrompt = (text: string) => {
   const linkRegex = /[\[\{]{2}\s*LINK\s*:\s*([\s\S]*?)\s*[\]\}]{2}/i;
   const youtubeRegex = /[\[\{]{2}\s*YOUTUBE\s*:\s*([\s\S]*?)\s*[\]\}]{2}/i;
   const spicyRegex = /[\[\{]{2}\s*SPICY\s*:\s*([\s\S]*?)\s*[\]\}]{2}/i;
-  const ttsRegex = /[\[\{]{2}\s*TTS\s*:\s*([\s\S]*?)\s*[\]\}]{2}/i; // ✅ Prevents TTS leaking into image prompt
+  const ttsRegex = /[\[\{]{2}\s*TTS\s*:\s*([\s\S]*?)\s*[\]\}]{2}/i; 
 
   // 2. Extract Data
   const visualMatch = text.match(visualRegex);
@@ -172,11 +170,11 @@ export const extractContextPrompt = (text: string) => {
     .replace(youtubeRegex, '')
     .replace(linkRegex, '')
     .replace(spicyRegex, '')
-    .replace(ttsRegex, '') // ✅ Strip TTS from text output to prevent hallucination bleeds
-    .replace(/\*\s*sends\s+.*?\*/gi, '') // Removes "*sends giggle emoji*"
+    .replace(ttsRegex, '') 
+    .replace(/\*\s*sends\s+.*?\*/gi, '')
     .trim();
 
-  // ✅ HALLUCINATION PATCH (IMPROVED)
+  // HALLUCINATION PATCH
   if (!contextPrompt && !gifSearchTerm && !externalLink && !youtubeSearchTerm && !spicySearchTerm) {
       const implicitTriggers = [
         "check this out", "look at this", "can you see", "look at me", "see this", "view",
@@ -192,8 +190,11 @@ export const extractContextPrompt = (text: string) => {
       }
   }
 
-  // 4. Emoji Sanitization for RunPod
+  // ✅ FIX 1: Enhanced Sanitization for the Image Prompt
   if (contextPrompt) {
+    // Strip action/sound tags like *smiles* or *moans*
+    contextPrompt = contextPrompt.replace(/\*[^*]+\*/g, '');
+    // Strip emojis
     contextPrompt = contextPrompt.replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '');
     contextPrompt = contextPrompt.replace(/\s+/g, ' ').trim();
   }
@@ -224,7 +225,6 @@ const buildSystemInstruction = (character: CharacterProfile): string => {
   const bodyDesc = body.length > 0 ? body.join(", ") : "not specified";
   const faceDesc = character.face.length > 0 ? character.face.join(", ") : "standard features";
 
-  // Dynamic Outfit Logic for the LLM Brain
   const isInputOutfit = outfit?.toLowerCase().includes('input') || outfit?.toLowerCase().includes('reference') || outfit?.toLowerCase().includes('same as');
   const outfitInstruction = isInputOutfit 
     ? "Assume you are wearing the exact clothes shown in your reference profile image. Do not invent new clothing." 
@@ -392,9 +392,7 @@ STRICT OPERATING RULES:
 
 /**
  * GENERATE AI RESPONSE
- * Now with Long-Term Vector Memory Recall, Visual Summarization, and Current Visual State Injection
  */
-// ✅ FIX 2: Added currentVisualState parameter
 export const generateAriaResponse = async (
   prompt: string,
   history: any[], 
@@ -423,18 +421,16 @@ export const generateAriaResponse = async (
       }
     }
 
-    // 🧠 NEW: Visual History Summarization to prevent context drift
     const visualHistory = history
       .filter(m => {
           const text = m.text || m.content || "";
           return text.includes('[[VISUAL') || (m.role === 'system' && text.includes('VISUAL_STATE'));
       })
-      .slice(-8); // Collect the last 8 visual events
+      .slice(-8); 
       
     const visualSummary = visualHistory.length > 0 ? 
       `\n### RECENT VISUAL CONTEXT (LAST 8)\n${visualHistory.map(m => m.text || m.content).join("\n→ ")}\n` : "";
 
-    // ✅ FIX 3: Inject Current State so Grok knows exactly what physical pose to continue from
     const stateContext = currentVisualState ? `
     ### CURRENT PHYSICAL STATE (CRITICAL)
     You are currently wearing: ${currentVisualState.clothing}.
@@ -570,16 +566,13 @@ const LORA_MAP: Record<string, string> = {
 
 /**
  * ==========================================
- * NEW: VISION BRIDGE CAPTIONING LOGIC
+ * VISION BRIDGE CAPTIONING LOGIC
  * ==========================================
- * This helper calls an endpoint to generate a text description
- * of the character's reference image so Biglust can "see" it.
  */
 const getVisualDescription = async (base64Image: string): Promise<string> => {
   try {
     if (!base64Image) return "";
     
-    // ✅ MODEL FIX INCLUDED FOR CAPTIONING
     const response = await fetch('/api/vision-caption', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -604,17 +597,20 @@ export const generateAriaImage = async (
   contextPrompt: string | null,
   userPrompt: string,
   character: any,
-  visualState?: VisualState,         // ✅ NEW
-  recentHistorySummary?: string      // ✅ NEW
+  visualState?: VisualState,         
+  recentHistorySummary?: string      
 ): Promise<string | null> => {
 
-  let enhancedPrompt = contextPrompt || "";
+  // ✅ FIX 1: Sanitize contextPrompt to prevent tags/actions leaking into generation
+  let cleanContextPrompt = contextPrompt ? contextPrompt
+    .replace(/\*[^*]+\*/g, '') 
+    .replace(/[\[\]\{\}]/g, '') 
+    .trim() : "";
 
   // === DYNAMIC BOT CUSTOMIZATION & CLOTHING LOGIC ===
   let targetClothing = visualState?.clothing || '';
   const profileOutfit = character.outfit ? character.outfit.toLowerCase() : "";
   
-  // If chat parser didn't specify a clothing change (or it's the generic fallback), check the Bot Profile outfit settings
   if (!targetClothing || targetClothing === 'casual outfit') {
       if (profileOutfit.includes('input') || profileOutfit.includes('reference') || profileOutfit.includes('same as')) {
           targetClothing = "wearing exact same original outfit as the reference image";
@@ -625,7 +621,10 @@ export const generateAriaImage = async (
       }
   }
 
-  // === STRONGER PERSISTENT STATE INJECTION ===
+  // ✅ FIX 3: Strong persistent state injection cleanly combined with intent
+  let promptCore = cleanContextPrompt || 'current moment';
+  let enhancedPrompt = "";
+
   if (visualState) {
     const statePrefix = [
       targetClothing,
@@ -633,11 +632,10 @@ export const generateAriaImage = async (
       visualState.pose || 'natural posture',
       ...(visualState.fluids || [])
     ].filter(Boolean).join(', ');
-    enhancedPrompt = `${statePrefix}, ${enhancedPrompt || 'current moment'}`;
-  } else if (!enhancedPrompt) {
-    // CRITICAL FIRST MESSAGE POSE LOCK FIX
+    enhancedPrompt = `${statePrefix}, ${promptCore}`;
+  } else {
     const stateFallbackPose = visualState?.pose ? `doing action: ${visualState.pose}` : "candid look, fresh dynamic natural pose, looking at camera";
-    enhancedPrompt = `${targetClothing}, ${stateFallbackPose}`;
+    enhancedPrompt = `${targetClothing}, ${stateFallbackPose}, ${promptCore}`;
   }
 
   // Force strong continuity
@@ -650,9 +648,6 @@ export const generateAriaImage = async (
   // Cleanup
   enhancedPrompt = enhancedPrompt.replace(/^[\s,]+|[\s,]+$/g, '').replace(/,\s*,/g, ', ');
 
-  // === THE FIX IS HERE ===
-  // We completely remove userPrompt from this string.
-  // Grok already extracted the visual requirements into the context prompt!
   const rawCombined = `${enhancedPrompt}`.trim();
   const baseDescription = rawCombined;
 
@@ -713,24 +708,23 @@ export const generateAriaImage = async (
   }
 
   // ==================== SMART MODEL DECISION ====================
-  // If the user is using the input image, always use Qwen with the Biglust refiner to prevent switching back and forth.
   const useQwen = !!character.avatarImage;
-  
   console.log(`🎯 Model Decision → ${useQwen ? '🔵 Qwen AIO NSFW (Image to Image Refiner)' : '🔴 Biglust (Text to Image)'}`);
 
-  // ✅ FIX: IMPROVED FRAMING & EXPOSURE SITUATIONAL ANALYSIS
-  const wantsFace = /face|selfie|eye contact|look at me|portrait/i.test(sceneLower);
-  const wantsUpper = /boobs|tits|breasts|chest|cleavage|nipples|upper body|waist up/i.test(sceneLower);
-  const wantsLower = /pussy|ass|butt|rear|vulva|clit|crotch|vagina|lower body|thighs/i.test(sceneLower);
-  const wantsFeet = /feet|toes|soles/i.test(sceneLower);
-  const wantsHands = /hands|fingers|nails/i.test(sceneLower);
-  const isHorizontal = /landscape|horizontal|wide shot|panoramic/i.test(sceneLower);
+  // ✅ FIX 2: Evaluate Framing based on COMBINED user intent & visual context
+  const combinedIntent = `${userPrompt} ${cleanContextPrompt}`.toLowerCase();
+  
+  const wantsFace = /face|selfie|eye contact|look at me|portrait/i.test(combinedIntent);
+  const wantsUpper = /boobs|tits|breasts|chest|cleavage|nipples|upper body|waist up/i.test(combinedIntent);
+  const wantsLower = /pussy|ass|butt|rear|vulva|clit|crotch|vagina|lower body|thighs/i.test(combinedIntent);
+  const wantsFeet = /feet|toes|soles/i.test(combinedIntent);
+  const wantsHands = /hands|fingers|nails/i.test(combinedIntent);
+  const isHorizontal = /landscape|horizontal|wide shot|panoramic/i.test(combinedIntent);
 
   const imgWidth = isHorizontal ? 1500 : 1024;
   const imgHeight = isHorizontal ? 1024 : 1500;
 
   // --- 3. DYNAMIC TAG ORCHESTRATION ---
-  // Ensure profile traits are always passed to the prompt generator
   const hairTags = character.hair?.length > 0 ? `${character.hair.join(", ")} hair` : "";
   const faceTags = character.face?.join(", ") || "";
    
@@ -784,11 +778,12 @@ export const generateAriaImage = async (
 
   let situationalTags: string[] = [];
 
-  // ✅ FIX: NEW EXPOSURE COMBINATIONS PREVENTS OVERRIDES
+  // ✅ FIX 2 (continued): Stronger Face Prioritization logic
   if (wantsFace && wantsLower) {
     situationalTags = [`medium wide shot showing face and lower body of ${botIdentity}`, character.ethnicity, faceTags, hairTags, bodyTags];
   } else if (wantsFace && wantsUpper) {
-    situationalTags = [`medium shot showing face and upper body of ${botIdentity}`, character.ethnicity, faceTags, hairTags, bodyTags];
+    // Correctly prioritizes face while making upper body visible
+    situationalTags = [`tight close-up portrait of ${botIdentity} prioritizing face, upper body visible`, character.ethnicity, faceTags, hairTags, bodyTags];
   } else if (wantsFace) {
     situationalTags = [`extreme closeup portrait of ${botIdentity}`, character.ethnicity, faceTags, hairTags, bodyTags];
   } else if (wantsLower && !wantsUpper && !wantsFace) {
@@ -856,7 +851,6 @@ export const generateAriaImage = async (
         ? "wearing exact same clothing and style as reference image"
         : `(${targetClothing}:1.25)`;
 
-    // Uses Grok's natural language construction like Biglust
     const fusedDescription = `${poseInstruction}, ${clothingInstruction}, (${visualState?.location || 'candid setting'}:1.2), ${baseDescription}${visualContext ? `, (${visualContext}:1.2)` : ''}`;
     
     const promptText = [
@@ -955,10 +949,8 @@ export const generateAriaImage = async (
     workflow["8"] = { "inputs": { "samples": ["3", 0], "vae": ["5", 2] }, "class_type": "VAEDecode" };
 
     // --- STAGE 2 (BigLust Refiner) ---
-    // Encode pixels from Stage 1 into SDXL format using BigLust's VAE
     workflow["200"] = { "inputs": { "pixels": ["8", 0], "vae": ["100", 2] }, "class_type": "VAEEncode" };
 
-    // Standard CLIP encoders for BigLust (SDXL) - Explicitly forcing "biglust style"
     workflow["202"] = { "inputs": { "text": "masterpiece, best quality, ultra detailed, highly realistic, biglust style, " + promptText, "clip": ["100", 1] }, "class_type": "CLIPTextEncode" };
     workflow["203"] = { "inputs": { "text": negativeText, "clip": ["100", 1] }, "class_type": "CLIPTextEncode" };
 
@@ -1007,7 +999,6 @@ export const generateAriaImage = async (
     console.log("🧬 Using Biglust Text-to-Image");
     if (activeLoraFile) console.log(`🧬 Active LoRA: ${activeLoraFile}.safetensors (Weight: ${activeWeight})`);
     
-    // The vision extraction has now been shifted up, we just inject it here
     const fusedDescription = `(${visualState?.clothing || 'casual outfit'}:1.25), (${visualState?.location || 'candid setting'}:1.2), ${baseDescription}${visualContext ? `, (${visualContext}:1.2)` : ''}`; 
     
     const promptText = [
@@ -1082,7 +1073,6 @@ export const generateAriaImage = async (
   try {
     const payload = imagesPayload ? { workflow, images: imagesPayload } : { workflow };
     
-    // === CONSOLE LOG ADDED HERE ===
     console.log("🚀 Payload being sent to RunPod (Workflow built from Grok's prompt):", JSON.stringify(workflow, null, 2));
 
     const runResponse = await fetch('/api/generate', {
@@ -1101,8 +1091,6 @@ export const generateAriaImage = async (
 
     if (!jobId) throw new Error("No Job ID returned from Proxy");
 
-    // ✅ TIMEOUT PROTECTION UPGRADE: Extended polling cycles from 60 to 120 attempts 
-    // to give the server a 6-minute window to handle model swapping between Qwen and SDXL.
     let attempts = 0;
     while (attempts < 120) {
       const statusResponse = await fetch(`/api/generate?id=${jobId}`, { method: "GET" });
