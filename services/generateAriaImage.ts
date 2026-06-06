@@ -171,9 +171,12 @@ export const extractContextPrompt = (text: string) => {
     .replace(gifRegex, '')
     .replace(youtubeRegex, '')
     .replace(linkRegex, '')
-    .replace(spicyRegex, '') // ✅ Remove Spicy Tag
-    .replace(/\*\s*sends\s+.*?\*/gi, '') // Removes "*sends giggle emoji*"
+    .replace(spicyRegex, '')
+    .replace(/\*\s*sends\s+.*?\*/gi, '')
+    .replace(/\[[^\]]+\]/g, '')     // ← add this
+    .replace(/<[^>]+>/g, '')        // ← add this
     .trim();
+
 
   // ✅ HALLUCINATION PATCH (IMPROVED)
   if (!contextPrompt && !gifSearchTerm && !externalLink && !youtubeSearchTerm && !spicySearchTerm) {
@@ -195,6 +198,14 @@ export const extractContextPrompt = (text: string) => {
   if (contextPrompt) {
     contextPrompt = contextPrompt.replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '');
     contextPrompt = contextPrompt.replace(/\s+/g, ' ').trim();
+  }
+  // ✅ STRIP TTS TAGS (critical for image prompts)
+  if (contextPrompt) {
+    contextPrompt = contextPrompt
+      .replace(/\[[^\]]+\]/g, '')     // removes [moan], [breath], [soft], etc.
+      .replace(/<[^>]+>/g, '')        // removes <soft>, <whisper>, etc.
+      .replace(/\s{2,}/g, ' ')
+      .trim();
   }
 
   // 5. Safety cleanup for malformed tags
