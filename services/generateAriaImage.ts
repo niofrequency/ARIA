@@ -1,5 +1,6 @@
 import { CharacterProfile, VisualState } from "../types";
 import { retrieveMemories } from "./memoryService";
+import { enrichImagePrompt } from './promptEnrichmentService';
   
 /**
  * ARIA VISUAL STATE PARSER - CONTEXT FLEXIBLE 
