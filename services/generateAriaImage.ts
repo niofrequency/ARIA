@@ -591,13 +591,19 @@ export const generateAriaImage = async (
     .replace(/[\[\]\{\}]/g, '') 
     .trim() : "";
 
-  // 🔥 NEW: INJECT ENRICHMENT PIPELINE 🔥
-  cleanContextPrompt = await enrichImagePrompt(
+// 🔥 NEW: INJECT ENRICHMENT PIPELINE 🔥
+let enrichedPrompt = cleanContextPrompt;
+if (conversationHistory && conversationHistory.length > 0) {
+  const enrichmentResult = await enrichImagePrompt(
     cleanContextPrompt,
     conversationHistory,
     character.vibe || "casual",
     previousImagePrompts
   );
+  enrichedPrompt = enrichmentResult;
+}
+
+cleanContextPrompt = enrichedPrompt;
 
   // === DYNAMIC BOT CUSTOMIZATION & CLOTHING LOGIC ===
   let targetClothing = visualState?.clothing || '';
