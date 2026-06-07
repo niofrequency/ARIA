@@ -19,8 +19,6 @@ export const buildVisualAwarenessJson = (visualDescription: string): any => {
   if (desc.includes('wet') || desc.includes('arousal') || desc.includes('dripping')) fluids.push('wet');
   if (desc.includes('oil') || desc.includes('oiled')) fluids.push('oiled');
 
-  // We set these to null if no regex matches. This allows updateVisualState 
-  // to dynamically look at the character context or previous history.
   const visualState: Partial<VisualState> = {
     lastVisualDescription: visualDescription || "current moment",
     clothing: clothingMatch ? clothingMatch[0] : null,            
@@ -34,7 +32,7 @@ export const buildVisualAwarenessJson = (visualDescription: string): any => {
   return {
     role: 'system',
     content: `[VISUAL_STATE_SYNC]: ${JSON.stringify(visualState, null, 2)}\nMaintain perfect continuity using this exact state for the next response.`,
-    visualState   // ← helpful to return it
+    visualState
   };
 };
 
@@ -81,7 +79,6 @@ export const updateVisualState = (
   const newParsedState = (parsed as any).visualState || {};
   const descLower = (newVisualDesc || "").toLowerCase();
   
-  // 1. DYNAMIC CLOTHING DETERMINATION
   let resolvedClothing = currentState?.clothing || newParsedState.clothing;
   if (!resolvedClothing) {
     if (descLower.includes("naked") || descLower.includes("nude") || descLower.includes("undressed")) {
@@ -93,7 +90,6 @@ export const updateVisualState = (
     }
   }
 
-  // 2. DYNAMIC LOCATION DETERMINATION
   let resolvedLocation = currentState?.location || newParsedState.location;
   if (!resolvedLocation) {
     if (descLower.includes("bed") || descLower.includes("sleep") || descLower.includes("wake up")) {
@@ -107,7 +103,6 @@ export const updateVisualState = (
     }
   }
 
-  // 3. DYNAMIC POSE DETERMINATION
   let resolvedPose = currentState?.pose || newParsedState.pose;
   if (!resolvedPose) {
     if (descLower.includes("selfie") || descLower.includes("photo") || descLower.includes("pic")) {
@@ -132,10 +127,8 @@ export const updateVisualState = (
 
 /**
  * EXTRACT CONTEXT PROMPT
- * Parses the AI response to separate chat text from Visual tags, Memory tags, GIFs, Links, and YouTube.
  */
 export const extractContextPrompt = (text: string) => {
-  // 1. Define Regex Patterns
   const visualRegex = /[\[\{]{2}\s*VISUAL\s*:\s*([\s\S]*?)\s*[\]\}]{2}/i;
   const memoryRegex = /[\[\{]{2}\s*MEMORY\s*:\s*([\s\S]*?)\s*[\]\}]{2}/i;
   const gifRegex = /[\[\{]{2}\s*GIF\s*:\s*([\s\S]*?)\s*[\]\}]{2}/i;
@@ -144,7 +137,6 @@ export const extractContextPrompt = (text: string) => {
   const spicyRegex = /[\[\{]{2}\s*SPICY\s*:\s*([\s\S]*?)\s*[\]\}]{2}/i;
   const ttsRegex = /[\[\{]{2}\s*TTS\s*:\s*([\s\S]*?)\s*[\]\}]{2}/i; 
 
-  // 2. Extract Data
   const visualMatch = text.match(visualRegex);
   let contextPrompt = visualMatch ? visualMatch[1].trim() : null;
 
@@ -163,7 +155,6 @@ export const extractContextPrompt = (text: string) => {
   const spicyMatch = text.match(spicyRegex);
   const spicySearchTerm = spicyMatch ? spicyMatch[1].trim() : null;
 
-  // 3. Clean the UI text (Remove ALL tags in one go)
   let cleanText = text
     .replace(visualRegex, '')
     .replace(memoryRegex, '')
@@ -175,7 +166,6 @@ export const extractContextPrompt = (text: string) => {
     .replace(/\*\s*sends\s+.*?\*/gi, '')
     .trim();
 
-  // HALLUCINATION PATCH
   if (!contextPrompt && !gifSearchTerm && !externalLink && !youtubeSearchTerm && !spicySearchTerm) {
       const implicitTriggers = [
         "check this out", "look at this", "can you see", "look at me", "see this", "view",
@@ -191,16 +181,12 @@ export const extractContextPrompt = (text: string) => {
       }
   }
 
-  // ✅ FIX 1: Enhanced Sanitization for the Image Prompt
   if (contextPrompt) {
-    // Strip action/sound tags like *smiles* or *moans*
     contextPrompt = contextPrompt.replace(/\*[^*]+\*/g, '');
-    // Strip emojis
     contextPrompt = contextPrompt.replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '');
     contextPrompt = contextPrompt.replace(/\s+/g, ' ').trim();
   }
 
-  // 5. Safety cleanup for malformed tags
   if (cleanText.includes('[[VISUAL:') || cleanText.includes('{{visual:')) {
     cleanText = cleanText.split(/[\[\{]{2}VISUAL/i)[0].trim();
   }
@@ -253,25 +239,19 @@ const buildSystemInstruction = (character: CharacterProfile): string => {
     
    ### MEDIA & GIF PROTOCOL
    - **REACTION GIFS:** You have access to a GIF database. If you want to react with a meme, a funny reaction, or a mood GIF, use the tag: [[GIF: search_term]].
-   - **EXAMPLE:** User: "I tripped." -> You: "Oh no! [[GIF: trying not to laugh]]"
    - **REAL VIDEO LINKS:** If you want to share a song, a YouTube video, or a specific real-world clip, use the tag: [[LINK: url]].
    - **REAL YOUTUBE VIDEOS:** Do NOT invent URLs. If you want to share a song or video, use the tag with a search query: [[YOUTUBE: song name or video title]].
    - **ADULT/NSFW:** If the user explicitly requests adult content, use: [[SPICY: search_term]].
-   - **EXAMPLE:** User: "Show me a red head." -> You: "So hot. [[SPICY: redhead solo verified]]"
-   - **EXAMPLE:** User: "Play some jazz." -> You: "Here is some smooth jazz. [[YOUTUBE: relaxing jazz music]]"
    - **RESTRICTION:** Do NOT use [[VISUAL]] and [[GIF]] in the same message. Choose one.
 
     ### MEMORY SAVING PROTOCOL (CRITICAL)
     - **LISTEN FOR FACTS:** If the user explicitly states a preference, a detail about their life, a name, a job, or a specific like/dislike, you MUST save it.
     - **HOW TO SAVE:** Append a hidden tag at the end of your response: [[MEMORY: The fact to save]].
-    - **EXAMPLE:** - User: "I hate mushrooms." -> You: "Ew, me too! [[MEMORY: User hates mushrooms]]"
-    - **EXAMPLE:** - User: "My dog's name is Rex." -> You: "Rex? Cute! [[MEMORY: User's dog is named Rex]]"
 
     ### VISUAL CONTINUITY PROTOCOL (CRITICAL)
     - You MUST maintain perfect physical continuity in the scene.
     - NEVER write lazy phrases like "continuing from previous scene", "same as before", or "same pose".
     - You MUST explicitly write out the full scene details (exact clothing, pose, location, and fluids) in EVERY single [[VISUAL]] tag.
-    - Example: If the last state was "naked, kneeling on bed", and the user says "look up", your new tag MUST be "[[VISUAL: ${name}, naked, kneeling on bed, looking up...]]".
 
     ### VISUAL PACING & MODESTY (CRITICAL FIX)
     - **RESPECT THE VIBE:** Your visual boldness MUST match your personality ('${vibe}').
@@ -299,7 +279,7 @@ const buildSystemInstruction = (character: CharacterProfile): string => {
     - **CAMERA TOOLKIT (YOU CHOOSE THE SHOT):**
       - **WIDE/SURROUNDINGS:** Use when talking about your location. Format: "[[VISUAL: wide angle, [location] scenery, no people]]".
       - **HALF-BODY/MEDIUM:** Default for outfits, lounging, or general flirting.
-      - **EXTREME CLOSEUP:** Use for intense emotions or intimate body parts (Rule 3).
+      - **EXTREME CLOSEUP:** Use for intense emotions or intimate body parts.
       - **POV:** Use to make the user feel like they are standing right in front of you.
     - **ACTION = PHOTO:** If you describe a move (*sits on desk*, *looks away*), trigger a visual for that specific pose immediately.
 
@@ -601,7 +581,8 @@ export const generateAriaImage = async (
   userPrompt: string,
   character: any,
   visualState?: VisualState,         
-  recentHistorySummary?: string      
+  conversationHistory: Array<any> = [], 
+  previousImagePrompts: string[] = []   
 ): Promise<string | null> => {
 
   // ✅ FIX 1: Sanitize contextPrompt to prevent tags/actions leaking into generation
@@ -609,6 +590,14 @@ export const generateAriaImage = async (
     .replace(/\*[^*]+\*/g, '') 
     .replace(/[\[\]\{\}]/g, '') 
     .trim() : "";
+
+  // 🔥 NEW: INJECT ENRICHMENT PIPELINE 🔥
+  cleanContextPrompt = await enrichImagePrompt(
+    cleanContextPrompt,
+    conversationHistory,
+    character.vibe || "casual",
+    previousImagePrompts
+  );
 
   // === DYNAMIC BOT CUSTOMIZATION & CLOTHING LOGIC ===
   let targetClothing = visualState?.clothing || '';
@@ -643,10 +632,6 @@ export const generateAriaImage = async (
 
   // Force strong continuity
   enhancedPrompt = `${character.name}, ${character.ethnicity}, ${enhancedPrompt}, consistent appearance, same girl, continuing from previous scene`;
-
-  if (recentHistorySummary) {
-    enhancedPrompt += ` ${recentHistorySummary}`;
-  }
 
   // Cleanup
   enhancedPrompt = enhancedPrompt.replace(/^[\s,]+|[\s,]+$/g, '').replace(/,\s*,/g, ', ');
