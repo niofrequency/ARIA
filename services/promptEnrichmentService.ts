@@ -16,7 +16,10 @@ export async function enrichImagePrompt(
 
   // 2. Clean the recent context so it behaves as safe visual tags 
   // (removes complex punctuation that confuses Stable Diffusion)
-  const cleanedContext = recentContext.replace(/[^\w\s,]/g, '').trim();
+ const cleanedContext = recentContext
+  .replace(/[[\]{}<>]/g, '')  // Only remove problematic chars for Stable Diffusion
+  .replace(/\s+/g, ' ')       // Normalize whitespace
+  .trim();
 
   // 3. Extract stylistic continuity
   const styleContinuity = previousImagePrompts && previousImagePrompts.length > 0
