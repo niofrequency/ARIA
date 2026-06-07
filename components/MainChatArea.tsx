@@ -10,7 +10,6 @@ import { fetchGiphyUrl } from '../services/giphyService';
 import { fetchYoutubeUrl } from '../services/youtubeService';
 import { generateAriaResponse, extractContextPrompt } from '../services/ariaService';
 import { fetchSpicyLink } from '../services/spicyService';
-// ✅ IMPORTED NEW TTS SERVICE FUNCTIONS
 import { playAriaSpeech, stopAriaSpeech, currentAudio } from '../services/ttsService'; 
 
 interface MainChatAreaProps {
@@ -45,14 +44,12 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
   setIsLoading
 }) => {
   const [input, setInput] = useState('');
-  
   const [selectedMedia, setSelectedMedia] = useState<{ url: string; type: 'image' | 'video' | 'embed' | 'youtube' } | null>(null);
-  
   const [showHeader, setShowHeader] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
   const [isDownloading, setIsDownloading] = useState(false);
   
-  // ✅ TTS States
+  // TTS States
   const [autoTTS, setAutoTTS] = useState(true);
   const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(null);
   
@@ -65,7 +62,7 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // ✅ Audio stream lifecycle cleanup using the global service
+  // Audio stream lifecycle cleanup
   useEffect(() => {
     return () => {
       stopAriaSpeech();
@@ -100,47 +97,48 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
   /**
    * AUDIO/TTS HANDLERS
    */
-const stopAudio = () => {
-  stopAriaSpeech();           // now works because ttsService exports it
-  setCurrentlyPlayingId(null);
-};
+  const stopAudio = () => {
+    stopAriaSpeech();           
+    setCurrentlyPlayingId(null);
+  };
 
-const playTTS = async (text: string, messageId: string) => {
-  if (currentlyPlayingId === messageId) {
-    stopAudio();           // uses the stopAudio function you already have
-    return;
-  }
-  stopAudio();
-  setCurrentlyPlayingId(messageId);
-  // Clean text + remove emojis + keep TTS tags
-  const cleanedText = text
-    .replace(/\*.*?\*/g, '')
-    .replace(/```[\s\S]*?```/g, ' [Code block omitted] ')
-    .replace(/`.*?`/g, '')
-    .replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu, '') // ← removes emojis
-    .trim();
-  if (!cleanedText) {
-    setCurrentlyPlayingId(null);
-    return;
-  }
-  // ✅ CONSOLE LOG — shows exactly what is sent to TTS (you can see the tags here)
-  console.log('🗣️ TTS Payload (tags should be visible):', cleanedText);
-  try {
-    const result = await playAriaSpeech(cleanedText, character.voiceId || 'ara');
-    if (result.success && currentAudio) {
-      currentAudio.addEventListener('ended', () => setCurrentlyPlayingId(null));
-      currentAudio.addEventListener('error', () => setCurrentlyPlayingId(null));
-    } else {
-      const fallbackDelay = Math.max(2000, cleanedText.split(' ').length * 350);
-      setTimeout(() => {
-        setCurrentlyPlayingId((current) => current === messageId ? null : current);
-      }, fallbackDelay);
+  const playTTS = async (text: string, messageId: string) => {
+    if (currentlyPlayingId === messageId) {
+      stopAudio();           
+      return;
     }
-  } catch (error) {
-    console.error('TTS execution failed:', error);
-    setCurrentlyPlayingId(null);
-  }
-};
+    stopAudio();
+    setCurrentlyPlayingId(messageId);
+    
+    const cleanedText = text
+      .replace(/\*.*?\*/g, '')
+      .replace(/```[\s\S]*?```/g, ' [Code block omitted] ')
+      .replace(/`.*?`/g, '')
+      .replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu, '') 
+      .trim();
+      
+    if (!cleanedText) {
+      setCurrentlyPlayingId(null);
+      return;
+    }
+    
+    console.log('🗣️ TTS Payload (tags should be visible):', cleanedText);
+    try {
+      const result = await playAriaSpeech(cleanedText, character.voiceId || 'ara');
+      if (result.success && currentAudio) {
+        currentAudio.addEventListener('ended', () => setCurrentlyPlayingId(null));
+        currentAudio.addEventListener('error', () => setCurrentlyPlayingId(null));
+      } else {
+        const fallbackDelay = Math.max(2000, cleanedText.split(' ').length * 350);
+        setTimeout(() => {
+          setCurrentlyPlayingId((current) => current === messageId ? null : current);
+        }, fallbackDelay);
+      }
+    } catch (error) {
+      console.error('TTS execution failed:', error);
+      setCurrentlyPlayingId(null);
+    }
+  };
 
   /**
    * REGENERATE IMAGE HANDLER
@@ -162,7 +160,31 @@ const playTTS = async (text: string, messageId: string) => {
       const oldImageUrl = message.imageUrl;
       const oldVideoUrl = message.videoUrl;
 
-      const tempImageUrl = await generateAriaImage(message.text || "", lookAnchor, character);
+      // 🔥 FIX: Reconstruct full history and previous prompts for regeneration
+      const history = (messages || []).map(m => {
+        let content = m.text || '';
+        if (m.role === 'model' && (m.imageUrl || m.videoUrl)) {
+          content += ` [[VISUAL: ${character.name}, photo sent]]`;
+        }
+        return {
+          role: m.role === 'model' || m.role === 'assistant' ? 'assistant' : 'user',
+          content: content
+        };
+      });
+
+      const previousImagePrompts = messages
+        .filter(m => m.role === 'model' && m.imageUrl && m.text)
+        .map(m => m.text as string);
+
+      // Pass the fully enriched context down to the generator
+      const tempImageUrl = await generateAriaImage(
+        message.text || "", 
+        lookAnchor, 
+        character, 
+        undefined, 
+        history, 
+        previousImagePrompts
+      );
       
       if (tempImageUrl) {
         if (oldImageUrl && oldImageUrl.startsWith('http')) deleteMediaFromStorage(oldImageUrl);
@@ -264,8 +286,7 @@ const playTTS = async (text: string, messageId: string) => {
     }
   };
 
-  
-/**
+  /**
    * CORE INTERACTION: HANDLE SEND
    */
   const handleSend = async () => {
@@ -328,7 +349,6 @@ const playTTS = async (text: string, messageId: string) => {
       }
 
       // 3. CHECK: SPICY CONTENT (Adult)
-      // Double check regex just in case ariaService didn't catch it
       if (!spicySearchTerm) {
         const spicyRegex = /[\[\{]{2}\s*SPICY\s*:\s*([\s\S]*?)\s*[\]\}]{2}/i;
         const spicyMatch = cleanText.match(spicyRegex) || rawResponse.match(spicyRegex);
@@ -345,9 +365,6 @@ const playTTS = async (text: string, messageId: string) => {
           } catch(e) { console.error("Spicy search failed", e); }
       }
 
-      // ✅ CRITICAL FIX: "The Standoff"
-      // Only set isImageLoading to TRUE if we have a prompt AND we did NOT find a video/gif.
-      // This prevents the infinite "Imaging Protocol" loader when sending links.
       const shouldGenerateImage = !!contextPrompt && !finalVideoUrl && !finalImageUrl;
 
       // 4. SEND BOT RESPONSE
@@ -361,20 +378,33 @@ const playTTS = async (text: string, messageId: string) => {
           timestamp: Date.now()
       });
 
-      // ✅ 🗣️ TRIGGER TEXT TO SPEECH (Auto-Speech)
+      // TRIGGER TEXT TO SPEECH (Auto-Speech)
       if (cleanText && autoTTS) {
-        // Strip out asterisk actions (e.g., *smiles*) so she doesn't read them aloud
         const speechText = cleanText.replace(/\*.*?\*/g, '').trim();
         if (speechText.length > 0) {
           playTTS(speechText, responseMessageId); 
         }
       }
 
-      // 5. TRIGGER AI IMAGE GENERATION (Only if explicitly needed)
+      // 5. TRIGGER AI IMAGE GENERATION
       if (shouldGenerateImage) {
         try {
           const promptToUse = contextPrompt || userText;
-          const tempImageUrl = await generateAriaImage(promptToUse, userText, character);
+          
+          // 🔥 FIX: Extract recent visual styles from past generated images
+          const previousImagePrompts = messages
+            .filter(m => m.role === 'model' && m.imageUrl && m.text)
+            .map(m => m.text as string);
+
+          // 🔥 FIX: Pass complete conversation context array into the generator
+          const tempImageUrl = await generateAriaImage(
+            promptToUse, 
+            userText, 
+            character, 
+            undefined, 
+            history, 
+            previousImagePrompts
+          );
           
           if (tempImageUrl) {
             onUpdateMessage(responseMessageId, { 
@@ -413,7 +443,6 @@ const playTTS = async (text: string, messageId: string) => {
     }
   };
 
-  // ✅ UPDATED: Download Media (Safety Check for Embeds)
   const downloadMedia = async (url: string, type: string) => {
     if (isDownloading) return;
     
@@ -461,12 +490,10 @@ const playTTS = async (text: string, messageId: string) => {
         `}
       >
         <div className="flex items-center gap-4">
-          {/* Mobile Toggle */}
           <button onClick={onToggleMobileSidebar} className="lg:hidden p-2 text-zinc-400 hover:text-white bg-white/5 rounded-xl transition-all">
             <Menu className="w-5 h-5" />
           </button>
           
-          {/* Desktop Toggle (Only visible when sidebar is closed) */}
           {!isDesktopSidebarOpen && (
             <button onClick={onToggleDesktopSidebar} className="hidden lg:block p-2 text-zinc-400 hover:text-white bg-white/5 rounded-xl transition-all">
               <PanelLeft className="w-5 h-5" />
@@ -482,7 +509,6 @@ const playTTS = async (text: string, messageId: string) => {
           </div>
         </div>
         
-        {/* ✅ Header Action Items (Includes new TTS Toggle) */}
         <div className="flex items-center gap-2">
           <button 
             onClick={() => setAutoTTS(!autoTTS)} 
@@ -515,11 +541,10 @@ const playTTS = async (text: string, messageId: string) => {
                 key={msg.id} 
                 message={msg} 
                 characterName={character.name} 
-                characterVoiceId={character.voiceId} // ✅ PASSED VOICE ID HERE
+                characterVoiceId={character.voiceId} 
                 onMediaClick={(url, type) => setSelectedMedia({ url, type: type as any })}
                 onAnimateRequest={() => handleAnimateRequest(msg)}
                 onRegenerateImage={() => handleRegenerateImage(msg)}
-                // ✅ ADDED TTS PROPS
                 isCurrentlyPlaying={currentlyPlayingId === msg.id}
                 onToggleTTS={(text, id) => playTTS(text, id)}
               />
@@ -529,7 +554,6 @@ const playTTS = async (text: string, messageId: string) => {
         </div>
       </main>
 
-      {/* INPUT AREA */}
       <footer 
         className={`fixed bottom-0 left-0 right-0 z-50 p-4 md:p-6 bg-gradient-to-t from-zinc-950 via-zinc-950 to-transparent
           ${isDesktopSidebarOpen ? 'lg:left-[280px]' : 'lg:left-0'}
@@ -561,12 +585,10 @@ const playTTS = async (text: string, messageId: string) => {
         </div>
       </footer>
 
-      {/* ✅ UPDATED MEDIA MODAL (HANDLES EMBEDS & YOUTUBE) */}
       {selectedMedia && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/95 backdrop-blur-md p-4" onClick={() => setSelectedMedia(null)}>
           <div className="relative max-w-6xl w-full flex flex-col items-center" onClick={(e) => e.stopPropagation()}>
             
-            {/* 1. NATIVE VIDEO FILE */}
             {selectedMedia.type === 'video' ? (
               <video 
                 src={selectedMedia.url} 
@@ -576,7 +598,6 @@ const playTTS = async (text: string, messageId: string) => {
                 className="max-h-[80vh] w-auto max-w-full rounded-2xl border border-purple-500/30 shadow-[0_0_50px_rgba(147,51,234,0.3)]"
               />
             ) 
-            /* 2. EMBED / YOUTUBE (THEATER MODE) */
             : (selectedMedia.type === 'embed' || selectedMedia.type === 'youtube') ? (
                <div className="w-full aspect-video bg-black rounded-2xl overflow-hidden border border-white/10 shadow-2xl">
                  <iframe 
@@ -589,7 +610,6 @@ const playTTS = async (text: string, messageId: string) => {
                  />
                </div>
             )
-            /* 3. STATIC IMAGE */
             : (
               <img 
                 src={selectedMedia.url} 
@@ -599,7 +619,6 @@ const playTTS = async (text: string, messageId: string) => {
             )}
 
             <div className="mt-6 flex gap-3">
-              {/* Only show download button for Native Files (Image/Video), hide for Embeds */}
               {(selectedMedia.type === 'image' || selectedMedia.type === 'video') && (
                   <button 
                     onClick={() => downloadMedia(selectedMedia.url, selectedMedia.type as 'image' | 'video')} 
