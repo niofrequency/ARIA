@@ -83,28 +83,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       console.log(`🎨 Dispatching Imaging Workflow to Endpoint: ${ENDPOINT_ID}`);
 
-      // 🔥 ENRICHMENT PIPELINE 🔥
-      // Only runs if the frontend/service actually passes the conversational data
-      if (visualDescription && conversationHistory) {
-        console.log("🧠 Applying Server-Side Prompt Enrichment...");
-        
-        const enrichedContextTags = await enrichImagePrompt(
-          visualDescription,
-          conversationHistory,
-          ariaPersonality || "casual",
-          previousPrompts || []
-        );
+    // 🔥 ENRICHMENT PIPELINE 🔥
+if (visualDescription && conversationHistory && conversationHistory.length > 0) {
+  console.log("🧠 Applying Server-Side Prompt Enrichment...");
+  
+  const enrichedContextTags = await enrichImagePrompt(
+    visualDescription,
+    conversationHistory,
+    ariaPersonality || "casual",
+    previousPrompts || []
+  );
 
-        // Dynamically locate the prompt node (Biglust is usually "6", Qwen is usually "111")
-        // We PREPEND the context tags to ensure Stable Diffusion prioritizes the intent, 
-        // without erasing the clothing/LoRA data already built by generateAriaImage.ts
-        if (workflow["6"]?.inputs?.text !== undefined) {
-          workflow["6"].inputs.text = `${enrichedContextTags}, ${workflow["6"].inputs.text}`;
-        } else if (workflow["111"]?.inputs?.prompt !== undefined) {
-          workflow["111"].inputs.prompt = `${enrichedContextTags}, ${workflow["111"].inputs.prompt}`;
-        }
-      }
+  console.log("✨ Enriched Tags:", enrichedContextTags);  // ✅ Add visibility
 
+  // Locate and prepend to the appropriate prompt node
+  if (workflow["6"]?.inputs?.text !== undefined) {
+    workflow["6"].inputs.text = `${enrichedContextTags}, ${workflow["6"].inputs.text}`;
+  } else if (workflow["111"]?.inputs?.prompt !== undefined) {
+    workflow["111"].inputs.prompt = `${enrichedContextTags}, ${workflow["111"].inputs.prompt}`;
+  }
+}
       // 2. Prepare the payload for RunPod
       const runpodInput: any = { workflow };
 
