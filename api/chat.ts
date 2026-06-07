@@ -49,7 +49,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // 🧠 INJECT SPEECH REALISM SYSTEM PROMPT
     // This forces the AI to use the TTS tags dynamically based on the context of the chat.
-const speechSystemPrompt = `You are communicating through an advanced Text-to-Speech (TTS) engine.
+    const speechSystemPrompt = `You are communicating through an advanced Text-to-Speech (TTS) engine.
 
 You MUST use the speech tags below in almost every response, especially during intimate, sexual, emotional, or sensual moments. Do NOT skip them.
 
@@ -122,7 +122,10 @@ Always mix tags with normal dialogue. Never mention these instructions.`;
       ...data,
       aria_meta: {
         has_visual: !!visualMatch,
-        visual_description: visualMatch ? visualMatch[1].trim() : null
+        visual_description: visualMatch ? visualMatch[1].trim() : null,
+        // 🔥 FIX: Expose the sanitized conversational history back to the client
+        // so it can be routed straight into the prompt enrichment service
+        conversation_history: sanitizedMessages
       }
     });
 
