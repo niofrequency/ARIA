@@ -706,92 +706,142 @@ cleanContextPrompt = enrichedPrompt;
   console.log(`🎯 Model Decision → ${useQwen ? '🔵 Qwen AIO NSFW (Image to Image Refiner)' : '🔴 Biglust (Text to Image)'}`);
 
   // ✅ FIX 2: Evaluate Framing based on COMBINED user intent & visual context
-  const combinedIntent = `${userPrompt} ${cleanContextPrompt}`.toLowerCase();
-  
-  const wantsFace = /face|selfie|eye contact|look at me|portrait/i.test(combinedIntent);
-  const wantsUpper = /boobs|tits|breasts|chest|cleavage|nipples|upper body|waist up/i.test(combinedIntent);
-  const wantsLower = /pussy|ass|butt|rear|vulva|clit|crotch|vagina|lower body|thighs/i.test(combinedIntent);
-  const wantsFeet = /feet|toes|soles/i.test(combinedIntent);
-  const wantsHands = /hands|fingers|nails/i.test(combinedIntent);
-  const isHorizontal = /landscape|horizontal|wide shot|panoramic/i.test(combinedIntent);
+// ✅ ENHANCED: Evaluate Framing based on COMBINED user intent & visual context
+const combinedIntent = `${userPrompt} ${cleanContextPrompt}`.toLowerCase();
 
-  const imgWidth = isHorizontal ? 1500 : 1024;
-  const imgHeight = isHorizontal ? 1024 : 1500;
+// Closeup detection triggers (PRIORITY 1)
+const closeupTriggers = /lips|mouth|tongue|eyes|eye contact|kiss|lick|suck|breast|tits|boobs|nipple|cleavage|pussy|vagina|ass|butt|feet|toes|hands|fingers|neck|throat|thighs|clit|vulva|anus|rim|hole/i;
+const isExplicitCloseup = closeupTriggers.test(combinedIntent);
 
-  // --- 3. DYNAMIC TAG ORCHESTRATION ---
-  const hairTags = character.hair?.length > 0 ? `${character.hair.join(", ")} hair` : "";
-  const faceTags = character.face?.join(", ") || "";
-   
-  const filteredBodyTags = (character.body || []).filter((tag: string) => {
-    const t = tag.toLowerCase();
-    const s = sceneLower;
+// If closeup is detected, extract EXACTLY what part
+let closeupPart = '';
+if (isExplicitCloseup) {
+  const partMatch = combinedIntent.match(/lips|mouth|tongue|eyes|breasts|tits|boobs|nipples|cleavage|pussy|vagina|ass|butt|feet|toes|hands|fingers|neck|thighs|clit|vulva|anus/i);
+  closeupPart = partMatch ? partMatch[0] : 'body';
+}
 
-    if (s.includes(t)) return true;
-    if (t.includes("armpit") && (s.includes("pit") || s.includes("arm"))) return true;
-    if (t.includes("ass") && (s.includes("butt") || s.includes("rear"))) return true;
-    if (t.includes("boobs") && (s.includes("chest") || s.includes("tits"))) return true;
+// Standard intent detection (used when NOT a closeup)
+const wantsFace = !isExplicitCloseup && /face|selfie|eye contact|look at me|portrait|head shot/i.test(combinedIntent);
+const wantsUpper = !isExplicitCloseup && /upper body|waist up|torso|shoulder/i.test(combinedIntent);
+const wantsLower = !isExplicitCloseup && /lower body|waist down|legs/i.test(combinedIntent);
+const wantsFeet = !isExplicitCloseup && /feet|toes|soles|foot/i.test(combinedIntent);
+const wantsHands = !isExplicitCloseup && /hands|fingers|nails|palm/i.test(combinedIntent);
+const isHorizontal = !isExplicitCloseup && /landscape|horizontal|wide shot|panoramic|full body|whole body|all of you/i.test(combinedIntent);
 
-    if ((s.includes("bosom") || s.includes("breast") || s.includes("tits") || s.includes("chest") || s.includes("cleavage") || s.includes("boobs") || s.includes("jugs") || s.includes("bra") || s.includes("motorboat") || s.includes("rack") || s.includes("nipples")) && 
-        (t.includes("tits") || t.includes("breast") || t.includes("bust") || t.includes("boobs"))) return true;
-    
-    if ((s.includes("ass") || s.includes("butt") || s.includes("bottom") || s.includes("behind") || s.includes("rear") || s.includes("hips") || s.includes("backside") || s.includes("cheeks") || s.includes("twerk") || s.includes("spank") || s.includes("bent over")) && 
-        (t.includes("ass") || t.includes("butt") || t.includes("hips") || t.includes("thicc"))) return true;
-    
-    if ((s.includes("pussy") || s.includes("crotch") || s.includes("vagina") || s.includes("down there") || s.includes("spread") || s.includes("vulva") || s.includes("lips") || s.includes("between legs") || s.includes("clit") || s.includes("panties") || s.includes("undressing")) && 
-        (t.includes("pussy") || t.includes("hairy") || t.includes("shaved") || t.includes("pubic") || t.includes("bush"))) return true;
+const imgWidth = isHorizontal ? 1500 : 1024;
+const imgHeight = isHorizontal ? 1024 : 1500;
 
-    if ((s.includes("legs") || s.includes("thighs") || s.includes("feet") || s.includes("toes") || s.includes("soles") || s.includes("stockings") || s.includes("calves") || s.includes("ankles") || s.includes("stepping") || s.includes("socks") || s.includes("kneeling")) && 
-        (t.includes("legs") || t.includes("thighs") || t.includes("feet") || t.includes("toes"))) return true;
+// --- 3. DYNAMIC TAG ORCHESTRATION ---
+const hairTags = character.hair?.length > 0 ? `${character.hair.join(", ")} hair` : "";
+const faceTags = character.face?.join(", ") || "";
+ 
+const filteredBodyTags = (character.body || []).filter((tag: string) => {
+  const t = tag.toLowerCase();
+  const s = sceneLower;
 
-    if ((s.includes("hands") || s.includes("fingers") || s.includes("arms") || s.includes("squeezing") || s.includes("touching") || s.includes("holding") || s.includes("grabbing") || s.includes("nails") || s.includes("shoulders") || s.includes("wrist") || s.includes("reaching") || s.includes("armpit") || s.includes("underarm")) && 
-        (t.includes("hands") || t.includes("fingers") || t.includes("nails") || t.includes("arms") || t.includes("armpit"))) return true;
-
-    if ((s.includes("skin") || s.includes("texture") || s.includes("detailed") || s.includes("tan") || s.includes("sweat") || s.includes("abs") || s.includes("stomach") || s.includes("belly") || s.includes("waist") || s.includes("navel") || s.includes("freckles") || s.includes("goosebumps") || s.includes("oiled")) && 
-        (t.includes("skin") || t.includes("tan") || t.includes("freckles") || t.includes("abs") || t.includes("waist") || t.includes("smooth") || t.includes("hairy"))) return true;
-
-    if ((s.includes("body") || s.includes("figure") || s.includes("shape") || s.includes("frame") || s.includes("petite") || s.includes("curvy") || s.includes("thick") || s.includes("slim") || s.includes("skinny") || s.includes("tall") || s.includes("short") || s.includes("silhouette") || s.includes("build")) && 
-        (t.includes("petite") || t.includes("curvy") || t.includes("thick") || t.includes("slim") || t.includes("skinny") || t.includes("tall") || t.includes("short") || t.includes("slender") || t.includes("thin"))) return true;
-
-    if ((s.includes("posing") || s.includes("sitting") || s.includes("standing") || s.includes("lying") || s.includes("laying") || s.includes("kneeling") || s.includes("on her knees") || s.includes("legs spread") || s.includes("squatting") || s.includes("bending") || s.includes("stretching") || s.includes("dancing") || s.includes("arching") || s.includes("on top") || s.includes("she is below") || s.includes("laying on side") || s.includes("doggy") || s.includes("missionary") || s.includes("cowgirl") || s.includes("riding")) && 
-        (t.includes("athletic") || t.includes("flexible") || t.includes("fit") || t.includes("toned") || t.includes("submissive") || t.includes("dominant") || t.includes("kneeling") || t.includes("side profile"))) return true;
-
-    if ((s.includes("frontview") || s.includes("backview") || s.includes("sideview") || s.includes("profile") || s.includes("from above") || s.includes("from below") || s.includes("high angle") || s.includes("low angle") || s.includes("overhead") || s.includes("birdseye") || s.includes("wormseye")) && 
-        (t.includes("front") || t.includes("back") || t.includes("side") || t.includes("rear") || t.includes("profile") || t.includes("bottom view") || t.includes("top view"))) return true;
-
-    if (!wantsFace && !wantsLower && !wantsUpper && !wantsFeet) {
-        const safeTagRegex = /petite|curvy|thick|slim|skinny|tall|short|slender|thin|athletic|fit|toned|muscular|chubby|voluptuous|freckles|pale|tan|dark|skin|bosom|bust|breast|hips|ass|butt|hairy|armpit/i;
-        if (safeTagRegex.test(t)) return true;
-        return false;
-      }
-  });
-
-  const bodyTags = filteredBodyTags.join(", ");
-   
-  const baseTag = character.gender?.toLowerCase() === 'male' ? '1boy' : '1girl';
-  const botIdentity = `solo, ${baseTag}, ${character.name}, a ${character.age}-year-old ${character.gender}`;
-
-  let situationalTags: string[] = [];
-
-  // ✅ FIX 2 (continued): Stronger Face Prioritization logic
-  if (wantsFace && wantsLower) {
-    situationalTags = [`medium wide shot showing face and lower body of ${botIdentity}`, character.ethnicity, faceTags, hairTags, bodyTags];
-  } else if (wantsFace && wantsUpper) {
-    // Correctly prioritizes face while making upper body visible
-    situationalTags = [`tight close-up portrait of ${botIdentity} prioritizing face, upper body visible`, character.ethnicity, faceTags, hairTags, bodyTags];
-  } else if (wantsFace) {
-    situationalTags = [`extreme closeup portrait of ${botIdentity}`, character.ethnicity, faceTags, hairTags, bodyTags];
-  } else if (wantsLower && !wantsUpper && !wantsFace) {
-    const focus = /(ass|butt|rear)/i.test(sceneLower) ? "ass" : "pussy";
-    situationalTags = [`detailed faceless extreme closeup on ${focus} only, tight crop excluding mouth and face completely, ${focus} focus only`, character.ethnicity, bodyTags];
-  } else if (wantsUpper && !wantsLower && !wantsFace) {
-    situationalTags = [`detailed faceless extreme closeup on breasts only, tight crop excluding face completely, cleavage focus`, character.ethnicity, bodyTags];
-  } else if (wantsFeet && !wantsFace) {
-    situationalTags = [`detailed faceless extreme closeup on feet and toes only`, character.ethnicity, bodyTags];
-  } else if (wantsHands && !wantsFace) {
-    situationalTags = [`macro detailed focus on hands and fingers`, character.ethnicity, bodyTags];
-  } else {
-    situationalTags = [`raw candid photo of ${botIdentity}`, character.ethnicity, bodyTags, hairTags, faceTags];
+  // If it's a closeup, ONLY include tags relevant to that body part
+  if (isExplicitCloseup) {
+    if (closeupPart.includes('lip') || closeupPart.includes('mouth')) return t.includes('lips') || t.includes('mouth');
+    if (closeupPart.includes('eye')) return t.includes('eye') || t.includes('face');
+    if (closeupPart.includes('breast') || closeupPart.includes('tit') || closeupPart.includes('boob')) return t.includes('breast') || t.includes('tit') || t.includes('boob');
+    if (closeupPart.includes('nipple') || closeupPart.includes('cleavage')) return t.includes('nipple') || t.includes('breast') || t.includes('cleavage');
+    if (closeupPart.includes('pussy') || closeupPart.includes('vagina') || closeupPart.includes('clit')) return t.includes('pussy') || t.includes('vagina') || t.includes('pubic');
+    if (closeupPart.includes('ass') || closeupPart.includes('butt')) return t.includes('ass') || t.includes('butt') || t.includes('hips');
+    if (closeupPart.includes('foot') || closeupPart.includes('feet') || closeupPart.includes('toe')) return t.includes('feet') || t.includes('toes');
+    if (closeupPart.includes('hand') || closeupPart.includes('finger')) return t.includes('hand') || t.includes('finger') || t.includes('nail');
+    if (closeupPart.includes('neck') || closeupPart.includes('throat')) return t.includes('neck') || t.includes('throat');
+    if (closeupPart.includes('thigh')) return t.includes('thigh') || t.includes('leg');
+    return false;
   }
+
+  // Standard filtering for non-closeup shots
+  if (s.includes(t)) return true;
+  if (t.includes("armpit") && (s.includes("pit") || s.includes("arm"))) return true;
+  if (t.includes("ass") && (s.includes("butt") || s.includes("rear"))) return true;
+  if (t.includes("boobs") && (s.includes("chest") || s.includes("tits"))) return true;
+
+  if ((s.includes("bosom") || s.includes("breast") || s.includes("tits") || s.includes("chest") || s.includes("cleavage") || s.includes("boobs") || s.includes("jugs") || s.includes("bra") || s.includes("nipple"))
+      && (t.includes("tits") || t.includes("breast") || t.includes("bust") || t.includes("boobs"))) return true;
+  
+  if ((s.includes("ass") || s.includes("butt") || s.includes("bottom") || s.includes("behind") || s.includes("rear") || s.includes("hips") || s.includes("backside") || s.includes("cheeks"))
+      && (t.includes("ass") || t.includes("butt") || t.includes("hips") || t.includes("thicc"))) return true;
+  
+  if ((s.includes("pussy") || s.includes("crotch") || s.includes("vagina") || s.includes("down there") || s.includes("spread") || s.includes("vulva") || s.includes("lips") || s.includes("between"))
+      && (t.includes("pussy") || t.includes("hairy") || t.includes("shaved") || t.includes("pubic") || t.includes("bush"))) return true;
+
+  if ((s.includes("legs") || s.includes("thighs") || s.includes("feet") || s.includes("toes") || s.includes("soles") || s.includes("stockings") || s.includes("calves") || s.includes("ankles"))
+      && (t.includes("legs") || t.includes("thighs") || t.includes("feet") || t.includes("toes"))) return true;
+
+  if ((s.includes("hands") || s.includes("fingers") || s.includes("arms") || s.includes("squeezing") || s.includes("touching") || s.includes("holding") || s.includes("grabbing"))
+      && (t.includes("hands") || t.includes("fingers") || t.includes("nails") || t.includes("arms") || t.includes("armpit"))) return true;
+
+  if ((s.includes("skin") || s.includes("texture") || s.includes("detailed") || s.includes("tan") || s.includes("sweat") || s.includes("abs") || s.includes("stomach") || s.includes("belly") || s.includes("visible muscles"))
+      && (t.includes("skin") || t.includes("tan") || t.includes("freckles") || t.includes("abs") || t.includes("waist") || t.includes("smooth") || t.includes("hairy"))) return true;
+
+  if ((s.includes("body") || s.includes("figure") || s.includes("shape") || s.includes("frame") || s.includes("petite") || s.includes("curvy") || s.includes("thick") || s.includes("slim"))
+      && (t.includes("petite") || t.includes("curvy") || t.includes("thick") || t.includes("slim") || t.includes("skinny") || t.includes("tall") || t.includes("short") || t.includes("slender"))) return true;
+
+  if ((s.includes("posing") || s.includes("sitting") || s.includes("standing") || s.includes("lying") || s.includes("laying") || s.includes("kneeling") || s.includes("on her knees"))
+      && (t.includes("athletic") || t.includes("flexible") || t.includes("fit") || t.includes("toned") || t.includes("submissive") || t.includes("dominant") || t.includes("kneeling"))) return true;
+
+  if ((s.includes("frontview") || s.includes("backview") || s.includes("sideview") || s.includes("profile") || s.includes("from above") || s.includes("from below") || s.includes("high angle"))
+      && (t.includes("front") || t.includes("back") || t.includes("side") || t.includes("rear") || t.includes("profile") || t.includes("bottom view") || t.includes("top view"))) return true;
+
+  if (!wantsFace && !wantsLower && !wantsUpper && !wantsFeet && !isExplicitCloseup) {
+    const safeTagRegex = /petite|curvy|thick|slim|skinny|tall|short|slender|thin|athletic|fit|toned|muscular|chubby|voluptuous|freckles|pale|tan|dark|skin|bosom|bust|breast|hips|ass|butt|hair/i;
+    if (safeTagRegex.test(t)) return true;
+    return false;
+  }
+  return false;
+});
+
+const bodyTags = filteredBodyTags.join(", ");
+ 
+const baseTag = character.gender?.toLowerCase() === 'male' ? '1boy' : '1girl';
+const botIdentity = `solo, ${baseTag}, ${character.name}, a ${character.age}-year-old ${character.gender}`;
+
+let situationalTags: string[] = [];
+
+// ✅ ENHANCED: Closeups take ABSOLUTE PRIORITY
+if (isExplicitCloseup) {
+  // Closeup mapping
+  if (closeupPart.includes('lip') || closeupPart.includes('mouth')) {
+    situationalTags = [`extreme macro closeup focus on lips and mouth only, ultra-detailed texture, saliva glistening, tightly cropped filling entire frame, isolated shot with blurred background`, character.ethnicity, bodyTags];
+  } else if (closeupPart.includes('eye')) {
+    situationalTags = [`extreme macro closeup portrait focus on eyes only, hyper-detailed iris and lashes, eye contact staring directly, isolated face crop with soft blurred background`, character.ethnicity, faceTags];
+  } else if (closeupPart.includes('breast') || closeupPart.includes('tit') || closeupPart.includes('boob') || closeupPart.includes('nipple') || closeupPart.includes('cleavage')) {
+    situationalTags = [`extreme closeup focus on breasts and cleavage only, deep detailed texture, tight crop excluding lower body and face, filled frame, soft bokeh background`, character.ethnicity, bodyTags];
+  } else if (closeupPart.includes('pussy') || closeupPart.includes('vagina') || closeupPart.includes('clit') || closeupPart.includes('vulva')) {
+    situationalTags = [`extreme intimate closeup focus on pussy only, faceless shot, hyper-detailed folds and texture, wide spread, tight crop excluding face and upper body, shallow depth of field`, character.ethnicity, bodyTags];
+  } else if (closeupPart.includes('ass') || closeupPart.includes('butt')) {
+    situationalTags = [`extreme closeup focus on ass and cheeks only, faceless shot, hyper-detailed dimples and texture, from behind angle, tight crop, soft bokeh`, character.ethnicity, bodyTags];
+  } else if (closeupPart.includes('foot') || closeupPart.includes('feet') || closeupPart.includes('toe')) {
+    situationalTags = [`extreme macro closeup focus on feet and toes only, hyper-detailed texture, toes spread, arched foot, isolated shot`, character.ethnicity, bodyTags];
+  } else if (closeupPart.includes('hand') || closeupPart.includes('finger')) {
+    situationalTags = [`macro closeup focus on hands and fingers only, hyper-detailed nails and skin texture, isolated shot with blurred background`, character.ethnicity, bodyTags];
+  } else if (closeupPart.includes('neck') || closeupPart.includes('throat')) {
+    situationalTags = [`tight closeup focus on neck and throat only, showing collarbone, hyper-detailed skin texture, from front angle`, character.ethnicity, bodyTags];
+  } else if (closeupPart.includes('thigh')) {
+    situationalTags = [`extreme closeup focus on thighs only, faceless shot, hyper-detailed skin and muscle, inner thigh visible, tight crop`, character.ethnicity, bodyTags];
+  }
+} else if (wantsFace && wantsLower) {
+  situationalTags = [`medium wide shot showing face and lower body of ${botIdentity}`, character.ethnicity, faceTags, hairTags, bodyTags];
+} else if (wantsFace && wantsUpper) {
+  situationalTags = [`tight close-up portrait of ${botIdentity} prioritizing face, upper body visible`, character.ethnicity, faceTags, hairTags, bodyTags];
+} else if (wantsFace) {
+  situationalTags = [`extreme closeup portrait of ${botIdentity}`, character.ethnicity, faceTags, hairTags, bodyTags];
+} else if (wantsLower && !wantsUpper && !wantsFace) {
+  const focus = /(ass|butt|rear)/i.test(sceneLower) ? "ass" : "lower body";
+  situationalTags = [`detailed shot from waist down focusing on ${focus}`, character.ethnicity, bodyTags];
+} else if (wantsUpper && !wantsLower && !wantsFace) {
+  situationalTags = [`detailed shot from waist up focusing on upper body and breasts`, character.ethnicity, bodyTags];
+} else if (wantsFeet && !wantsFace) {
+  situationalTags = [`detailed shot focusing on feet and legs`, character.ethnicity, bodyTags];
+} else if (wantsHands && !wantsFace) {
+  situationalTags = [`macro detailed focus on hands and fingers`, character.ethnicity, bodyTags];
+} else {
+  situationalTags = [`raw candid full-body photo of ${botIdentity}`, character.ethnicity, bodyTags, hairTags, faceTags];
+}
 
   // --- 4. NEURAL CONTEXT SYNC ---
   const actionTriggers = ["nude", "naked", "sex", "intimate", "undressing", "exposed", "touching", "pussy", "vagina", "penis", "dick"];
