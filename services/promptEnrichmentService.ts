@@ -12,27 +12,32 @@ export async function enrichImagePrompt(
     .filter(msg => msg.role === 'user')
     .map(msg => msg.content || msg.text || "")
     .filter(Boolean)
-    .join(', ');
+    .join(', ')
+    .substring(0, 150); // ✅ Limit to 150 chars
 
-  // 2. Clean the recent context so it behaves as safe visual tags 
-  // (removes complex punctuation that confuses Stable Diffusion)
- const cleanedContext = recentContext
-  .replace(/[[\]{}<>]/g, '')  // Only remove problematic chars for Stable Diffusion
-  .replace(/\s+/g, ' ')       // Normalize whitespace
-  .trim();
+  // 2. Clean the recent context
+  const cleanedContext = recentContext
+    .replace(/[[\]{}<>]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
 
-  // 3. Extract stylistic continuity
+  // 3. Extract stylistic continuity (limit 2 previous prompts)
   const styleContinuity = previousImagePrompts && previousImagePrompts.length > 0
-    ? previousImagePrompts.slice(-2).join(', ')
+    ? previousImagePrompts.slice(-2)
+        .map(p => p.substring(0, 80))  // ✅ Limit each to 80 chars
+        .join(', ')
     : '';
 
-  // 4. Build the enriched prompt as a comma-separated string for RunPod/BigLust
+  // 4. Build enriched prompt with length control
   const enrichedTags = [
-    visualDescription,
+    visualDescription.substring(0, 200),  // ✅ Limit visual description
     cleanedContext ? `intent: ${cleanedContext}` : null,
-    `vibe: ${ariaPersonality}`,
+    `vibe: ${ariaPersonality}`.substring(0, 100),  // ✅ Limit vibe
     styleContinuity ? `continuity: ${styleContinuity}` : null
-  ].filter(Boolean).join(', ');
+  ]
+    .filter(Boolean)
+    .join(', ')
+    .substring(0, 500); // ✅ Final limit: 500 chars max
 
   return enrichedTags;
 }
