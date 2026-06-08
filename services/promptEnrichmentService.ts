@@ -6,38 +6,68 @@ export async function enrichImagePrompt(
   ariaPersonality: string,
   previousImagePrompts?: string[]
 ): Promise<string> {
-  // 1. Extract intent from last 4 user messages
-  const recentContext = conversationHistory
-    .slice(-4)
+  // 1. Get recent user intent (last 5 messages, looking for user role)
+  const recentUserMessages = conversationHistory
+    .slice(-5)
     .filter(msg => msg.role === 'user')
-    .map(msg => msg.content || msg.text || "")
-    .filter(Boolean)
-    .join(', ')
-    .substring(0, 150); // ✅ Limit to 150 chars
+    .map(msg => (msg.content || msg.text || "").trim())
+    .filter(Boolean);
 
-  // 2. Clean the recent context
-  const cleanedContext = recentContext
-    .replace(/[[\]{}<>]/g, '')
+  // Join with a separator to keep intents distinct within the context string
+  const recentContext = recentUserMessages.join(" | ").substring(0, 180);
+
+  // 2. Clean context but PRESERVE important keywords
+  let cleanedContext = recentContext
+    .replace(/[[\]{}<>]/g, '') // Remove structural characters that might break parsers
     .replace(/\s+/g, ' ')
     .trim();
 
-  // 3. Extract stylistic continuity (limit 2 previous prompts)
+  // 3. Extract & protect critical framing/position keywords
+  // This ensures that even if context is trimmed later, essential shot details remain.
+  const importantKeywords = [
+    // Shot Types
+    "full body", "far shot", "wide shot", "medium shot", "half-body", 
+    "closeup", "extreme closeup", 
+    // Positions / Angles
+    "doggystyle", "missionary", "cowgirl", "doggy", 
+    "from behind", "backview", "rear view",
+    // Contextual Instructions
+    "pov", "point of view", 
+    "solo", "alone", "no other", 
+    "my cock", "your mouth"
+  ];
+
+  const protectedTerms: string[] = [];
+  const lowerCleanedContext = cleanedContext.toLowerCase();
+
+  for (const kw of importantKeywords) {
+    if (lowerCleanedContext.includes(kw.toLowerCase())) {
+      protectedTerms.push(kw);
+    }
+  }
+
+  // 4. Style continuity from previous prompts (very limited to prevent drift)
   const styleContinuity = previousImagePrompts && previousImagePrompts.length > 0
     ? previousImagePrompts.slice(-2)
-        .map(p => p.substring(0, 80))  // ✅ Limit each to 80 chars
+        .map(p => p.substring(0, 70)) // Cap previous prompt snippets
         .join(', ')
     : '';
 
-  // 4. Build enriched prompt with length control
-  const enrichedTags = [
-    visualDescription.substring(0, 200),  // ✅ Limit visual description
-    cleanedContext ? `intent: ${cleanedContext}` : null,
-    `vibe: ${ariaPersonality}`.substring(0, 100),  // ✅ Limit vibe
-    styleContinuity ? `continuity: ${styleContinuity}` : null
-  ]
-    .filter(Boolean)
-    .join(', ')
-    .substring(0, 500); // ✅ Final limit: 500 chars max
+  // 5. Build enriched prompt — prioritize original visual + protected framing terms
+  const enrichedParts = [
+    visualDescription.substring(0, 220),           // 1. Main visual description takes priority
+    protectedTerms.length > 0 ? protectedTerms.join(', ') : null, // 2. Critical framing keywords
+    cleanedContext ? `context: ${cleanedContext}` : null,          // 3. Raw conversational context
+    `personality: ${ariaPersonality}`.substring(0, 90),           // 4. Character vibe
+    styleContinuity ? `previous style: ${styleContinuity}` : null // 5. Minimal style linkage
+  ].filter(Boolean);
 
-  return enrichedTags;
+  let finalEnriched = enrichedParts.join(', ');
+
+  // Hard cap to prevent token bloat for the API call
+  if (finalEnriched.length > 520) {
+    finalEnriched = finalEnriched.substring(0, 520);
+  }
+
+  return finalEnriched;
 }
