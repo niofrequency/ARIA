@@ -720,7 +720,7 @@ cleanContextPrompt = enrichedPrompt;
   }
 
   // 🔥 NEW: DETECT VIEW ANGLES AND POSITIONS
- const angleMatch = combinedIntent.match(/from behind|backview|back view|from back|rear view|looking back|glancing back|over shoulder|bend over|ass up|bent forward|doggy|perched|angled back|back pose|reverse cowgirl|backshot/i);
+  const angleMatch = combinedIntent.match(/from behind|backview|back view|from back|rear view|looking back|glancing back|over shoulder|bend over|ass up|bent forward|doggy|perched|angled back|back pose|reverse cowgirl|backshot/i);
   const isBackAngle = angleMatch ? angleMatch[0] : '';
   const frontMatch = combinedIntent.match(/frontview|front view|from front|facing|facing me|looking at|eye contact|facing camera|straight on/i);
   const isFrontAngle = frontMatch ? frontMatch[0] : '';
@@ -728,6 +728,19 @@ cleanContextPrompt = enrichedPrompt;
   const isSideAngle = sideMatch ? sideMatch[0] : '';
   const pov = combinedIntent.match(/pov|point of view|from my view|looking down at|standing over|between legs/i);
   const isPOV = pov ? pov[0] : '';
+
+  // 🔥 NEW: MULTI-FOCUS DETECTION (Face + Body Part Combo)
+  const multiFocusMatch = combinedIntent.match(/(face|look at me|show your face|look|eyes).*?(pussy|vagina|breasts|tits|ass|butt|cock|dick)/i) ||
+                          combinedIntent.match(/(pussy|vagina|breasts|tits|ass|butt|cock|dick).*?(face|look at me|show your face|look|eyes)/i);
+  const isMultiFocus = !!multiFocusMatch;
+  let multiFocusParts: string[] = [];
+  if (isMultiFocus) {
+    // Extract which body parts are requested
+    if (combinedIntent.match(/pussy|vagina|clit|vulva/i)) multiFocusParts.push('pussy');
+    if (combinedIntent.match(/breasts|tits|boobs|nipples|cleavage/i)) multiFocusParts.push('breasts');
+    if (combinedIntent.match(/ass|butt|cheeks/i)) multiFocusParts.push('ass');
+    if (combinedIntent.match(/cock|dick|penis/i)) multiFocusParts.push('penis');
+  }
 
   // Standard intent detection (used when NOT a closeup)
   const wantsFace = !isExplicitCloseup && /face|selfie|eye contact|look at me|portrait|head shot/i.test(combinedIntent);
@@ -812,7 +825,31 @@ cleanContextPrompt = enrichedPrompt;
   let situationalTags: string[] = [];
 
   // ✅ ENHANCED: Closeups take ABSOLUTE PRIORITY + ANGLE AWARENESS
-  if (isExplicitCloseup) {
+  if (isMultiFocus) {
+    // Multi-focus: Face + Lower Body Combination
+    if (multiFocusParts.includes('pussy')) {
+      situationalTags = [
+        `medium closeup from chest to thighs showing face and pussy, face visible with ${isFrontAngle ? 'direct eye contact, horny expression' : 'sensual expression looking down'}, lower body spread and exposed, hyper-detailed, shallow depth of field`,
+        character.ethnicity,
+        faceTags,
+        bodyTags
+      ];
+    } else if (multiFocusParts.includes('breasts')) {
+      situationalTags = [
+        `medium closeup showing face and breasts together, face with ${isFrontAngle ? 'sultry eye contact' : 'sensual gaze'}, breasts prominently displayed, hands visible, soft lighting`,
+        character.ethnicity,
+        faceTags,
+        bodyTags
+      ];
+    } else if (multiFocusParts.includes('ass')) {
+      situationalTags = [
+        `medium closeup showing face and ass together, ${isBackAngle ? 'glancing back over shoulder with playful grin' : 'looking down at own body'}, ass prominently in frame, hyper-detailed texture`,
+        character.ethnicity,
+        faceTags,
+        bodyTags
+      ];
+    }
+  } else if (isExplicitCloseup) {
     // Lips/Mouth closeup
     if (closeupPart.includes('lip') || closeupPart.includes('mouth')) {
       situationalTags = [
