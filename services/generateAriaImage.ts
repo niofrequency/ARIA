@@ -559,7 +559,7 @@ const getVisualDescription = async (base64Image: string): Promise<string> => {
     const response = await fetch('/api/vision-caption', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ image: base64Image, model: "gpt-4o" })
+      body: JSON.stringify({ image: base64Image, model: "grok-vision" })
     });
     
     if (!response.ok) return "";
