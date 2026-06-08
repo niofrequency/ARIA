@@ -720,7 +720,7 @@ cleanContextPrompt = enrichedPrompt;
   }
 
   // 🔥 NEW: DETECT VIEW ANGLES AND POSITIONS
-  const angleMatch = combinedIntent.match(/from behind|backview|back view|from back|rear view|looking back|glancing back|over shoulder|bend over|ass up|bent forward|doggy|perched|angled back|back pose/i);
+ const angleMatch = combinedIntent.match(/from behind|backview|back view|from back|rear view|looking back|glancing back|over shoulder|bend over|ass up|bent forward|doggy|perched|angled back|back pose|reverse cowgirl|backshot/i);
   const isBackAngle = angleMatch ? angleMatch[0] : '';
   const frontMatch = combinedIntent.match(/frontview|front view|from front|facing|facing me|looking at|eye contact|facing camera|straight on/i);
   const isFrontAngle = frontMatch ? frontMatch[0] : '';
