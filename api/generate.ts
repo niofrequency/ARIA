@@ -1,11 +1,12 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-
+import { buildImageConsistencyPrompt, buildEnrichedImagePrompt, VisualContextMemory } from '../lib/imageConsistency';
 
 /**
  * ARIA NEURAL IMAGE PROXY (RunPod Serverless)
  * Logic:
  * 1. GET: Polls the status of a specific Job ID from RunPod.
  * 2. POST: Dispatches a ComfyUI workflow (supports Identity Images & Text-to-Image).
+ * 3. IMAGE CONSISTENCY: Applies shot type, angle, position, and POV detection to prompts.
  */
 
 const API_KEY = process.env.RUNPOD_API_KEY;
@@ -73,8 +74,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         images,
         visualDescription,
         conversationHistory,
+        userMessage,
+        characterName,
+        characterDescription,
         ariaPersonality,
-        previousPrompts
+        previousPrompts,
+        userId
       } = req.body;
       
       if (!workflow) {
@@ -83,22 +88,41 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       console.log(`🎨 Dispatching Imaging Workflow to Endpoint: ${ENDPOINT_ID}`);
 
-    // 🔥 ENRICHMENT PIPELINE 🔥
-if (visualDescription && conversationHistory && conversationHistory.length > 0) {
-  console.log("🧠 Applying Server-Side Prompt Enrichment...");
-  
-// Replace the current enrichImagePrompt() call with:
-const enrichedContextTags = buildEnrichedImagePrompt(metadata, visualDescription, ariaPersonality);
+      // 🔥 IMAGE CONSISTENCY ENRICHMENT PIPELINE 🔥
+      let enrichedContextTags = "";
 
-  console.log("✨ Enriched Tags:", enrichedContextTags);  // ✅ Add visibility
+      if (visualDescription && userMessage) {
+        console.log("🧠 Applying IMAGE CONSISTENCY Enrichment...");
+        
+        // Create a temporary visual memory for this generation
+        const visualMemory = new VisualContextMemory();
+        
+        // Build image consistency metadata from user message
+        const metadata = buildImageConsistencyPrompt(
+          userMessage,
+          characterName || "ARIA",
+          visualMemory
+        );
 
-  // Locate and prepend to the appropriate prompt node
-  if (workflow["6"]?.inputs?.text !== undefined) {
-    workflow["6"].inputs.text = `${enrichedContextTags}, ${workflow["6"].inputs.text}`;
-  } else if (workflow["111"]?.inputs?.prompt !== undefined) {
-    workflow["111"].inputs.prompt = `${enrichedContextTags}, ${workflow["111"].inputs.prompt}`;
-  }
-}
+        console.log("📸 Shot Type:", metadata.shotType);
+        console.log("📷 Camera Angle:", metadata.cameraAngle);
+        console.log("🍆 Sexual Position:", metadata.sexualPosition);
+        console.log("👁️ POV Action:", metadata.isPOVAction);
+        
+        // Build enriched prompt with all consistency rules
+        enrichedContextTags = buildEnrichedImagePrompt(
+          metadata,
+          visualDescription,
+          characterDescription || ariaPersonality || "casual"
+        );
+
+        console.log("✨ Enriched Tags:", enrichedContextTags);
+      } else if (conversationHistory && conversationHistory.length > 0) {
+        // Fallback: Use old enrichment method if image consistency isn't available
+        console.log("🧠 Applying Server-Side Prompt Enrichment (legacy)...");
+        enrichedContextTags = visualDescription || "";
+      }
+
       // 2. Prepare the payload for RunPod
       const runpodInput: any = { workflow };
 
@@ -106,6 +130,16 @@ const enrichedContextTags = buildEnrichedImagePrompt(metadata, visualDescription
       if (images && Array.isArray(images)) {
         runpodInput.images = images;
         console.log("📸 Image array successfully attached to workflow payload.");
+      }
+
+      // 3. Inject enriched context into workflow
+      if (enrichedContextTags) {
+        // Locate and prepend to the appropriate prompt node
+        if (workflow["6"]?.inputs?.text !== undefined) {
+          workflow["6"].inputs.text = `${enrichedContextTags}, ${workflow["6"].inputs.text}`;
+        } else if (workflow["111"]?.inputs?.prompt !== undefined) {
+          workflow["111"].inputs.prompt = `${enrichedContextTags}, ${workflow["111"].inputs.prompt}`;
+        }
       }
 
       // ✅ LOGS FOR PROMPT DEBUGGING
