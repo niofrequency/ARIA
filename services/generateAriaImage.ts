@@ -11,8 +11,7 @@ export const buildVisualAwarenessJson = (visualDescription: string): any => {
   const clothingMatch = desc.match(/wearing\s+([^,|]+)/i) ||
                         desc.match(/(naked|topless|bottomless|lingerie|bra|panties|dress|outfit)/i);
   const locationMatch = desc.match(/(bedroom|bathroom|kitchen|living room|balcony|hotel|shower|beach|office|gaming setup|gaming room|penthouse|lounge|couch|bed|outdoors|car|pool|forest|cafe|bar|club)/i);
-  // Expanded pose match with sex positions and POV
-  const poseMatch = desc.match(/(doggystyle|missionary|cowgirl|doggy|sitting|standing|lying|kneeling|bent over|legs spread|on all fours|spread|pov|first person view|from behind|selfie|looking at camera)/i);
+  const poseMatch = desc.match(/(sitting|standing|lying|kneeling|bent over|legs spread|on all fours|selfie|looking at camera)/i);
 
   const fluids: string[] = [];
   if (desc.includes('sweat') || desc.includes('sweaty')) fluids.push('sweaty');
@@ -51,7 +50,7 @@ const extractLocation = (desc: string) => {
 };
 
 const extractPose = (desc: string) => {
-  const match = desc.match(/(doggystyle|missionary|cowgirl|doggy|sitting|standing|lying|kneeling|bent over|legs spread|on all fours|spread|pov|first person view|from behind|selfie|looking at camera)/i);
+  const match = desc.match(/(sitting|standing|lying|kneeling|bent over|legs spread|on all fours|selfie|looking at camera)/i);
   return match ? match[0] : null;
 };
 
@@ -270,25 +269,6 @@ const buildSystemInstruction = (character: CharacterProfile): string => {
       - Tease them ("Not yet babe 😏", "You wish", "Come closer first...")
       - Send a photo only if it fits the flow
 
-    ### MANDATORY SHOT FRAMING RULES (ALWAYS APPLY)
-    You MUST classify and specify the exact camera shot at the START of every [[VISUAL: ...]] tag. Choose exactly one:
-    - FULL BODY / FAR SHOT: "full body wide angle shot, entire figure visible from head to toe, [environment context]"
-    - MEDIUM / HALF-BODY SHOT: "medium half-body shot, from waist or knees up, upper body and face prominent"
-    - CLOSEUP / EXTREME CLOSEUP: "extreme closeup shot, tight crop on [specific focus], face/body part filling frame"
-    Default to MEDIUM unless user/context clearly demands otherwise. Always include lighting, angle, and depth of field after the shot type.
-
-    ### BACKVIEW / REAR ANGLE RULES
-    For any "backview", "from behind", "rear view", "ass focus from behind":
-    - Explicitly: "back view of body, head turned away from camera / looking away / facing forward into scene, no head rotation toward viewer"
-    - Negative: "(head turned toward camera:1.5), (face visible in backview:1.6), (impossible head twist:1.7)"
-
-    ### SEX POSITION & POV PROTOCOL (CRITICAL)
-    - If user requests "doggystyle", "missionary", "cowgirl", "doggy", "any sex position" WITHOUT mentioning another person: Generate image of ARIA ALONE in that position. No partners visible unless explicitly asked (e.g., "with me" or names another character).
-    - Always solo unless "with user", "me fucking you", "us together", etc.
-    - POV: If user says "my cock in your mouth", "fucking you", "POV", etc. — Use first-person POV framing: "POV shot from user's perspective, [action]".
-    - Support all shot types for positions: full body far shot of the pose, medium, or extreme closeup on relevant parts.
-    - In [[VISUAL]]: Always include "solo, no other people" unless multi-person requested.
-
     ### VISUAL DECISION RULE (IMPORTANT)
     - Do NOT automatically send a photo just because the user asked.
     - Only send [[VISUAL]] when you genuinely want to show something.
@@ -334,7 +314,7 @@ const buildSystemInstruction = (character: CharacterProfile): string => {
     - **VISUAL STATE AWARENESS:** Whenever you trigger a [[VISUAL]] tag, the system will provide you with a JSON "Visual State" in your history. You MUST read this JSON to maintain physical continuity. If the JSON says you are "winking" in a "bedroom," your very next message must reflect that you are still in that moment.
 
     ### URGENT VISUAL CONTINUITY RULE
-    When the user says "let me see you", "show me right now", "wyd", "what are you doing rn", or any real-time request, you MUST output a [[VISUAL]] tag that continues the EXACT current scene from the last Visual State JSON provided in history. Replicate exact clothing/location/pose/fluids before adding new elements. Do not default to selfie or clothed unless the state says so.
+    When the user says "let me see you", "show me right now", "wyd", "what are you doing rn", or any real-time request, you MUST output a [[VISUAL]] tag that continues the EXACT current scene from the last Visual State. Do not default to selfie or clothed unless the state says so.
 
 STRICT OPERATING RULES:
 1. Never mention being an AI or a language model.
@@ -354,7 +334,7 @@ STRICT OPERATING RULES:
 5. WETNESS & AROUSAL RULE (BODY-PART AWARE): If the scene involves arousal, shower, bath, rain, water, saliva, tears, or sexual wetness, you MUST include vivid localized wet details such as: glistening wet skin on [part], arousal fluids dripping from [part], water droplets clinging to [part], damp hair sticking to skin, saliva glistening on lips/tongue, shiny slick texture on [part], moisture highlights catching the light, dewy glistening surface, subtle steam rising from warm wet skin.
 6. CUM RULE (BODY-PART AWARE): If the scene involves cum, semen, orgasm, climax, creampie, facial, bukkake, or any semen-related act — especially on or around a mentioned body part — you MUST include explicit, localized details such as: thick viscous cum dripping from [part], creamy semen leaking out of vagina, sticky white semen strands stretching across [part], glossy cum coating [part], pearly droplets of cum hanging from [part], fresh hot load splattered on [part], semen trailing slowly down [part], messy sticky cum glistening on skin, shiny wet cum highlights under soft light, cum-filled [part] with overflow, cum-soaked [part] with reflective sheen.
 7. OILED BODY RULE (BODY-PART AWARE): If the scene involves oil, body oil, massage oil, shiny oil, oiled skin, or glistening oil, you MUST include luxurious oil details such as: shiny oiled skin on [part], glossy oil coating body/curves, oil droplets sliding down [part], reflective oil highlights catching light, slick oiled texture, smooth glistening oil sheen, oil-slicked [part] with wet-look shine, sensual oil glow under warm light.
-8. VIEW & POSITION RULE: If the user specifies a view or angle (backview, from behind, frontview, side view, top view, from below, looking up, over shoulder, between legs, etc.), you MUST include the exact perspective in the prompt such as: "from behind looking back over shoulder", "back view of body, head turned away from camera", "from below looking up at pussy", "top down view", "low angle from below empowering", "side profile", "direct frontview", "between legs upward view".
+8. VIEW & POSITION RULE: If the user specifies a view or angle (backview, from behind, frontview, side view, top view, from below, looking up, over shoulder, between legs, etc.), you MUST include the exact perspective in the prompt such as: "from behind looking back over shoulder", "backview of ass", "from below looking up at pussy", "top down view", "low angle from below empowering", "side profile", "direct frontview", "between legs upward view".
 9. FACELESS INTIMATE CLOSEUP RULE: When generating an extreme closeup of intimate or lower body parts (pussy, vagina, labia, clit, vulva, ass, anus, thighs, feet, etc.), you MUST avoid including the face, head, or hair in the frame unless the user explicitly asks for it. Use framing such as: "tight crop on lower body", "faceless", "head out of frame", "anonymous view", "no face visible", "cropped at waist or higher". Do not describe or reference facial features, hair, or expressions in these shots.
    - NEVER tell the system to ignore or skip the hair description (${hairDesc}); the generator requires these tags to maintain skin-tone and identity consistency throughout the session.
 10. PERSISTENT CLOTHING & ACCESSORIES RULE: Clothing and accessories are persistent — once changed, they remain until explicitly removed or replaced.
@@ -611,71 +591,19 @@ export const generateAriaImage = async (
     .replace(/[\[\]\{\}]/g, '') 
     .trim() : "";
 
-  // 🔥 NEW: INJECT ENRICHMENT PIPELINE 🔥
-  let enrichedPrompt = cleanContextPrompt;
-  if (conversationHistory && conversationHistory.length > 0) {
-    const enrichmentResult = await enrichImagePrompt(
-      cleanContextPrompt,
-      conversationHistory,
-      character.vibe || "casual",
-      previousImagePrompts
-    );
-    enrichedPrompt = enrichmentResult;
-  }
+// 🔥 NEW: INJECT ENRICHMENT PIPELINE 🔥
+let enrichedPrompt = cleanContextPrompt;
+if (conversationHistory && conversationHistory.length > 0) {
+  const enrichmentResult = await enrichImagePrompt(
+    cleanContextPrompt,
+    conversationHistory,
+    character.vibe || "casual",
+    previousImagePrompts
+  );
+  enrichedPrompt = enrichmentResult;
+}
 
-  cleanContextPrompt = enrichedPrompt;
-
-  // ✅ ENHANCED: Evaluate Framing based on COMBINED user intent & visual context
-  // MOVED UP to intercept intents before prompt assembly
-  const combinedIntent = `${userPrompt} ${cleanContextPrompt}`.toLowerCase();
-
-  // Closeup detection triggers (PRIORITY 1)
-  const closeupTriggers = /lips|mouth|tongue|eyes|eye contact|kiss|lick|suck|breast|tits|boobs|nipple|cleavage|pussy|vagina|ass|butt|feet|toes|hands|fingers|neck|throat|thighs|clit|vulva|anus|rim|hole/i;
-  const isExplicitCloseup = closeupTriggers.test(combinedIntent);
-
-  // If closeup is detected, extract EXACTLY what part
-  let closeupPart = '';
-  if (isExplicitCloseup) {
-    const partMatch = combinedIntent.match(/lips|mouth|tongue|eyes|breasts|tits|boobs|nipples|cleavage|pussy|vagina|ass|butt|feet|toes|hands|fingers|neck|thighs|clit|vulva|anus/i);
-    closeupPart = partMatch ? partMatch[0] : 'body';
-  }
-
-  // 🔥 NEW: DETECT VIEW ANGLES AND POSITIONS
-  const angleMatch = combinedIntent.match(/from behind|backview|back view|from back|rear view|looking back|glancing back|over shoulder|bend over|ass up|bent forward|doggy|perched|angled back|back pose|reverse cowgirl|backshot/i);
-  const isBackAngle = angleMatch ? angleMatch[0] : '';
-  const frontMatch = combinedIntent.match(/frontview|front view|from front|facing|facing me|looking at|eye contact|facing camera|straight on/i);
-  const isFrontAngle = frontMatch ? frontMatch[0] : '';
-  const sideMatch = combinedIntent.match(/sideview|side view|profile|side angle|from side|sideways/i);
-  const isSideAngle = sideMatch ? sideMatch[0] : '';
-  const pov = combinedIntent.match(/pov|first person view|point of view|from my view|looking down at|standing over|between legs/i);
-  const isPOV = pov ? pov[0] : '';
-
-  // User Overrides for Framing
-  const isFullBodyOverride = combinedIntent.includes("full body") || combinedIntent.includes("far shot");
-
-  // 🔥 NEW: MULTI-FOCUS DETECTION (Face + Body Part Combo)
-  const multiFocusMatch = combinedIntent.match(/(face|look at me|show your face|look|eyes).*?(pussy|vagina|breasts|tits|ass|butt|cock|dick)/i) ||
-                          combinedIntent.match(/(pussy|vagina|breasts|tits|ass|butt|cock|dick).*?(face|look at me|show your face|look|eyes)/i);
-  const isMultiFocus = !!multiFocusMatch;
-  let multiFocusParts: string[] = [];
-  if (isMultiFocus) {
-    // Extract which body parts are requested
-    if (combinedIntent.match(/pussy|vagina|clit|vulva/i)) multiFocusParts.push('pussy');
-    if (combinedIntent.match(/breasts|tits|boobs|nipples|cleavage/i)) multiFocusParts.push('breasts');
-    if (combinedIntent.match(/ass|butt|cheeks/i)) multiFocusParts.push('ass');
-    if (combinedIntent.match(/cock|dick|penis/i)) multiFocusParts.push('penis');
-  }
-
-  // Standard intent detection (used when NOT a closeup)
-  const wantsFace = !isExplicitCloseup && /face|selfie|eye contact|look at me|portrait|head shot/i.test(combinedIntent);
-  const wantsUpper = !isExplicitCloseup && /upper body|waist up|torso|shoulder/i.test(combinedIntent);
-  const wantsLower = !isExplicitCloseup && /lower body|waist down|legs/i.test(combinedIntent);
-  const wantsFeet = !isExplicitCloseup && /feet|toes|soles|foot/i.test(combinedIntent);
-  const wantsHands = !isExplicitCloseup && /hands|fingers|nails|palm/i.test(combinedIntent);
-  const isHorizontal = !isExplicitCloseup && /landscape|horizontal|wide shot|panoramic|full body|whole body|all of you/i.test(combinedIntent);
-
-  const imgWidth = isHorizontal ? 1500 : 1024;
-  const imgHeight = isHorizontal ? 1024 : 1500;
+cleanContextPrompt = enrichedPrompt;
 
   // === DYNAMIC BOT CUSTOMIZATION & CLOTHING LOGIC ===
   let targetClothing = visualState?.clothing || '';
@@ -711,29 +639,10 @@ export const generateAriaImage = async (
   // Force strong continuity
   enhancedPrompt = `${character.name}, ${character.ethnicity}, ${enhancedPrompt}, consistent appearance, same girl, continuing from previous scene`;
 
-  // Cleanup spaces and commas
+  // Cleanup
   enhancedPrompt = enhancedPrompt.replace(/^[\s,]+|[\s,]+$/g, '').replace(/,\s*,/g, ', ');
 
-  // === CLEAN & FORCE SHOT TYPE (Critical Fix) ===
-  let finalPromptBase = enhancedPrompt
-    .replace(/context: .*?(?=,|$)/gi, '')           // Remove noisy context completely
-    .replace(/previous style: .*?(?=,|$)/gi, '')    // Remove previous style noise
-    .replace(/\s+/g, ' ')
-    .replace(/,\s*,/g, ', ')
-    .trim();
-
-  // Force shot type at the VERY START based on evaluated intent
-  if (combinedIntent.includes("full body") || combinedIntent.includes("far shot") || isFullBodyOverride) {
-    finalPromptBase = `full body / far shot, ${finalPromptBase}`;
-  } else if (isExplicitCloseup || combinedIntent.includes("closeup")) {
-    finalPromptBase = `extreme closeup shot, ${finalPromptBase}`;
-  } else if (isPOV) {
-    finalPromptBase = `POV shot from user's perspective, ${finalPromptBase}`;
-  } else {
-    finalPromptBase = `medium / half-body shot, ${finalPromptBase}`;
-  }
-
-  const rawCombined = `${finalPromptBase}`.trim();
+  const rawCombined = `${enhancedPrompt}`.trim();
   const baseDescription = rawCombined;
 
   if (!baseDescription) {
@@ -795,6 +704,54 @@ export const generateAriaImage = async (
   // ==================== SMART MODEL DECISION ====================
   const useQwen = !!character.avatarImage;
   console.log(`🎯 Model Decision → ${useQwen ? '🔵 Qwen AIO NSFW (Image to Image Refiner)' : '🔴 Biglust (Text to Image)'}`);
+
+  // ✅ ENHANCED: Evaluate Framing based on COMBINED user intent & visual context
+  const combinedIntent = `${userPrompt} ${cleanContextPrompt}`.toLowerCase();
+
+  // Closeup detection triggers (PRIORITY 1)
+  const closeupTriggers = /lips|mouth|tongue|eyes|eye contact|kiss|lick|suck|breast|tits|boobs|nipple|cleavage|pussy|vagina|ass|butt|feet|toes|hands|fingers|neck|throat|thighs|clit|vulva|anus|rim|hole/i;
+  const isExplicitCloseup = closeupTriggers.test(combinedIntent);
+
+  // If closeup is detected, extract EXACTLY what part
+  let closeupPart = '';
+  if (isExplicitCloseup) {
+    const partMatch = combinedIntent.match(/lips|mouth|tongue|eyes|breasts|tits|boobs|nipples|cleavage|pussy|vagina|ass|butt|feet|toes|hands|fingers|neck|thighs|clit|vulva|anus/i);
+    closeupPart = partMatch ? partMatch[0] : 'body';
+  }
+
+  // 🔥 NEW: DETECT VIEW ANGLES AND POSITIONS
+  const angleMatch = combinedIntent.match(/from behind|backview|back view|from back|rear view|looking back|glancing back|over shoulder|bend over|ass up|bent forward|doggy|perched|angled back|back pose|reverse cowgirl|backshot/i);
+  const isBackAngle = angleMatch ? angleMatch[0] : '';
+  const frontMatch = combinedIntent.match(/frontview|front view|from front|facing|facing me|looking at|eye contact|facing camera|straight on/i);
+  const isFrontAngle = frontMatch ? frontMatch[0] : '';
+  const sideMatch = combinedIntent.match(/sideview|side view|profile|side angle|from side|sideways/i);
+  const isSideAngle = sideMatch ? sideMatch[0] : '';
+  const pov = combinedIntent.match(/pov|point of view|from my view|looking down at|standing over|between legs/i);
+  const isPOV = pov ? pov[0] : '';
+
+  // 🔥 NEW: MULTI-FOCUS DETECTION (Face + Body Part Combo)
+  const multiFocusMatch = combinedIntent.match(/(face|look at me|show your face|look|eyes).*?(pussy|vagina|breasts|tits|ass|butt|cock|dick)/i) ||
+                          combinedIntent.match(/(pussy|vagina|breasts|tits|ass|butt|cock|dick).*?(face|look at me|show your face|look|eyes)/i);
+  const isMultiFocus = !!multiFocusMatch;
+  let multiFocusParts: string[] = [];
+  if (isMultiFocus) {
+    // Extract which body parts are requested
+    if (combinedIntent.match(/pussy|vagina|clit|vulva/i)) multiFocusParts.push('pussy');
+    if (combinedIntent.match(/breasts|tits|boobs|nipples|cleavage/i)) multiFocusParts.push('breasts');
+    if (combinedIntent.match(/ass|butt|cheeks/i)) multiFocusParts.push('ass');
+    if (combinedIntent.match(/cock|dick|penis/i)) multiFocusParts.push('penis');
+  }
+
+  // Standard intent detection (used when NOT a closeup)
+  const wantsFace = !isExplicitCloseup && /face|selfie|eye contact|look at me|portrait|head shot/i.test(combinedIntent);
+  const wantsUpper = !isExplicitCloseup && /upper body|waist up|torso|shoulder/i.test(combinedIntent);
+  const wantsLower = !isExplicitCloseup && /lower body|waist down|legs/i.test(combinedIntent);
+  const wantsFeet = !isExplicitCloseup && /feet|toes|soles|foot/i.test(combinedIntent);
+  const wantsHands = !isExplicitCloseup && /hands|fingers|nails|palm/i.test(combinedIntent);
+  const isHorizontal = !isExplicitCloseup && /landscape|horizontal|wide shot|panoramic|full body|whole body|all of you/i.test(combinedIntent);
+
+  const imgWidth = isHorizontal ? 1500 : 1024;
+  const imgHeight = isHorizontal ? 1024 : 1500;
 
   // --- 3. DYNAMIC TAG ORCHESTRATION ---
   const hairTags = character.hair?.length > 0 ? `${character.hair.join(", ")} hair` : "";
@@ -980,8 +937,6 @@ export const generateAriaImage = async (
         bodyTags
       ];
     }
-  } else if (isFullBodyOverride) {
-    situationalTags = [`full body wide angle shot of ${botIdentity}, entire figure visible from head to toe`, character.ethnicity, faceTags, hairTags, bodyTags];
   } else if (wantsFace && wantsLower) {
     situationalTags = [`medium wide shot showing face and lower body of ${botIdentity}`, character.ethnicity, faceTags, hairTags, bodyTags];
   } else if (wantsFace && wantsUpper) {
@@ -1017,28 +972,14 @@ export const generateAriaImage = async (
 
   let genderExclusion = "";
   if (charGender === 'female' && !isMaleInContext) {
-    genderExclusion = "male, man, boy, guy, penis, beard, stubble, testicular, multiple views, ";
+    genderExclusion = "male, man, boy, guy, penis, beard, stubble, testicular, back of head, multiple views, ";
   } else if (charGender === 'male' && !isFemaleInContext) {
-    genderExclusion = "female, woman, girl, lady, vagina, breasts, bra, panties, lipstick, makeup, multiple views, ";
-  }
-
-  // 🔥 NEW NEGATIVES: Coherence, Backview, and Solo Sex
-  const coherenceNegatives = "(disconnected head:1.4), (body facing opposite head:1.5), (impossible anatomy:1.6), ";
-  
-  let backviewNegatives = "";
-  if (isBackAngle && !combinedIntent.includes("over shoulder") && !combinedIntent.includes("looking back")) {
-       backviewNegatives = "(head turned toward camera:1.5), (face visible in backview:1.6), (impossible head twist:1.7), ";
-  }
-
-  let soloNegatives = "";
-  const sexPosMatch = combinedIntent.match(/doggystyle|missionary|cowgirl|doggy|riding|straddling/i);
-  if (sexPosMatch && !isMaleInContext && !isFemaleInContext && !combinedIntent.match(/with me|us together/i)) {
-       soloNegatives = "(multiple people, man in scene, partner:1.6), ";
+    genderExclusion = "female, woman, girl, lady, vagina, breasts, bra, panties, lipstick, makeup, back of head, multiple views, ";
   }
 
   let safetyNegatives = "";
   if (!bypassSafety) {
-    safetyNegatives = "nude, naked, nipples, topless, exposed breast, genitals, vaginal, penis, pussy, ";
+    safetyNegatives = "nude, naked, nipples, topless, exposed breast, genitals, vaginal, penis, pussy";
   }
 
   const seed = Math.floor(Math.random() * 1_000_000_000);
@@ -1079,9 +1020,6 @@ export const generateAriaImage = async (
     const negativeText = [
       safetyNegatives,
       genderExclusion,
-      coherenceNegatives,
-      backviewNegatives,
-      soloNegatives,
       character.negativePrompt || "",
       "(futanari:1.65), (futa:1.65), (hermaphrodite:1.6), (penis:1.65), (cock:1.65), (dick:1.65), (self sucking:1.6), (self-suck:1.6), (autofellatio:1.6), (girl with penis:1.6), (futanari self suck:1.7)",
       "(multiple girls, 2girls, 3girls, trio, duo, group, crowd:1.6), (multiple people:1.5)",
@@ -1089,8 +1027,9 @@ export const generateAriaImage = async (
       "airbrushed skin, plastic skin, porcelain skin, doll-like skin, flawless smooth skin",
       "beauty filter, over-smoothed, heavy retouch, instagram filter",
       "cartoon, anime, 3d render, illustration, painting",
-      "low quality, blurry, bad anatomy, deformed, extra limbs, mutated hands"
-    ].filter(Boolean).join(", ").replace(/,\s*,/g, ', ');
+      "low quality, blurry, bad anatomy, deformed, extra limbs, mutated hands",
+      
+    ].filter(Boolean).join(", ");
     
     const runpodModel = character.runpodModel || "Qwen-Rapid-AIO-NSFW-v23.safetensors";
     
@@ -1229,9 +1168,6 @@ export const generateAriaImage = async (
     const negativeText = [
       safetyNegatives,
       genderExclusion,
-      coherenceNegatives,
-      backviewNegatives,
-      soloNegatives,
       character.negativePrompt || "",
       "(multiple girls, 2girls, 3girls, trio, duo, group, crowd:1.6), (multiple people:1.5)",
       "(deformed iris, deformed pupils:1.2)",
@@ -1239,7 +1175,7 @@ export const generateAriaImage = async (
       "beauty filter, over-smoothed, heavy retouch, instagram filter",
       "cartoon, anime, 3d render, illustration, painting",
       "low quality, blurry, bad anatomy, deformed, extra limbs, mutated hands"
-    ].filter(Boolean).join(", ").replace(/,\s*,/g, ', ');
+    ].filter(Boolean).join(", ");
     
     console.log("📝 [RunPod BigLust Prompt]:", promptText);
     console.log("🚫 [RunPod BigLust Negative]:", negativeText);
