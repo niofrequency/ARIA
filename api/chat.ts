@@ -1,9 +1,13 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+// AT THE TOP:
 import { buildImageConsistencyPrompt, buildEnrichedImagePrompt, VisualContextMemory } from '../lib/imageConsistency';
 
-// When [[VISUAL:]] tag is detected:
-const metadata = buildImageConsistencyPrompt(userMessage, characterName, visualMemory);
-const enrichedPrompt = buildEnrichedImagePrompt(metadata, baseVisualDescription, characterDescription);
+// INSIDE the handler function, AFTER getting response from Grok:
+if (visualMatch) {
+  const metadata = buildImageConsistencyPrompt(visualMatch[1], "ARIA", visualMemory);
+  const enrichedPrompt = buildEnrichedImagePrompt(metadata, visualMatch[1], "sensual");
+  // Send enrichedPrompt to frontend or generate.ts
+}
 /**
  * ARIA BRAIN PROXY (xAI Grok)
  * Logic:
