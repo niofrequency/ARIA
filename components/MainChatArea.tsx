@@ -50,15 +50,18 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
   const [lastScrollY, setLastScrollY] = useState(0);
   const [isDownloading, setIsDownloading] = useState(false);
   
-  // ✅ FIXED: ADDED THE MISSING STATE VARIABLE HERE
+  // ✅ Global Mood State
   const [showGlobalMood, setShowGlobalMood] = useState(false);
   
   // TTS States
   const [autoTTS, setAutoTTS] = useState(true);
   const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(null);
   
-  // Current bot mood state
-  const [botMood, setBotMood] = useState<BotMood>({
+  // ✅ 1. Find the last known mood from your chat history
+  const lastKnownMoodMsg = [...messages].reverse().find(m => m.role === 'model' && m.botMood);
+
+  // ✅ 2. Initialize state using history (falls back to defaults ONLY for brand new bots)
+  const [botMood, setBotMood] = useState<BotMood>(lastKnownMoodMsg?.botMood || {
     energy: 75,
     confidence: 65,
     horniness: 45,
@@ -70,8 +73,20 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
     minutesSinceLastMessage: 0,
   });
 
-  const [emotionalState, setEmotionalState] = useState<EmotionalState>('playful');
-  const [emotionalIntensity, setEmotionalIntensity] = useState(6);
+  const [emotionalState, setEmotionalState] = useState<EmotionalState>(lastKnownMoodMsg?.emotionalState || 'playful');
+  const [emotionalIntensity, setEmotionalIntensity] = useState(lastKnownMoodMsg?.emotionalIntensity || 6);
+
+  // ✅ 3. Auto-sync the mood when you switch bots or when Firebase finishes loading history
+  useEffect(() => {
+    if (messages && messages.length > 0) {
+      const latestMsg = [...messages].reverse().find(m => m.role === 'model' && m.botMood);
+      if (latestMsg && latestMsg.botMood) {
+        setBotMood(latestMsg.botMood);
+        setEmotionalState(latestMsg.emotionalState || 'playful');
+        setEmotionalIntensity(latestMsg.emotionalIntensity || 6);
+      }
+    }
+  }, [botId, messages]);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -548,8 +563,6 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
           </div>
           
           <div className="flex items-center gap-2">
-            
-            {/* ✅ FIXED: Toggle Live Mood Matrix Button */}
             <button 
               onClick={() => setShowGlobalMood(!showGlobalMood)} 
               className={`p-2.5 rounded-xl transition-all ${showGlobalMood ? 'bg-purple-500/20 text-purple-400' : 'bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10'}`}
@@ -572,7 +585,6 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
           </div>
         </div>
 
-        {/* ✅ FIXED: MoodIndicator JSX Syntax */}
         {showGlobalMood && (
           <div className="absolute top-full right-6 mt-2 w-[300px] z-50 animate-in slide-in-from-top-2 fade-in duration-200 shadow-2xl">
              <MoodIndicator 
