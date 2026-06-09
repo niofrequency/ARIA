@@ -47,9 +47,8 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
   const [showMobileOverlay, setShowMobileOverlay] = useState(false);
 
   // --- HELPER: EXTRACT COMMANDS FROM PARENTHESES ---
-  // For BOT: (commands) are completely hidden from display
-  // For USER: (commands) are shown as badges
-  const extractCommands = (text: string | undefined, role: 'user' | 'model' | 'assistant') => {
+  // Commands are stripped from display text but kept internally
+  const extractCommands = (text: string | undefined) => {
     if (!text) return { displayText: '', commands: [] };
     
     const commandRegex = /\([^)]*\)/g;
@@ -70,11 +69,8 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
   };
 
   // The clean text that the user will actually see
-  const { displayText: cleanedText, commands: allCommands } = extractCommands(message.text, message.role);
+  const { displayText: cleanedText } = extractCommands(message.text);
   const uiText = cleanMessageForUI(cleanedText);
-  
-  // ✅ Only show commands for USER messages, hide for BOT
-  const botCommands = isUser ? allCommands : [];
 
   // --- TYPEWRITER STATE ---
   const [shouldAnimate] = useState(() => {
@@ -114,57 +110,60 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
     }
   };
 
-  // --- HELPER: FORMAT TEXT WITH ASTERISKS & PARENTHESES ---
+  // --- HELPER: FORMAT TEXT WITH ASTERISKS ---
   /**
    * Handles:
-   * **text** → italic (internal feelings)
-   * (command) → stripped from display for bot, shown as badge for user
+   * *text* → italic (internal feelings)
    * Regular text → normal
+   * 
+   * Note: Commands in () are already stripped by extractCommands()
    */
   const formatMessageText = (text: string) => {
     if (!text) return null;
     
     const parts: React.ReactNode[] = [];
-    let buffer = '';
     let i = 0;
 
     while (i < text.length) {
-      // Check for **italic**
-      if (text[i] === '*' && text[i + 1] === '*') {
-        if (buffer) {
-          parts.push(<span key={parts.length}>{buffer}</span>);
-          buffer = '';
-        }
-        
-        // Find closing **
-        let j = i + 2;
+      // Check for *italic* (single asterisks, not double)
+      if (text[i] === '*' && (i === 0 || text[i - 1] !== '*') && text[i + 1] !== '*') {
+        // Find closing *
+        let j = i + 1;
+        let foundClosing = false;
         let italicContent = '';
-        while (j < text.length - 1) {
-          if (text[j] === '*' && text[j + 1] === '*') {
-            italicContent = text.substring(i + 2, j);
+        
+        while (j < text.length) {
+          if (text[j] === '*' && (j === text.length - 1 || text[j + 1] !== '*')) {
+            italicContent = text.substring(i + 1, j);
             parts.push(
               <em key={parts.length} className="italic opacity-75 text-purple-300">
                 {italicContent}
               </em>
             );
-            i = j + 2;
+            i = j + 1;
+            foundClosing = true;
             break;
           }
           j++;
         }
         
-        if (j >= text.length - 1) {
-          buffer += text[i];
+        // If no closing * found, treat it as regular text
+        if (!foundClosing) {
+          parts.push(<span key={parts.length}>{text[i]}</span>);
           i++;
         }
       } else {
-        buffer += text[i];
-        i++;
+        // Regular text - collect until next * or end
+        let j = i;
+        while (j < text.length && text[j] !== '*') {
+          j++;
+        }
+        
+        if (j > i) {
+          parts.push(<span key={parts.length}>{text.substring(i, j)}</span>);
+          i = j;
+        }
       }
-    }
-
-    if (buffer) {
-      parts.push(<span key={parts.length}>{buffer}</span>);
     }
 
     return parts.length > 0 ? parts : null;
@@ -274,21 +273,6 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
               {formatMessageText(displayedText)}
               {!isTypingComplete && !isUser && <span className="inline-block w-1.5 h-3.5 ml-1 bg-purple-400 align-middle animate-pulse" />}
             </p>
-          </div>
-        )}
-
-        {/* USER COMMAND BADGES (Only for user messages) */}
-        {isUser && botCommands.length > 0 && (
-          <div className="mt-2 px-1 flex flex-wrap gap-2">
-            {botCommands.map((cmd, idx) => (
-              <div 
-                key={idx}
-                className="text-[9px] px-2 py-1 rounded-full bg-purple-500/20 border border-purple-500/30 text-purple-300 font-mono"
-                title={cmd}
-              >
-                ⚡ {cmd.slice(1, -1).substring(0, 20)}...
-              </div>
-            ))}
           </div>
         )}
 
