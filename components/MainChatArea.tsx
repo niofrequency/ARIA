@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ChatMessage from './ChatMessage';
-import { Message, CharacterProfile, UserData } from '../types';
+import { Message, CharacterProfile, UserData, BotMood, EmotionalState } from '../types';
 import { generateAriaImage } from '../services/generateAriaImage'; 
 import { initiateNeuralMotion, pollNeuralMotionStatus } from '../services/neuralMotionService';
 import { uploadImageToStorage, deleteMediaFromStorage } from '../services/firebaseService';
@@ -52,6 +52,22 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
   // TTS States
   const [autoTTS, setAutoTTS] = useState(true);
   const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(null);
+  
+  // ✅ NEW: Current bot mood state (update this in your AI service)
+  const [botMood, setBotMood] = useState<BotMood>({
+    energy: 75,
+    confidence: 65,
+    horniness: 45,
+    affection: 80,
+    timeOfDay: 'evening',
+    daysSinceSex: 0,
+    stressLevel: 20,
+    recentConflict: false,
+    minutesSinceLastMessage: 0,
+  });
+
+  const [emotionalState, setEmotionalState] = useState<EmotionalState>('playful');
+  const [emotionalIntensity, setEmotionalIntensity] = useState(6);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -160,7 +176,6 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
       const oldImageUrl = message.imageUrl;
       const oldVideoUrl = message.videoUrl;
 
-      // 🔥 FIX: Reconstruct full history and previous prompts for regeneration
       const history = (messages || []).map(m => {
         let content = m.text || '';
         if (m.role === 'model' && (m.imageUrl || m.videoUrl)) {
@@ -176,7 +191,6 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
         .filter(m => m.role === 'model' && m.imageUrl && m.text)
         .map(m => m.text as string);
 
-      // Pass the fully enriched context down to the generator
       const tempImageUrl = await generateAriaImage(
         message.text || "", 
         lookAnchor, 
@@ -306,7 +320,6 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
     });
 
     try {
-      // REINJECT TAGS INTO HISTORY
       const history = (messages || []).map(m => {
         let content = m.text || '';
         if (m.role === 'model' && (m.imageUrl || m.videoUrl)) {
@@ -318,21 +331,59 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
         };
       });
 
-      // Call Brain Proxy
       const rawResponse = await generateAriaResponse(userText, history, character, userData?.uid, botId);
       
-      // Extract Context
       let { cleanText, contextPrompt, memoryText, gifSearchTerm, youtubeSearchTerm, spicySearchTerm } = extractContextPrompt(rawResponse);
       
       if (memoryText && userData?.uid) {
         storeMemory(memoryText, userData.uid, botId);
       }
 
-      // --- LOGIC: DETERMINE MEDIA TYPE ---
+      // ✅ EXTRACT MOOD FROM RESPONSE (if your AI provides it)
+      // Format: [[MOOD: energy:75, confidence:65, horniness:45, affection:80, state:playful, intensity:6]]
+      const moodRegex = /\[\[MOOD:\s*(.*?)\]\]/i;
+      const moodMatch = rawResponse.match(moodRegex);
+      
+      let newBotMood = botMood;
+      let newEmotionalState = emotionalState;
+      let newIntensity = emotionalIntensity;
+
+      if (moodMatch) {
+        try {
+          const moodData = moodMatch[1];
+          const params = new URLSearchParams(moodData.replace(/,\s*/g, '&'));
+          
+          newBotMood = {
+            energy: parseInt(params.get('energy') || '75'),
+            confidence: parseInt(params.get('confidence') || '65'),
+            horniness: parseInt(params.get('horniness') || '45'),
+            affection: parseInt(params.get('affection') || '80'),
+            timeOfDay: (params.get('timeOfDay') || 'evening') as any,
+            daysSinceSex: parseInt(params.get('daysSinceSex') || '0'),
+            stressLevel: parseInt(params.get('stressLevel') || '20'),
+            recentConflict: params.get('recentConflict') === 'true',
+            minutesSinceLastMessage: parseInt(params.get('minutesSinceLastMessage') || '0'),
+          };
+          
+          newEmotionalState = (params.get('state') || 'playful') as EmotionalState;
+          newIntensity = parseInt(params.get('intensity') || '6');
+          
+          // Remove mood tag from display
+          cleanText = cleanText.replace(moodRegex, '').trim();
+          
+          setBotMood(newBotMood);
+          setEmotionalState(newEmotionalState);
+          setEmotionalIntensity(newIntensity);
+          
+          console.log('✅ Mood Updated:', newBotMood, newEmotionalState, newIntensity);
+        } catch (e) {
+          console.error('⚠️ Mood parse error:', e);
+        }
+      }
+
       let finalImageUrl = undefined;
       let finalVideoUrl = undefined;
 
-      // 1. CHECK: Real GIF
       if (gifSearchTerm) {
           try {
               const gifUrl = await fetchGiphyUrl(gifSearchTerm);
@@ -340,7 +391,6 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
           } catch(e) { console.error("Giphy failed", e); }
       }
 
-      // 2. CHECK: Real Video (YouTube)
       if (youtubeSearchTerm) {
           try {
               const ytUrl = await fetchYoutubeUrl(youtubeSearchTerm);
@@ -348,7 +398,6 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
           } catch(e) { console.error("YouTube failed", e); }
       }
 
-      // 3. CHECK: SPICY CONTENT (Adult)
       if (!spicySearchTerm) {
         const spicyRegex = /[\[\{]{2}\s*SPICY\s*:\s*([\s\S]*?)\s*[\]\}]{2}/i;
         const spicyMatch = cleanText.match(spicyRegex) || rawResponse.match(spicyRegex);
@@ -367,18 +416,20 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
 
       const shouldGenerateImage = !!contextPrompt && !finalVideoUrl && !finalImageUrl;
 
-      // 4. SEND BOT RESPONSE
+      // ✅ ATTACH MOOD TO MESSAGE
       onSendMessage({
           id: responseMessageId,
           role: 'model',
           text: cleanText,
           imageUrl: finalImageUrl,
           videoUrl: finalVideoUrl,
-          isImageLoading: shouldGenerateImage, 
+          isImageLoading: shouldGenerateImage,
+          botMood: newBotMood,
+          emotionalState: newEmotionalState,
+          emotionalIntensity: newIntensity,
           timestamp: Date.now()
       });
 
-      // TRIGGER TEXT TO SPEECH (Auto-Speech)
       if (cleanText && autoTTS) {
         const speechText = cleanText.replace(/\*.*?\*/g, '').trim();
         if (speechText.length > 0) {
@@ -386,17 +437,14 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
         }
       }
 
-      // 5. TRIGGER AI IMAGE GENERATION
       if (shouldGenerateImage) {
         try {
           const promptToUse = contextPrompt || userText;
           
-          // 🔥 Extract previous visual styles
           const previousImagePrompts = messages
             .filter(m => m.role === 'model' && m.imageUrl && m.text)
             .map(m => m.text as string);
 
-          // 🔥 FIX: Build proper conversation history for enrichment
           const conversationHistoryForEnrichment = (messages || []).map(m => ({
             role: m.role === 'model' || m.role === 'assistant' ? 'assistant' : 'user',
             content: m.text || ''
@@ -407,7 +455,7 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
             userText, 
             character,
             undefined, 
-            conversationHistoryForEnrichment,  // ✅ Use this instead of history
+            conversationHistoryForEnrichment,
             previousImagePrompts
           );
           
@@ -451,7 +499,6 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
   const downloadMedia = async (url: string, type: string) => {
     if (isDownloading) return;
     
-    // Don't try to download embeds/youtube (CORS/Safety)
     if (type === 'embed' || type === 'youtube') {
         window.open(url, '_blank');
         return;
