@@ -62,6 +62,9 @@ export interface VisualState {
   fluids: string[]; // e.g., "sweaty", "tears", etc.
   arousalLevel: number; // 0-10
   timestamp: number;
+  shotType?: ShotType;
+  cameraAngle?: CameraAngle;
+  sexualPosition?: SexualPosition;
 }
 
 export interface Conversation {
