@@ -283,18 +283,17 @@ STRICT OPERATING RULES:
 
 /**
  * GENERATE AI RESPONSE
- * Now with Long-Term Vector Memory Recall
+ * Now with Long-Term Vector Memory Recall & Backend Mood Injection
  */
 export const generateAriaResponse = async (
   prompt: string,
   history: any[], 
   character: CharacterProfile,
-  userId?: string, // <--- Param 4: User ID for Memory lookup
-  botId?: string   // <--- Param 5: Bot ID to keep memories separate
+  userId?: string,
+  botId?: string
 ): Promise<string> => {
   try {
-    // 1. MEMORY RECALL (The "Thought Process")
-    // Before speaking, check the database for relevant facts based on the user's prompt.
+    // 1. MEMORY RECALL
     let memoryContext = "";
     
     if (userId && botId) {
@@ -302,7 +301,6 @@ export const generateAriaResponse = async (
         const relevantMemories = await retrieveMemories(prompt, userId, botId);
         
         if (relevantMemories && relevantMemories.length > 0) {
-          // Inject facts into the context so Grok knows them
           memoryContext = `
     ### LONG-TERM MEMORY (RELEVANT FACTS)
     The user has previously mentioned these facts. Use them to personalize your response, but do NOT explicitly say "I remember you said...":
@@ -328,7 +326,7 @@ export const generateAriaResponse = async (
       { role: "user", content: prompt }
     ];
 
-    // 4. Send to Grok
+    // 4. Send to Vercel Proxy (Grok)
     const response = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -345,9 +343,21 @@ export const generateAriaResponse = async (
     }
 
     const data = await response.json();
-    const content = data.choices[0]?.message?.content;
+    let content = data.choices[0]?.message?.content || "";
     
-    return content ? content.trim() : "I'm lost in thought... 💕";
+    // ✅ CRITICAL FIX: Bridge the backend calculated mood to the frontend UI
+    // We inject the aria_meta data into the string as a hidden tag using '=' so URLSearchParams can read it.
+    if (data.aria_meta && data.aria_meta.botMood) {
+      const m = data.aria_meta.botMood;
+      const state = data.aria_meta.emotionalState || 'playful';
+      const intensity = data.aria_meta.emotionalIntensity || 6;
+      
+      const moodStr = `[[MOOD: energy=${m.energy}, confidence=${m.confidence}, horniness=${m.horniness}, affection=${m.affection}, state=${state}, intensity=${intensity}, timeOfDay=${m.timeOfDay}, daysSinceSex=${m.daysSinceSex}, stressLevel=${m.stressLevel}, recentConflict=${m.recentConflict}, minutesSinceLastMessage=${m.minutesSinceLastMessage}]]`;
+      
+      content += ` \n${moodStr}`;
+    }
+
+    return content.trim() || "I'm lost in thought... 💕";
 
   } catch (err: any) {
     console.error("❌ AI Service Error:", err);
