@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { BotMood, EmotionalState } from '../types';
 import { Heart, Zap, Brain, Flame, AlertCircle } from 'lucide-react';
 
@@ -15,6 +15,21 @@ const MoodIndicator: React.FC<MoodIndicatorProps> = ({
   emotionalIntensity = 5,
   compact = false 
 }) => {
+  // ✅ ADDED: State to track the real-life time
+  const [realTime, setRealTime] = useState<string>('');
+
+  useEffect(() => {
+    // Format the current time (e.g., "6:08 PM")
+    const updateTime = () => {
+      setRealTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+    };
+    
+    updateTime(); // Set initially
+    const interval = setInterval(updateTime, 60000); // Update every minute
+    
+    return () => clearInterval(interval);
+  }, []);
+
   if (!botMood && !emotionalState) return null;
 
   // --- EMOTIONAL STATE STYLING ---
@@ -191,8 +206,9 @@ const MoodIndicator: React.FC<MoodIndicatorProps> = ({
                   ⚠️ Recent Conflict
                 </div>
               )}
-              <div className="text-[9px] px-2 py-1 rounded-full bg-purple-500/20 border border-purple-500/30 text-purple-300 font-bold">
-                {botMood.timeOfDay.charAt(0).toUpperCase() + botMood.timeOfDay.slice(1)}
+              {/* ✅ CHANGED: Now displays the real-world local time */}
+              <div className="text-[9px] px-2 py-1 rounded-full bg-purple-500/20 border border-purple-500/30 text-purple-300 font-bold tracking-widest uppercase">
+                🕒 {realTime || 'SYNCING...'}
               </div>
             </div>
           </div>
