@@ -1,5 +1,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { buildImageConsistencyPrompt, buildEnrichedImagePrompt, VisualContextMemory } from '../lib/imageConsistency';
 
+// When [[VISUAL:]] tag is detected:
+const metadata = buildImageConsistencyPrompt(userMessage, characterName, visualMemory);
+const enrichedPrompt = buildEnrichedImagePrompt(metadata, baseVisualDescription, characterDescription);
 /**
  * ARIA BRAIN PROXY (xAI Grok)
  * Logic:
