@@ -104,7 +104,6 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
   };
 
   // --- HELPER: FORMAT TEXT WITH ASTERISKS FOR ITALICS ---
-  // ✅ NOW PROPERLY HANDLES *italic text* WITH COLORED STYLING
   const formatMessageText = (text: string) => {
     if (!text) return null;
     
@@ -112,15 +111,12 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
     let i = 0;
 
     while (i < text.length) {
-      // Look for single asterisk
       if (text[i] === '*') {
-        // Find the closing asterisk
         let j = i + 1;
         let foundClosing = false;
 
         while (j < text.length) {
           if (text[j] === '*') {
-            // Found closing asterisk
             const italicContent = text.substring(i + 1, j);
             
             parts.push(
@@ -136,12 +132,10 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
         }
 
         if (!foundClosing) {
-          // No closing asterisk found, treat as regular text
           parts.push(<span key={parts.length}>{text[i]}</span>);
           i++;
         }
       } else {
-        // Regular text - collect until next asterisk
         let j = i;
         while (j < text.length && text[j] !== '*') {
           j++;
@@ -233,7 +227,6 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
     (!message.videoUrl && message.imageUrl)
   );
 
-  // Check if bot message has mood data
   const hasMoodData = !isUser && (message.botMood || message.emotionalState);
 
   return (
@@ -248,7 +241,6 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
             </span>
             {isUser && <User className="w-3 h-3 text-zinc-500" />}
             
-            {/* Mood Toggle Button for Bot Messages */}
             {hasMoodData && (
               <button 
                 onClick={() => setShowMoodIndicator(!showMoodIndicator)}
@@ -369,16 +361,17 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
 
               {(mediaType === 'video_file' || (!message.videoUrl && message.imageUrl)) && (
                   <>
-                    <div className={`absolute inset-0 flex flex-col items-center justify-center gap-3 backdrop-blur-[2px] transition-all duration-300 pointer-events-none ${showMobileOverlay ? 'bg-black/60' : 'bg-black/0 group-hover:bg-black/50'}`}>
+                    {/* ✅ FIXED: Added opacity-0 and group-hover:opacity-100 to completely hide the overlay until hovered/tapped */}
+                    <div className={`absolute inset-0 flex flex-col items-center justify-center gap-3 backdrop-blur-[2px] transition-all duration-300 pointer-events-none ${showMobileOverlay ? 'bg-black/60 opacity-100' : 'opacity-0 group-hover:opacity-100 bg-black/0 group-hover:bg-black/50'}`}>
                         <button 
                             onClick={(e) => { e.stopPropagation(); setShowMobileOverlay(false); onAnimateRequest(message); }} 
-                            className="pointer-events-auto flex items-center gap-2 px-5 py-2.5 bg-white text-black rounded-full font-black text-[10px] uppercase tracking-tighter hover:bg-purple-500 hover:text-white transition-all"
+                            className="pointer-events-auto flex items-center gap-2 px-5 py-2.5 bg-white text-black rounded-full font-black text-[10px] uppercase tracking-tighter hover:bg-purple-500 hover:text-white transition-all shadow-lg"
                         >
                             <Film className="w-3.5 h-3.5" /> Neural Motion
                         </button>
                         <button 
                             onClick={(e) => { e.stopPropagation(); setShowMobileOverlay(false); onMediaClick(message.imageUrl!, 'image'); }} 
-                            className="pointer-events-auto text-white/70 hover:text-white text-[9px] uppercase tracking-[0.2em] font-bold py-1"
+                            className="pointer-events-auto text-white/70 hover:text-white text-[9px] uppercase tracking-[0.2em] font-bold py-1 drop-shadow-md"
                         >
                             View Fullscreen
                         </button>
@@ -398,7 +391,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
                     
                     {!message.isVideoLoading && (
                         <div className={`absolute top-3 right-3 transition-opacity pointer-events-none ${showMobileOverlay ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
-                            <div className="bg-black/50 backdrop-blur-md p-1.5 rounded-lg border border-white/10">
+                            <div className="bg-black/50 backdrop-blur-md p-1.5 rounded-lg border border-white/10 shadow-lg">
                                 {message.videoUrl && viewMode === 'video' ? <Maximize2 className="w-3.5 h-3.5 text-white" /> : <ZoomIn className="w-3.5 h-3.5 text-white" />}
                             </div>
                         </div>
