@@ -14,6 +14,7 @@ import {
   deleteBotFromFirestore,
   uploadImageToStorage 
 } from '../services/firebaseService';
+import { generateAriaResponse, extractContextPrompt } from '../services/ariaService';
 
 export type ViewState = 'discover' | 'create' | 'chat';
 
@@ -55,6 +56,7 @@ const ChatDashboard: React.FC<ChatDashboardProps> = ({
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isDesktopSidebarOpen, setIsDesktopSidebarOpen] = useState(true);
   const [isLoadingResponse, setIsLoadingResponse] = useState(false);
+  const [autonomyEnabled, setAutonomyEnabled] = useState(true);
   
   // View & Routing States
   const [activeView, setActiveView] = useState<ViewState>('discover');
@@ -204,7 +206,7 @@ const ChatDashboard: React.FC<ChatDashboardProps> = ({
     if (botConvs.length > 0) {
       setCurrentConversationId(botConvs[0].id);
     } else {
-      handleNewConversation(botId, true);
+      handleNewConversation(botId, true, autonomyEnabled);
     }
     setActiveView('chat');
     setIsMobileSidebarOpen(false);
@@ -233,31 +235,95 @@ const ChatDashboard: React.FC<ChatDashboardProps> = ({
     
     saveBotToFirestore(userData.uid, newBot).catch(err => console.error("Save failed:", err));
     
-    handleNewConversation(newBotId, true);
-    setActiveView('chat'); // Instantly drop into the chat view
+    // ✅ ENABLE AUTONOMOUS GREETING ON CREATION
+    await handleNewConversation(newBotId, true, autonomyEnabled);
+    setActiveView('chat');
   };
 
-  const handleNewConversation = async (botId: string, skipInitialMessage = false) => {
+  const handleNewConversation = async (botId: string, skipInitialMessage = false, generateGreeting = false) => {
     if (!userData?.uid) return;
     const bot = bots.find(b => b.id === botId);
     const newConvId = generateUniqueId('conv');
+    
     const messages: Message[] = skipInitialMessage ? [] : [{ 
       id: generateUniqueId('msg'), role: 'model', 
       text: `Link established. I am ${bot?.name || 'Aria'}. Ready for input.`, timestamp: Date.now() 
     }];
+    
     const newConversation: Conversation = { 
         id: newConvId, 
         title: `Session ${new Date().toLocaleDateString()}`, 
         messages, 
         timestamp: Date.now() 
     };
+    
     setConversations(prev => {
         const next = new Map(prev);
         const list = next.get(botId) || [];
         return next.set(botId, [newConversation, ...list]);
     });
+    
     await saveConversationToFirestore(userData.uid, botId, newConversation);
     setCurrentConversationId(newConvId);
+    
+    // ✅ TRIGGER AUTONOMOUS GREETING IF ENABLED
+    if (generateGreeting && bot) {
+      console.log("🤖 Triggering autonomous greeting for:", bot.name);
+      triggerAutonomousGreeting(botId, newConvId, bot);
+    }
+  };
+
+  // ✅ NEW: Autonomous greeting function
+  const triggerAutonomousGreeting = async (botId: string, conversationId: string, bot: Bot) => {
+    try {
+      setIsLoadingResponse(true);
+      
+      // Generate a proactive opening line based on bot personality
+      const greetingPrompt = `You are ${bot.name}. Your personality: ${bot.characterProfile.vibe}. Generate a brief, warm, and engaging opening line to start the conversation. Be authentic and inviting. Keep it under 80 characters.`;
+      
+      // Call your AI service with the greeting prompt
+      const greeting = await generateAriaResponse(greetingPrompt, [], bot.characterProfile, userData?.uid, botId);
+      
+      const { cleanText } = extractContextPrompt(greeting);
+      
+      console.log("✅ Autonomous greeting generated:", cleanText);
+      
+      // Add the autonomous message to the conversation
+      const autonomousMessage: Message = {
+        id: generateUniqueId('msg'),
+        role: 'model',
+        text: cleanText || `Hey, I'm ${bot.name}! What would you like to talk about?`,
+        timestamp: Date.now()
+      };
+      
+      // Update conversation with autonomous greeting
+      setConversations(prev => {
+        const next = new Map(prev);
+        const botConvs = [...(next.get(botId) || [])];
+        
+        const updatedConvs = botConvs.map(conv => {
+          if (conv.id === conversationId) {
+            const updatedConv = {
+              ...conv,
+              messages: [...conv.messages, autonomousMessage],
+              timestamp: Date.now()
+            };
+            
+            // Persist to Firebase
+            saveConversationToFirestore(userData.uid!, botId, updatedConv);
+            return updatedConv;
+          }
+          return conv;
+        });
+        
+        return next.set(botId, updatedConvs);
+      });
+      
+    } catch (err) {
+      console.error("❌ Autonomous Greeting Failed:", err);
+    } finally {
+      setIsLoadingResponse(false);
+    }
   };
 
   const handleDeleteBot = async (botId: string) => {
@@ -369,7 +435,7 @@ const ChatDashboard: React.FC<ChatDashboardProps> = ({
         onToggleMobileSidebar={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
         isDesktopSidebarOpen={isDesktopSidebarOpen}
         onToggleDesktopSidebar={() => setIsDesktopSidebarOpen(prev => !prev)}
-        activeView={activeView as any} // Pass the state so Sidebar can highlight the active tab
+        activeView={activeView as any}
         setActiveView={setActiveView as any} 
       />
       
@@ -423,6 +489,13 @@ const ChatDashboard: React.FC<ChatDashboardProps> = ({
             setIsLoading={setIsLoadingResponse}
           />
         )}
+        
+        {/* DEBUG: Autonomy Status Indicator */}
+        <div className="absolute bottom-2 right-2 text-xs text-purple-400 font-mono z-20 bg-black/50 px-2 py-1 rounded">
+          {isLoadingResponse && '🔄 Bot generating...'}
+          {!isLoadingResponse && autonomyEnabled && currentMessages.length > 0 && '✅ Autonomy: ON'}
+          {!autonomyEnabled && '⏸️ Autonomy: OFF'}
+        </div>
       </main>
 
       {/* Settings Modal stays as an overlay */}
