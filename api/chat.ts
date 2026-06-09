@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { buildImageConsistencyPrompt, buildEnrichedImagePrompt, VisualContextMemory, debugImagePromptAnalysis } from '../lib/imageConsistency';
+import { buildImageConsistencyPrompt, buildEnrichedImagePrompt, VisualContextMemory, debugImagePromptAnalysis } from '../lib/imageConsistency.js';
 import { 
   buildAutonomySystemPrompt,
   calculateBotMood,
@@ -9,8 +9,8 @@ import {
   calculateEmotionalProgression,
   updateCharacterMemoryFromInteraction,
   type AutonomyDecision
-} from '../lib/botAutonomy';
-import { VisualState } from '../types';
+} from '../lib/botAutonomy.js';
+import { type VisualState } from '../types.js';
 
 /**
  * ARIA BRAIN PROXY (xAI Grok) - ENHANCED WITH AUTONOMY & REALISM
