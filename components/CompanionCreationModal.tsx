@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { CharacterProfile } from '../types';
 import { generateAriaImage } from '../services/generateAriaImage';
 import { 
-  Sparkles, Cpu, Fingerprint, Activity, Loader2, Plus, Box, Camera, Upload, Server, ArrowRight, ArrowLeft, CheckCircle2, Menu, PanelLeft, ChevronDown, Volume2, Play, X } from 'lucide-react';
+  Sparkles, Cpu, Fingerprint, Activity, Loader2, Plus, Box, Camera, Upload, Server, ArrowRight, ArrowLeft, CheckCircle2, Menu, PanelLeft, ChevronDown, Volume2, Play, X 
+} from 'lucide-react';
 
 import { playAriaSpeech } from '../services/ttsService'; // ✅ ADDED TTS IMPORT
 
@@ -327,7 +328,8 @@ const CompanionCreationModal: React.FC<CompanionCreationModalProps> = ({
             {isVoiceDropdownOpen && (
               <>
                 <div className="fixed inset-0 z-[110]" onClick={() => setIsVoiceDropdownOpen(false)} />
-                <div className="absolute top-full mt-2 left-0 right-0 z-[120] bg-zinc-900 border border-purple-500/20 rounded-xl shadow-[0_0_30px_rgba(0,0,0,0.8)] max-h-[250px] overflow-y-auto custom-scrollbar">
+                {/* ✅ FIXED FOR MOBILE: Added bottom-full (opens UP instead of down) and overscroll-contain touch-pan-y */}
+                <div className="absolute bottom-full mb-2 left-0 right-0 z-[120] bg-zinc-900 border border-purple-500/20 rounded-xl shadow-[0_0_30px_rgba(0,0,0,0.8)] max-h-[250px] overflow-y-auto overscroll-contain touch-pan-y custom-scrollbar">
                   <button
                     type="button"
                     onClick={() => {
@@ -609,7 +611,8 @@ const CompanionCreationModal: React.FC<CompanionCreationModalProps> = ({
                     {isModelDropdownOpen && (
                       <>
                         <div className="fixed inset-0 z-[110]" onClick={() => setIsModelDropdownOpen(false)} />
-                        <div className="absolute top-full left-0 right-0 mt-2 z-[120] bg-zinc-900 border border-purple-500/20 rounded-xl shadow-[0_0_30px_rgba(0,0,0,0.8)] overflow-hidden">
+                        {/* ✅ FIXED FOR MOBILE: Added overscroll-contain and touch-pan-y */}
+                        <div className="absolute top-full left-0 right-0 mt-2 z-[120] bg-zinc-900 border border-purple-500/20 rounded-xl shadow-[0_0_30px_rgba(0,0,0,0.8)] max-h-[250px] overflow-y-auto overscroll-contain touch-pan-y custom-scrollbar">
                           {RUNPOD_MODELS.map(m => (
                             <button
                               key={m.id}
@@ -668,7 +671,8 @@ const CompanionCreationModal: React.FC<CompanionCreationModalProps> = ({
                     {isLoraDropdownOpen && (
                       <>
                         <div className="fixed inset-0 z-[110]" onClick={() => setIsLoraDropdownOpen(false)} />
-                        <div className="absolute bottom-full mb-2 left-0 right-0 z-[120] bg-zinc-900 border border-purple-500/20 rounded-xl shadow-[0_0_30px_rgba(0,0,0,0.8)] max-h-[250px] overflow-y-auto custom-scrollbar">
+                        {/* ✅ FIXED FOR MOBILE: Added overscroll-contain and touch-pan-y */}
+                        <div className="absolute bottom-full mb-2 left-0 right-0 z-[120] bg-zinc-900 border border-purple-500/20 rounded-xl shadow-[0_0_30px_rgba(0,0,0,0.8)] max-h-[250px] overflow-y-auto overscroll-contain touch-pan-y custom-scrollbar">
                           {LORA_OPTIONS.filter(opt => !(formData.activeRunpodLoras || []).find(l => l.id === opt.id)).map(opt => (
                             <button
                               key={opt.id}
