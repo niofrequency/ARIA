@@ -611,19 +611,71 @@ export const generateAriaImage = async (
     .replace(/[\[\]\{\}]/g, '') 
     .trim() : "";
 
-// 🔥 NEW: INJECT ENRICHMENT PIPELINE 🔥
-let enrichedPrompt = cleanContextPrompt;
-if (conversationHistory && conversationHistory.length > 0) {
-  const enrichmentResult = await enrichImagePrompt(
-    cleanContextPrompt,
-    conversationHistory,
-    character.vibe || "casual",
-    previousImagePrompts
-  );
-  enrichedPrompt = enrichmentResult;
-}
+  // 🔥 NEW: INJECT ENRICHMENT PIPELINE 🔥
+  let enrichedPrompt = cleanContextPrompt;
+  if (conversationHistory && conversationHistory.length > 0) {
+    const enrichmentResult = await enrichImagePrompt(
+      cleanContextPrompt,
+      conversationHistory,
+      character.vibe || "casual",
+      previousImagePrompts
+    );
+    enrichedPrompt = enrichmentResult;
+  }
 
-cleanContextPrompt = enrichedPrompt;
+  cleanContextPrompt = enrichedPrompt;
+
+  // ✅ ENHANCED: Evaluate Framing based on COMBINED user intent & visual context
+  // MOVED UP to intercept intents before prompt assembly
+  const combinedIntent = `${userPrompt} ${cleanContextPrompt}`.toLowerCase();
+
+  // Closeup detection triggers (PRIORITY 1)
+  const closeupTriggers = /lips|mouth|tongue|eyes|eye contact|kiss|lick|suck|breast|tits|boobs|nipple|cleavage|pussy|vagina|ass|butt|feet|toes|hands|fingers|neck|throat|thighs|clit|vulva|anus|rim|hole/i;
+  const isExplicitCloseup = closeupTriggers.test(combinedIntent);
+
+  // If closeup is detected, extract EXACTLY what part
+  let closeupPart = '';
+  if (isExplicitCloseup) {
+    const partMatch = combinedIntent.match(/lips|mouth|tongue|eyes|breasts|tits|boobs|nipples|cleavage|pussy|vagina|ass|butt|feet|toes|hands|fingers|neck|thighs|clit|vulva|anus/i);
+    closeupPart = partMatch ? partMatch[0] : 'body';
+  }
+
+  // 🔥 NEW: DETECT VIEW ANGLES AND POSITIONS
+  const angleMatch = combinedIntent.match(/from behind|backview|back view|from back|rear view|looking back|glancing back|over shoulder|bend over|ass up|bent forward|doggy|perched|angled back|back pose|reverse cowgirl|backshot/i);
+  const isBackAngle = angleMatch ? angleMatch[0] : '';
+  const frontMatch = combinedIntent.match(/frontview|front view|from front|facing|facing me|looking at|eye contact|facing camera|straight on/i);
+  const isFrontAngle = frontMatch ? frontMatch[0] : '';
+  const sideMatch = combinedIntent.match(/sideview|side view|profile|side angle|from side|sideways/i);
+  const isSideAngle = sideMatch ? sideMatch[0] : '';
+  const pov = combinedIntent.match(/pov|first person view|point of view|from my view|looking down at|standing over|between legs/i);
+  const isPOV = pov ? pov[0] : '';
+
+  // User Overrides for Framing
+  const isFullBodyOverride = combinedIntent.includes("full body") || combinedIntent.includes("far shot");
+
+  // 🔥 NEW: MULTI-FOCUS DETECTION (Face + Body Part Combo)
+  const multiFocusMatch = combinedIntent.match(/(face|look at me|show your face|look|eyes).*?(pussy|vagina|breasts|tits|ass|butt|cock|dick)/i) ||
+                          combinedIntent.match(/(pussy|vagina|breasts|tits|ass|butt|cock|dick).*?(face|look at me|show your face|look|eyes)/i);
+  const isMultiFocus = !!multiFocusMatch;
+  let multiFocusParts: string[] = [];
+  if (isMultiFocus) {
+    // Extract which body parts are requested
+    if (combinedIntent.match(/pussy|vagina|clit|vulva/i)) multiFocusParts.push('pussy');
+    if (combinedIntent.match(/breasts|tits|boobs|nipples|cleavage/i)) multiFocusParts.push('breasts');
+    if (combinedIntent.match(/ass|butt|cheeks/i)) multiFocusParts.push('ass');
+    if (combinedIntent.match(/cock|dick|penis/i)) multiFocusParts.push('penis');
+  }
+
+  // Standard intent detection (used when NOT a closeup)
+  const wantsFace = !isExplicitCloseup && /face|selfie|eye contact|look at me|portrait|head shot/i.test(combinedIntent);
+  const wantsUpper = !isExplicitCloseup && /upper body|waist up|torso|shoulder/i.test(combinedIntent);
+  const wantsLower = !isExplicitCloseup && /lower body|waist down|legs/i.test(combinedIntent);
+  const wantsFeet = !isExplicitCloseup && /feet|toes|soles|foot/i.test(combinedIntent);
+  const wantsHands = !isExplicitCloseup && /hands|fingers|nails|palm/i.test(combinedIntent);
+  const isHorizontal = !isExplicitCloseup && /landscape|horizontal|wide shot|panoramic|full body|whole body|all of you/i.test(combinedIntent);
+
+  const imgWidth = isHorizontal ? 1500 : 1024;
+  const imgHeight = isHorizontal ? 1024 : 1500;
 
   // === DYNAMIC BOT CUSTOMIZATION & CLOTHING LOGIC ===
   let targetClothing = visualState?.clothing || '';
@@ -659,10 +711,29 @@ cleanContextPrompt = enrichedPrompt;
   // Force strong continuity
   enhancedPrompt = `${character.name}, ${character.ethnicity}, ${enhancedPrompt}, consistent appearance, same girl, continuing from previous scene`;
 
-  // Cleanup
+  // Cleanup spaces and commas
   enhancedPrompt = enhancedPrompt.replace(/^[\s,]+|[\s,]+$/g, '').replace(/,\s*,/g, ', ');
 
-  const rawCombined = `${enhancedPrompt}`.trim();
+  // === CLEAN & FORCE SHOT TYPE (Critical Fix) ===
+  let finalPromptBase = enhancedPrompt
+    .replace(/context: .*?(?=,|$)/gi, '')           // Remove noisy context completely
+    .replace(/previous style: .*?(?=,|$)/gi, '')    // Remove previous style noise
+    .replace(/\s+/g, ' ')
+    .replace(/,\s*,/g, ', ')
+    .trim();
+
+  // Force shot type at the VERY START based on evaluated intent
+  if (combinedIntent.includes("full body") || combinedIntent.includes("far shot") || isFullBodyOverride) {
+    finalPromptBase = `full body / far shot, ${finalPromptBase}`;
+  } else if (isExplicitCloseup || combinedIntent.includes("closeup")) {
+    finalPromptBase = `extreme closeup shot, ${finalPromptBase}`;
+  } else if (isPOV) {
+    finalPromptBase = `POV shot from user's perspective, ${finalPromptBase}`;
+  } else {
+    finalPromptBase = `medium / half-body shot, ${finalPromptBase}`;
+  }
+
+  const rawCombined = `${finalPromptBase}`.trim();
   const baseDescription = rawCombined;
 
   if (!baseDescription) {
@@ -724,57 +795,6 @@ cleanContextPrompt = enrichedPrompt;
   // ==================== SMART MODEL DECISION ====================
   const useQwen = !!character.avatarImage;
   console.log(`🎯 Model Decision → ${useQwen ? '🔵 Qwen AIO NSFW (Image to Image Refiner)' : '🔴 Biglust (Text to Image)'}`);
-
-  // ✅ ENHANCED: Evaluate Framing based on COMBINED user intent & visual context
-  const combinedIntent = `${userPrompt} ${cleanContextPrompt}`.toLowerCase();
-
-  // Closeup detection triggers (PRIORITY 1)
-  const closeupTriggers = /lips|mouth|tongue|eyes|eye contact|kiss|lick|suck|breast|tits|boobs|nipple|cleavage|pussy|vagina|ass|butt|feet|toes|hands|fingers|neck|throat|thighs|clit|vulva|anus|rim|hole/i;
-  const isExplicitCloseup = closeupTriggers.test(combinedIntent);
-
-  // If closeup is detected, extract EXACTLY what part
-  let closeupPart = '';
-  if (isExplicitCloseup) {
-    const partMatch = combinedIntent.match(/lips|mouth|tongue|eyes|breasts|tits|boobs|nipples|cleavage|pussy|vagina|ass|butt|feet|toes|hands|fingers|neck|thighs|clit|vulva|anus/i);
-    closeupPart = partMatch ? partMatch[0] : 'body';
-  }
-
-  // 🔥 NEW: DETECT VIEW ANGLES AND POSITIONS
-  const angleMatch = combinedIntent.match(/from behind|backview|back view|from back|rear view|looking back|glancing back|over shoulder|bend over|ass up|bent forward|doggy|perched|angled back|back pose|reverse cowgirl|backshot/i);
-  const isBackAngle = angleMatch ? angleMatch[0] : '';
-  const frontMatch = combinedIntent.match(/frontview|front view|from front|facing|facing me|looking at|eye contact|facing camera|straight on/i);
-  const isFrontAngle = frontMatch ? frontMatch[0] : '';
-  const sideMatch = combinedIntent.match(/sideview|side view|profile|side angle|from side|sideways/i);
-  const isSideAngle = sideMatch ? sideMatch[0] : '';
-  const pov = combinedIntent.match(/pov|first person view|point of view|from my view|looking down at|standing over|between legs/i);
-  const isPOV = pov ? pov[0] : '';
-
-  // User Overrides for Framing
-  const isFullBodyOverride = combinedIntent.includes("full body") || combinedIntent.includes("far shot");
-
-  // 🔥 NEW: MULTI-FOCUS DETECTION (Face + Body Part Combo)
-  const multiFocusMatch = combinedIntent.match(/(face|look at me|show your face|look|eyes).*?(pussy|vagina|breasts|tits|ass|butt|cock|dick)/i) ||
-                          combinedIntent.match(/(pussy|vagina|breasts|tits|ass|butt|cock|dick).*?(face|look at me|show your face|look|eyes)/i);
-  const isMultiFocus = !!multiFocusMatch;
-  let multiFocusParts: string[] = [];
-  if (isMultiFocus) {
-    // Extract which body parts are requested
-    if (combinedIntent.match(/pussy|vagina|clit|vulva/i)) multiFocusParts.push('pussy');
-    if (combinedIntent.match(/breasts|tits|boobs|nipples|cleavage/i)) multiFocusParts.push('breasts');
-    if (combinedIntent.match(/ass|butt|cheeks/i)) multiFocusParts.push('ass');
-    if (combinedIntent.match(/cock|dick|penis/i)) multiFocusParts.push('penis');
-  }
-
-  // Standard intent detection (used when NOT a closeup)
-  const wantsFace = !isExplicitCloseup && /face|selfie|eye contact|look at me|portrait|head shot/i.test(combinedIntent);
-  const wantsUpper = !isExplicitCloseup && /upper body|waist up|torso|shoulder/i.test(combinedIntent);
-  const wantsLower = !isExplicitCloseup && /lower body|waist down|legs/i.test(combinedIntent);
-  const wantsFeet = !isExplicitCloseup && /feet|toes|soles|foot/i.test(combinedIntent);
-  const wantsHands = !isExplicitCloseup && /hands|fingers|nails|palm/i.test(combinedIntent);
-  const isHorizontal = !isExplicitCloseup && /landscape|horizontal|wide shot|panoramic|full body|whole body|all of you/i.test(combinedIntent);
-
-  const imgWidth = isHorizontal ? 1500 : 1024;
-  const imgHeight = isHorizontal ? 1024 : 1500;
 
   // --- 3. DYNAMIC TAG ORCHESTRATION ---
   const hairTags = character.hair?.length > 0 ? `${character.hair.join(", ")} hair` : "";
