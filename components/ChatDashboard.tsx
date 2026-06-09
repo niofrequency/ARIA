@@ -8,7 +8,7 @@ import DefaultCompanionsModal from './DefaultCompanionsModal';
 import LoadingScreen from './LoadingScreen';
 import { 
   saveBotToFirestore, 
-  loadBotsFromFirestore, 
+  loadBotsFromFirestore,  
   saveConversationToFirestore,  
   loadConversationsFromFirestore,
   deleteBotFromFirestore,
