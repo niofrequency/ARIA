@@ -4,13 +4,14 @@ import { Message, CharacterProfile, UserData, BotMood, EmotionalState } from '..
 import { generateAriaImage } from '../services/generateAriaImage'; 
 import { initiateNeuralMotion, pollNeuralMotionStatus } from '../services/neuralMotionService';
 import { uploadImageToStorage, deleteMediaFromStorage } from '../services/firebaseService';
-import { Loader2, X, Download, Menu, Settings, Cpu, ArrowUp, PanelLeft, Volume2, VolumeX } from 'lucide-react';
+import { Loader2, X, Download, Menu, Settings, Cpu, ArrowUp, PanelLeft, Volume2, VolumeX, Activity } from 'lucide-react';
 import { storeMemory } from '../services/memoryService';
 import { fetchGiphyUrl } from '../services/giphyService';
 import { fetchYoutubeUrl } from '../services/youtubeService';
 import { generateAriaResponse, extractContextPrompt } from '../services/ariaService';
 import { fetchSpicyLink } from '../services/spicyService';
 import { playAriaSpeech, stopAriaSpeech, currentAudio } from '../services/ttsService'; 
+import MoodIndicator from './MoodIndicator';
 
 interface MainChatAreaProps {
   character: CharacterProfile;
@@ -49,11 +50,14 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
   const [lastScrollY, setLastScrollY] = useState(0);
   const [isDownloading, setIsDownloading] = useState(false);
   
+  // ✅ FIXED: ADDED THE MISSING STATE VARIABLE HERE
+  const [showGlobalMood, setShowGlobalMood] = useState(false);
+  
   // TTS States
   const [autoTTS, setAutoTTS] = useState(true);
   const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(null);
   
-  // ✅ NEW: Current bot mood state (update this in your AI service)
+  // Current bot mood state
   const [botMood, setBotMood] = useState<BotMood>({
     energy: 75,
     confidence: 65,
@@ -91,6 +95,7 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
     const currentScrollY = scrollContainerRef.current.scrollTop;
     if (currentScrollY > lastScrollY && currentScrollY > 100) {
       setShowHeader(false); // Hide on scroll down
+      setShowGlobalMood(false); // Also auto-hide the mood panel
     } else {
       setShowHeader(true); // Show on scroll up
     }
@@ -114,13 +119,13 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
    * AUDIO/TTS HANDLERS
    */
   const stopAudio = () => {
-    stopAriaSpeech();           
+    stopAriaSpeech();            
     setCurrentlyPlayingId(null);
   };
 
   const playTTS = async (text: string, messageId: string) => {
     if (currentlyPlayingId === messageId) {
-      stopAudio();           
+      stopAudio();            
       return;
     }
     stopAudio();
@@ -138,7 +143,6 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
       return;
     }
     
-    console.log('🗣️ TTS Payload (tags should be visible):', cleanedText);
     try {
       const result = await playAriaSpeech(cleanedText, character.voiceId || 'ara');
       if (result.success && currentAudio) {
@@ -171,7 +175,6 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
         : "high-fidelity portrait";
 
       const lookAnchor = `${character.hair.join(", ")} hair, ${originalUserRequest}`;
-      console.log("🔄 Regenerating with Identity Anchor:", lookAnchor);
 
       const oldImageUrl = message.imageUrl;
       const oldVideoUrl = message.videoUrl;
@@ -225,10 +228,7 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
    * NEURAL MOTION HANDLER
    */
   const handleAnimateRequest = async (message: Message) => {
-    if (!message.imageUrl || !character) {
-      console.error("❌ Animation Aborted: Missing Image or Character Profile");
-      return;
-    }
+    if (!message.imageUrl || !character) return;
 
     onUpdateMessage(message.id, { 
       videoUrl: undefined,
@@ -307,8 +307,6 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
     if (!input.trim() || isLoadingResponse || !character) return;
 
     const userText = input.trim();
-    
-    // 1. SEND USER MESSAGE (Immediately)
     const responseMessageId = generateId('bot'); 
     setInput('');
     
@@ -332,15 +330,12 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
       });
 
       const rawResponse = await generateAriaResponse(userText, history, character, userData?.uid, botId);
-      
       let { cleanText, contextPrompt, memoryText, gifSearchTerm, youtubeSearchTerm, spicySearchTerm } = extractContextPrompt(rawResponse);
       
       if (memoryText && userData?.uid) {
         storeMemory(memoryText, userData.uid, botId);
       }
 
-      // ✅ EXTRACT MOOD FROM RESPONSE (if your AI provides it)
-      // Format: [[MOOD: energy:75, confidence:65, horniness:45, affection:80, state:playful, intensity:6]]
       const moodRegex = /\[\[MOOD:\s*(.*?)\]\]/i;
       const moodMatch = rawResponse.match(moodRegex);
       
@@ -368,14 +363,11 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
           newEmotionalState = (params.get('state') || 'playful') as EmotionalState;
           newIntensity = parseInt(params.get('intensity') || '6');
           
-          // Remove mood tag from display
           cleanText = cleanText.replace(moodRegex, '').trim();
           
           setBotMood(newBotMood);
           setEmotionalState(newEmotionalState);
           setEmotionalIntensity(newIntensity);
-          
-          console.log('✅ Mood Updated:', newBotMood, newEmotionalState, newIntensity);
         } catch (e) {
           console.error('⚠️ Mood parse error:', e);
         }
@@ -388,14 +380,14 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
           try {
               const gifUrl = await fetchGiphyUrl(gifSearchTerm);
               if (gifUrl) finalImageUrl = gifUrl; 
-          } catch(e) { console.error("Giphy failed", e); }
+          } catch(e) {}
       }
 
       if (youtubeSearchTerm) {
           try {
               const ytUrl = await fetchYoutubeUrl(youtubeSearchTerm);
               if (ytUrl) finalVideoUrl = ytUrl;
-          } catch(e) { console.error("YouTube failed", e); }
+          } catch(e) {}
       }
 
       if (!spicySearchTerm) {
@@ -411,12 +403,11 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
           try {
               const spicyUrl = await fetchSpicyLink(spicySearchTerm);
               if (spicyUrl) finalVideoUrl = spicyUrl;
-          } catch(e) { console.error("Spicy search failed", e); }
+          } catch(e) {}
       }
 
       const shouldGenerateImage = !!contextPrompt && !finalVideoUrl && !finalImageUrl;
 
-      // ✅ ATTACH MOOD TO MESSAGE
       onSendMessage({
           id: responseMessageId,
           role: 'model',
@@ -440,7 +431,6 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
       if (shouldGenerateImage) {
         try {
           const promptToUse = contextPrompt || userText;
-          
           const previousImagePrompts = messages
             .filter(m => m.role === 'model' && m.imageUrl && m.text)
             .map(m => m.text as string);
@@ -498,25 +488,20 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
 
   const downloadMedia = async (url: string, type: string) => {
     if (isDownloading) return;
-    
     if (type === 'embed' || type === 'youtube') {
         window.open(url, '_blank');
         return;
     }
-
     setIsDownloading(true);
-    
     try {
       const response = await fetch(url);
       const blob = await response.blob();
       const blobUrl = window.URL.createObjectURL(blob);
-      
       const a = document.createElement('a');
       a.href = blobUrl;
       a.download = `${character.name.toLowerCase()}-${Date.now()}.${type === 'video' ? 'mp4' : 'png'}`;
       document.body.appendChild(a);
       a.click();
-      
       document.body.removeChild(a);
       window.URL.revokeObjectURL(blobUrl);
     } catch (err) {
@@ -536,44 +521,68 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
       </div>
 
       <header 
-        className={`fixed top-0 left-0 right-0 z-40 px-6 py-4 border-b border-white/5 bg-zinc-950/80 backdrop-blur-xl flex items-center justify-between transition-transform duration-300 ease-in-out
+        className={`fixed top-0 left-0 right-0 z-40 px-6 py-4 border-b border-white/5 bg-zinc-950/80 backdrop-blur-xl transition-transform duration-300 ease-in-out
           ${showHeader ? 'translate-y-0' : '-translate-y-full'}
           ${isDesktopSidebarOpen ? 'lg:left-[280px]' : 'lg:left-0'}
         `}
       >
-        <div className="flex items-center gap-4">
-          <button onClick={onToggleMobileSidebar} className="lg:hidden p-2 text-zinc-400 hover:text-white bg-white/5 rounded-xl transition-all">
-            <Menu className="w-5 h-5" />
-          </button>
-          
-          {!isDesktopSidebarOpen && (
-            <button onClick={onToggleDesktopSidebar} className="hidden lg:block p-2 text-zinc-400 hover:text-white bg-white/5 rounded-xl transition-all">
-              <PanelLeft className="w-5 h-5" />
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <button onClick={onToggleMobileSidebar} className="lg:hidden p-2 text-zinc-400 hover:text-white bg-white/5 rounded-xl transition-all">
+              <Menu className="w-5 h-5"/>
             </button>
-          )}
-          
-          <div>
-            <h1 className="text-sm font-black text-white tracking-wide uppercase">{character.name}</h1>
-            <div className="flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse"></span>
-              <span className="text-[10px] text-purple-400 uppercase tracking-widest font-bold font-mono">Online</span>
+            
+            {!isDesktopSidebarOpen && (
+              <button onClick={onToggleDesktopSidebar} className="hidden lg:block p-2 text-zinc-400 hover:text-white bg-white/5 rounded-xl transition-all">
+                <PanelLeft className="w-5 h-5"/>
+              </button>
+            )}
+            
+            <div>
+              <h1 className="text-sm font-black text-white tracking-wide uppercase">{character.name}</h1>
+              <div className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse"></span>
+                <span className="text-[10px] text-purple-400 uppercase tracking-widest font-bold font-mono">Online</span>
+              </div>
             </div>
           </div>
-        </div>
-        
-        <div className="flex items-center gap-2">
-          <button 
-            onClick={() => setAutoTTS(!autoTTS)} 
-            className={`p-2.5 rounded-xl transition-all ${autoTTS ? 'bg-purple-500/20 text-purple-400' : 'bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10'}`}
-            title={autoTTS ? "Auto-TTS Enabled" : "Auto-TTS Disabled"}
-          >
-            {autoTTS ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
-          </button>
+          
+          <div className="flex items-center gap-2">
+            
+            {/* ✅ FIXED: Toggle Live Mood Matrix Button */}
+            <button 
+              onClick={() => setShowGlobalMood(!showGlobalMood)} 
+              className={`p-2.5 rounded-xl transition-all ${showGlobalMood ? 'bg-purple-500/20 text-purple-400' : 'bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10'}`}
+              title="View Live Mood Matrix"
+            >
+              <Activity className="w-5 h-5"/>
+            </button>
 
-          <button onClick={() => onOpenBotCustomization(botId)} className="p-2.5 bg-white/5 text-zinc-400 hover:text-purple-400 hover:bg-white/10 rounded-xl transition-all">
-            <Settings className="w-5 h-5" />
-          </button>
+            <button 
+              onClick={() => setAutoTTS(!autoTTS)} 
+              className={`p-2.5 rounded-xl transition-all ${autoTTS ? 'bg-purple-500/20 text-purple-400' : 'bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10'}`}
+              title={autoTTS ? "Auto-TTS Enabled" : "Auto-TTS Disabled"}
+            >
+              {autoTTS ? <Volume2 className="w-5 h-5"/> : <VolumeX className="w-5 h-5"/>}
+            </button>
+
+            <button onClick={() => onOpenBotCustomization(botId)} className="p-2.5 bg-white/5 text-zinc-400 hover:text-purple-400 hover:bg-white/10 rounded-xl transition-all">
+              <Settings className="w-5 h-5"/>
+            </button>
+          </div>
         </div>
+
+        {/* ✅ FIXED: MoodIndicator JSX Syntax */}
+        {showGlobalMood && (
+          <div className="absolute top-full right-6 mt-2 w-[300px] z-50 animate-in slide-in-from-top-2 fade-in duration-200 shadow-2xl">
+             <MoodIndicator 
+               botMood={botMood} 
+               emotionalState={emotionalState} 
+               emotionalIntensity={emotionalIntensity} 
+               compact={false}
+             />
+          </div>
+        )}
       </header>
 
       <main 
@@ -584,13 +593,13 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
         <div className="w-full mx-auto space-y-6 max-w-4xl">
           {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center mt-20 text-center space-y-4">
-              <Cpu className="w-12 h-12 text-zinc-800 animate-pulse" />
+              <Cpu className="w-12 h-12 text-zinc-800 animate-pulse"/>
               <p className="text-zinc-500 tracking-widest text-[10px] font-bold uppercase">Initialize Neural Session</p>
             </div>
           ) : (
             messages.map((msg) => (
               <ChatMessage 
-                key={msg.id} 
+                key={msg.id}
                 message={msg} 
                 characterName={character.name} 
                 characterVoiceId={character.voiceId} 
@@ -631,7 +640,7 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
                   ? 'bg-zinc-800 text-zinc-600' 
                   : 'bg-white text-black hover:bg-zinc-200'}`}
             >
-              {isLoadingResponse ? <Loader2 className="animate-spin w-5 h-5" /> : <ArrowUp className="w-5 h-5 stroke-[3px]" />}
+              {isLoadingResponse ? <Loader2 className="animate-spin w-5 h-5"/> : <ArrowUp className="w-5 h-5 stroke-[3px]"/>}
             </button>
           </div>
         </div>
@@ -678,7 +687,7 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
                     className={`flex items-center gap-2 px-8 py-3.5 bg-white text-black font-black rounded-xl hover:bg-purple-500 hover:text-white transition-all
                       ${isDownloading ? 'opacity-50 cursor-wait' : ''}`}
                   >
-                    {isDownloading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Download className="w-5 h-5" />}
+                    {isDownloading ? <Loader2 className="w-5 h-5 animate-spin"/> : <Download className="w-5 h-5"/>}
                     <span className="uppercase text-[10px] tracking-widest">
                       {isDownloading ? 'Saving...' : `Save ${selectedMedia.type === 'video' ? 'MP4' : 'PNG'}`}
                     </span>
@@ -689,7 +698,7 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
                 onClick={() => setSelectedMedia(null)} 
                 className="p-3.5 bg-zinc-900 border border-white/10 text-white rounded-xl hover:bg-zinc-800 transition-all"
               >
-                <X className="w-6 h-6" />
+                <X className="w-6 h-6"/>
               </button>
             </div>
           </div>
