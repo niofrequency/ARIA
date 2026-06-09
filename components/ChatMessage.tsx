@@ -386,7 +386,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
               {/* === OVERLAYS (Only for Native Video/Image) === */}
               {(mediaType === 'video_file' || (!message.videoUrl && message.imageUrl)) && (
                   <>
-                    <div className={`absolute inset-0 flex flex-col items-center justify-center gap-3 backdrop-blur-[2px] transition-all duration-300 pointer-events-none ${showMobileOverlay ? 'bg-black/60' : 'bg-black/0 group-hover:bg-black/50'}`}>
+                    <div className={`absolute inset-0 flex flex-col items-center justify-center gap-3 backdrop-blur-[2px] transition-all duration-300 pointer-events-none ${showMobileOverlay ? 'opacity-100 bg-black/60' : 'opacity-0 group-hover:opacity-100 bg-black/0 group-hover:bg-black/50'}`}>
                         <button 
                             onClick={(e) => { e.stopPropagation(); setShowMobileOverlay(false); onAnimateRequest(message); }} 
                             className="pointer-events-auto flex items-center gap-2 px-5 py-2.5 bg-white text-black rounded-full font-black text-[10px] uppercase tracking-tighter hover:bg-purple-500 hover:text-white transition-all"
