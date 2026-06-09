@@ -386,30 +386,30 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
         }
       }
 
-// 5. TRIGGER AI IMAGE GENERATION
-if (shouldGenerateImage) {
-  try {
-    const promptToUse = contextPrompt || userText;
-    
-    // 🔥 Extract previous visual styles
-    const previousImagePrompts = messages
-      .filter(m => m.role === 'model' && m.imageUrl && m.text)
-      .map(m => m.text as string);
+      // 5. TRIGGER AI IMAGE GENERATION
+      if (shouldGenerateImage) {
+        try {
+          const promptToUse = contextPrompt || userText;
+          
+          // 🔥 Extract previous visual styles
+          const previousImagePrompts = messages
+            .filter(m => m.role === 'model' && m.imageUrl && m.text)
+            .map(m => m.text as string);
 
-    // 🔥 FIX: Build proper conversation history for enrichment
-    const conversationHistoryForEnrichment = (messages || []).map(m => ({
-      role: m.role === 'model' || m.role === 'assistant' ? 'assistant' : 'user',
-      content: m.text || ''
-    }));
+          // 🔥 FIX: Build proper conversation history for enrichment
+          const conversationHistoryForEnrichment = (messages || []).map(m => ({
+            role: m.role === 'model' || m.role === 'assistant' ? 'assistant' : 'user',
+            content: m.text || ''
+          }));
 
-    const tempImageUrl = await generateAriaImage(
-      promptToUse, 
-      userText, 
-      character,
-      undefined, 
-      conversationHistoryForEnrichment,  // ✅ Use this instead of history
-      previousImagePrompts
-    );
+          const tempImageUrl = await generateAriaImage(
+            promptToUse, 
+            userText, 
+            character,
+            undefined, 
+            conversationHistoryForEnrichment,  // ✅ Use this instead of history
+            previousImagePrompts
+          );
           
           if (tempImageUrl) {
             onUpdateMessage(responseMessageId, { 
