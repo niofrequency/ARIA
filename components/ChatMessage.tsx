@@ -46,6 +46,19 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
   const [isDownloading, setIsDownloading] = useState(false);
   const [showMobileOverlay, setShowMobileOverlay] = useState(false);
 
+  // --- HELPER: EXTRACT COMMANDS FROM PARENTHESES ---
+  // For BOT: (commands) are completely hidden from display
+  // For USER: (commands) are shown as badges
+  const extractCommands = (text: string | undefined, role: 'user' | 'model' | 'assistant') => {
+    if (!text) return { displayText: '', commands: [] };
+    
+    const commandRegex = /\([^)]*\)/g;
+    const commands = text.match(commandRegex) || [];
+    const displayText = text.replace(commandRegex, '').trim();
+    
+    return { displayText, commands };
+  };
+
   // --- HELPER: CLEAN TEXT FOR UI (Hides TTS Tags) ---
   const cleanMessageForUI = (rawText: string | undefined) => {
     if (!rawText) return '';
@@ -57,7 +70,11 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
   };
 
   // The clean text that the user will actually see
-  const uiText = cleanMessageForUI(message.text);
+  const { displayText: cleanedText, commands: allCommands } = extractCommands(message.text, message.role);
+  const uiText = cleanMessageForUI(cleanedText);
+  
+  // ✅ Only show commands for USER messages, hide for BOT
+  const botCommands = isUser ? allCommands : [];
 
   // --- TYPEWRITER STATE ---
   const [shouldAnimate] = useState(() => {
@@ -97,17 +114,60 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
     }
   };
 
-  // --- HELPER: FORMAT TEXT FOR ITALICS ---
+  // --- HELPER: FORMAT TEXT WITH ASTERISKS & PARENTHESES ---
+  /**
+   * Handles:
+   * **text** → italic (internal feelings)
+   * (command) → stripped from display for bot, shown as badge for user
+   * Regular text → normal
+   */
   const formatMessageText = (text: string) => {
     if (!text) return null;
-    const parts = text.split('*');
-    return parts.map((part, index) => {
-      // Every odd index means the text was inside an asterisk pair
-      if (index % 2 === 1) {
-        return <em key={index} className="italic opacity-80">{part}</em>;
+    
+    const parts: React.ReactNode[] = [];
+    let buffer = '';
+    let i = 0;
+
+    while (i < text.length) {
+      // Check for **italic**
+      if (text[i] === '*' && text[i + 1] === '*') {
+        if (buffer) {
+          parts.push(<span key={parts.length}>{buffer}</span>);
+          buffer = '';
+        }
+        
+        // Find closing **
+        let j = i + 2;
+        let italicContent = '';
+        while (j < text.length - 1) {
+          if (text[j] === '*' && text[j + 1] === '*') {
+            italicContent = text.substring(i + 2, j);
+            parts.push(
+              <em key={parts.length} className="italic opacity-75 text-purple-300">
+                {italicContent}
+              </em>
+            );
+            i = j + 2;
+            break;
+          }
+          j++;
+        }
+        
+        if (j >= text.length - 1) {
+          buffer += text[i];
+          i++;
+        }
+      } else {
+        buffer += text[i];
+        i++;
       }
-      return <span key={index}>{part}</span>;
-    });
+    }
+
+    if (buffer) {
+      parts.push(<span key={parts.length}>{buffer}</span>);
+    }
+
+    return parts.length > 0 ? parts : null;
   };
 
   // --- TYPING EFFECT LOGIC ---
@@ -217,9 +277,24 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
           </div>
         )}
 
+        {/* USER COMMAND BADGES (Only for user messages) */}
+        {isUser && botCommands.length > 0 && (
+          <div className="mt-2 px-1 flex flex-wrap gap-2">
+            {botCommands.map((cmd, idx) => (
+              <div 
+                key={idx}
+                className="text-[9px] px-2 py-1 rounded-full bg-purple-500/20 border border-purple-500/30 text-purple-300 font-mono"
+                title={cmd}
+              >
+                ⚡ {cmd.slice(1, -1).substring(0, 20)}...
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* LOADING SKELETON (Imaging Protocol) */}
         {message.isImageLoading && (
-           <div className={`mt-3 w-[280px] md:w-[360px] ${getImageAspectRatio()} bg-zinc-900/50 rounded-2xl border border-dashed border-white/10 flex flex-col items-center justify-center gap-4 animate-pulse ${isUser ? '' : 'rounded-tl-none'}`}>
+           <div className={`mt-3 w-[280px] md:w-[360px] ${getImageAspectRatio()} bg-zinc-900/50 rounded-2xl border border-dashed border-white/10 flex flex-col items-center justify-center gap-4 animate-pulse`}>
               <div className="relative">
                 <div className="absolute -inset-2 bg-purple-500/20 rounded-full blur-xl animate-pulse"></div>
                 <Loader2 className="w-8 h-8 text-purple-500 animate-spin relative" />
@@ -304,17 +379,17 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
                       onMediaClick(message.imageUrl!, 'image');
                     }
                   }} 
-                  className={`w-[280px] md:w-[360px] h-auto min-h-[100px] object-cover block bg-zinc-900 transition-all duration-700 cursor-pointer ${message.isVideoLoading ? 'blur-xl scale-110 brightness-50' : 'group-hover:scale-105'}`}
+                  className={`w-[280px] md:w-[360px] h-auto min-h-[100px] object-cover block bg-zinc-900 transition-all duration-700 cursor-pointer ${message.isVideoLoading ? 'blur-xl scale-110 brightness-75' : ''}`}
                 />
               )}
 
               {/* === OVERLAYS (Only for Native Video/Image) === */}
               {(mediaType === 'video_file' || (!message.videoUrl && message.imageUrl)) && (
                   <>
-                    <div className={`absolute inset-0 flex flex-col items-center justify-center gap-3 backdrop-blur-[2px] transition-all duration-300 pointer-events-none ${showMobileOverlay ? 'bg-black/40 opacity-100' : 'bg-black/40 opacity-0 group-hover:opacity-100'}`}>
+                    <div className={`absolute inset-0 flex flex-col items-center justify-center gap-3 backdrop-blur-[2px] transition-all duration-300 pointer-events-none ${showMobileOverlay ? 'bg-black/60' : 'bg-black/0 group-hover:bg-black/50'}`}>
                         <button 
                             onClick={(e) => { e.stopPropagation(); setShowMobileOverlay(false); onAnimateRequest(message); }} 
-                            className="pointer-events-auto flex items-center gap-2 px-5 py-2.5 bg-white text-black rounded-full font-black text-[10px] uppercase tracking-tighter hover:bg-purple-500 hover:text-white transition-all active:scale-95 shadow-xl"
+                            className="pointer-events-auto flex items-center gap-2 px-5 py-2.5 bg-white text-black rounded-full font-black text-[10px] uppercase tracking-tighter hover:bg-purple-500 hover:text-white transition-all"
                         >
                             <Film className="w-3.5 h-3.5" /> Neural Motion
                         </button>
@@ -357,29 +432,29 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
                 
                 {/* LEFT BUTTONS: THEATER MODE or NATIVE CONTROLS */}
                 {mediaType === 'embed' || mediaType === 'youtube' ? (
-                   <button onClick={() => onMediaClick(message.videoUrl!, mediaType as any)} className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-purple-400 hover:text-white transition-colors">
+                   <button onClick={() => onMediaClick(message.videoUrl!, mediaType as any)} className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-purple-400 hover:text-purple-300 transition-colors">
                      <Maximize2 className="w-3 h-3" /> Theater Mode
                    </button>
                 ) : message.videoUrl ? (
-                  <button onClick={() => setViewMode(prev => prev === 'video' ? 'image' : 'video')} className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-zinc-500 hover:text-white transition-colors">
+                  <button onClick={() => setViewMode(prev => prev === 'video' ? 'image' : 'video')} className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-zinc-500 hover:text-purple-400 transition-colors">
                     {viewMode === 'video' ? <ImageIcon className="w-3 h-3" /> : <Film className="w-3 h-3" />}
                     {viewMode === 'video' ? 'Show Static' : 'Show Motion'}
                   </button>
                 ) : (
-                   <button onClick={() => onAnimateRequest(message)} className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-purple-400 hover:text-purple-300 transition-colors animate-pulse">
-                    <Wand2 className="w-3 h-3" />
-                    <span className="md:hidden">Animate</span>
-                    <span className="hidden md:inline">Generate Motion</span>
-                  </button>
+                   <button onClick={() => onAnimateRequest(message)} className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-purple-400 hover:text-purple-300 transition-colors">
+                     <Wand2 className="w-3 h-3" />
+                     <span className="md:hidden">Animate</span>
+                     <span className="hidden md:inline">Generate Motion</span>
+                   </button>
                 )}
                 
                 {/* RIGHT BUTTONS: DOWNLOAD / REFRESH */}
                 {mediaType !== 'embed' && mediaType !== 'youtube' && (
                     <div className="flex items-center gap-3">
-                        <button onClick={() => { if (message.videoUrl && viewMode === 'video') onAnimateRequest(message); else onRegenerateImage(message); }} className="text-zinc-600 hover:text-purple-400 transition-all hover:rotate-180 duration-500">
+                        <button onClick={() => { if (message.videoUrl && viewMode === 'video') onAnimateRequest(message); else onRegenerateImage(message); }} className="text-zinc-600 hover:text-purple-400 transition-colors">
                             <RefreshCw className="w-3.5 h-3.5" />
                         </button>
-                        <button onClick={handleDownload} disabled={isDownloading} className={`flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider transition-colors ${isDownloading ? 'text-zinc-600 cursor-wait' : 'text-zinc-500 hover:text-purple-400'}`}>
+                        <button onClick={handleDownload} disabled={isDownloading} className={`flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider transition-colors ${isDownloading ? 'opacity-50' : 'text-zinc-600 hover:text-purple-400'}`}>
                             {isDownloading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
                             {isDownloading ? 'Saving...' : (viewMode === 'video' && message.videoUrl ? 'Save MP4' : 'Save PNG')}
                         </button>
