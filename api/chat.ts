@@ -1,13 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-// AT THE TOP:
-import { buildImageConsistencyPrompt, buildEnrichedImagePrompt, VisualContextMemory } from '../lib/imageConsistency';
+import { buildImageConsistencyPrompt, buildEnrichedImagePrompt, VisualContextMemory, debugImagePromptAnalysis } from '../lib/imageConsistency';
 
-// INSIDE the handler function, AFTER getting response from Grok:
-if (visualMatch) {
-  const metadata = buildImageConsistencyPrompt(visualMatch[1], "ARIA", visualMemory);
-  const enrichedPrompt = buildEnrichedImagePrompt(metadata, visualMatch[1], "sensual");
-  // Send enrichedPrompt to frontend or generate.ts
-}
 /**
  * ARIA BRAIN PROXY (xAI Grok)
  * Logic:
@@ -15,7 +8,12 @@ if (visualMatch) {
  * 2. Proxies the "Brain" dialogue to Grok.
  * 3. SPEECH REALISM: Injects system instructions for TTS tags ([ ] and < >).
  * 4. INTELLIGENT PARSING: Detects [[VISUAL]] tags server-side to flag the frontend.
+ * 5. IMAGE CONSISTENCY: Applies shot type, angle, and position detection to visual descriptions.
  */
+
+// Global visual context memory (maintains consistency across chat messages in a session)
+const visualMemoryStore = new Map<string, VisualContextMemory>();
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // 1. CORS CONFIGURATION
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -36,7 +34,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { messages, model, temperature } = req.body;
+    const { messages, model, temperature, userId } = req.body;
 
     if (!messages || !Array.isArray(messages)) {
       return res.status(400).json({ error: 'Invalid message protocol. Expected array.' });
@@ -86,7 +84,6 @@ When using [[VISUAL: description]] tags, be EXTREMELY DETAILED about:
 
 Example:
 [[VISUAL: ARIA in dim bedroom lighting, soft smile, eyes slightly closed, wearing silk robe, leaning forward intimately, soft warm orange tones, matching the sensual mood from previous messages]]`;
-
     
     // Check if the first message is a system message. If it is, append our rules. If not, unshift a new system message.
     if (sanitizedMessages[0]?.role === 'system') {
@@ -135,12 +132,50 @@ Example:
     const visualRegex = /\[\[VISUAL:\s*(.*?)\s*\]\]/i;
     const visualMatch = content.match(visualRegex);
 
+    let imageConsistencyMeta = null;
+
+    // 🔥 IMAGE CONSISTENCY ENGINE 🔥
+    if (visualMatch) {
+      const visualDescription = visualMatch[1].trim();
+      const userMessage = sanitizedMessages[sanitizedMessages.length - 1]?.content || "";
+      
+      // Get or create visual memory for this user session
+      const memoryKey = userId || "anonymous";
+      if (!visualMemoryStore.has(memoryKey)) {
+        visualMemoryStore.set(memoryKey, new VisualContextMemory());
+      }
+      const visualMemory = visualMemoryStore.get(memoryKey)!;
+
+      // Build image consistency metadata
+      const metadata = buildImageConsistencyPrompt(userMessage, "ARIA", visualMemory);
+      debugImagePromptAnalysis(userMessage, metadata);
+
+      // Build enriched prompt
+      const enrichedPrompt = buildEnrichedImagePrompt(metadata, visualDescription, "sensual");
+
+      // Record this visual for context persistence
+      visualMemory.recordVisual({
+        shotType: metadata.shotType,
+        angle: metadata.cameraAngle,
+        position: metadata.sexualPosition,
+        description: enrichedPrompt
+      });
+
+      imageConsistencyMeta = {
+        ...metadata,
+        enrichedPrompt
+      };
+
+      console.log("✨ IMAGE CONSISTENCY APPLIED:", imageConsistencyMeta);
+    }
+
     // 6. RETURN ENHANCED RESPONSE
     return res.status(200).json({
       ...data,
       aria_meta: {
         has_visual: !!visualMatch,
         visual_description: visualMatch ? visualMatch[1].trim() : null,
+        image_consistency: imageConsistencyMeta,
         // 🔥 FIX: Expose the sanitized conversational history back to the client
         // so it can be routed straight into the prompt enrichment service
         conversation_history: sanitizedMessages
