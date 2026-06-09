@@ -20,6 +20,45 @@ Whether you're building next-level AI companions, experimenting with storytellin
 *   **Neural Link UI**: A fully responsive, high-performance React interface featuring a futuristic grid aesthetic that is iOS safe-area aware.
 
 ---
+## How it Works
+
+```
+User Message
+    ↓
+api/chat.ts (Grok receives message)
+    ↓
+Grok generates response with [[VISUAL: ...]] tag
+    ↓
+api/chat.ts detects [[VISUAL: ...]] tag
+    ↓
+buildImageConsistencyPrompt() analyzes user message
+    ├─ detectShotType() → full_body/medium/closeup
+    ├─ detectCameraAngle() → front/back/side/pov
+    ├─ detectSexualPosition() → doggy/missionary/etc
+    ├─ detectPOVAction() → "my cock in your mouth"
+    ├─ shouldIncludeOtherPeople() → solo/group
+    └─ Context memory retrieval
+    ↓
+buildEnrichedImagePrompt() builds detailed prompt
+    ├─ Shot type specs
+    ├─ Camera angle instructions
+    ├─ Sexual position descriptions
+    ├─ POV action enhancements
+    ├─ Head deformity prevention
+    ├─ Quality tokens
+    └─ Returns enriched prompt
+    ↓
+visualMemory.recordVisual() stores for future consistency
+    ↓
+api/generate.ts receives enriched prompt
+    ↓
+RunPod receives workflow + enriched prompt
+    ↓
+Image generated with exact specifications
+
+```
+
+---
 
 ## 🎬 Architecture: The "Director's Notes" Bridge
 
