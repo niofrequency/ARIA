@@ -5,7 +5,7 @@ import { generateAriaImage } from '../services/generateAriaImage';
 import { initiateNeuralMotion, pollNeuralMotionStatus } from '../services/neuralMotionService';
 import { uploadImageToStorage, deleteMediaFromStorage } from '../services/firebaseService';
 import { Loader2, X, Download, Menu, Settings, Cpu, ArrowUp, PanelLeft, Volume2, VolumeX, Activity } from 'lucide-react';
-import { storeMemory } from '../services/memoryService';
+import { storeMemory, storeMoodMemory, retrieveLatestMoodMemory } from '../services/memoryService';
 import { fetchGiphyUrl } from '../services/giphyService';
 import { fetchYoutubeUrl } from '../services/youtubeService';
 import { generateAriaResponse, extractContextPrompt } from '../services/ariaService';
@@ -52,16 +52,14 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
   
   // ✅ Global Mood State
   const [showGlobalMood, setShowGlobalMood] = useState(false);
+  const [isLoadingMood, setIsLoadingMood] = useState(false);
   
   // TTS States
   const [autoTTS, setAutoTTS] = useState(true);
   const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(null);
   
-  // ✅ 1. Find the last known mood from your chat history
-  const lastKnownMoodMsg = [...messages].reverse().find(m => m.role === 'model' && m.botMood);
-
-  // ✅ 2. Initialize state using history (falls back to defaults ONLY for brand new bots)
-  const [botMood, setBotMood] = useState<BotMood>(lastKnownMoodMsg?.botMood || {
+  // ✅ DEFAULT MOOD (fallback only)
+  const DEFAULT_BOT_MOOD: BotMood = {
     energy: 75,
     confidence: 65,
     horniness: 45,
@@ -71,12 +69,48 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
     stressLevel: 20,
     recentConflict: false,
     minutesSinceLastMessage: 0,
-  });
-
+  };
+  
+  // ✅ 1. Initialize mood state - Priority: message history > memory service > defaults
+  const lastKnownMoodMsg = [...messages].reverse().find(m => m.role === 'model' && m.botMood);
+  
+  const [botMood, setBotMood] = useState<BotMood>(lastKnownMoodMsg?.botMood || DEFAULT_BOT_MOOD);
   const [emotionalState, setEmotionalState] = useState<EmotionalState>(lastKnownMoodMsg?.emotionalState || 'playful');
   const [emotionalIntensity, setEmotionalIntensity] = useState(lastKnownMoodMsg?.emotionalIntensity || 6);
+  
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  // ✅ 3. Auto-sync the mood when you switch bots or when Firebase finishes loading history
+  const generateId = (prefix: string) => `${prefix}-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+
+  // ✅ 2. FETCH INITIAL MOOD FROM MEMORY SERVICE ON MOUNT
+  useEffect(() => {
+    const fetchMoodFromMemory = async () => {
+      if (!userData?.uid || !botId || messages.length === 0) {
+        return; // Skip if no user data or messages exist
+      }
+
+      setIsLoadingMood(true);
+      try {
+        const savedMoodData = await retrieveLatestMoodMemory(userData.uid, botId);
+        
+        if (savedMoodData) {
+          console.log("✅ MainChatArea: Loaded mood from memory service:", savedMoodData);
+          setBotMood(savedMoodData.botMood);
+          setEmotionalState(savedMoodData.emotionalState);
+          setEmotionalIntensity(savedMoodData.emotionalIntensity);
+        }
+      } catch (error) {
+        console.error("❌ MainChatArea: Failed to fetch mood from memory:", error);
+      } finally {
+        setIsLoadingMood(false);
+      }
+    };
+
+    fetchMoodFromMemory();
+  }, [userData?.uid, botId]);
+
+  // ✅ 3. AUTO-SYNC MOOD WHEN SWITCHING BOTS OR LOADING HISTORY
   useEffect(() => {
     if (messages && messages.length > 0) {
       const latestMsg = [...messages].reverse().find(m => m.role === 'model' && m.botMood);
@@ -87,11 +121,6 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
       }
     }
   }, [botId, messages]);
-  
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-
-  const generateId = (prefix: string) => `${prefix}-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -347,8 +376,9 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
       const rawResponse = await generateAriaResponse(userText, history, character, userData?.uid, botId);
       let { cleanText, contextPrompt, memoryText, gifSearchTerm, youtubeSearchTerm, spicySearchTerm } = extractContextPrompt(rawResponse);
       
+      // ✅ STORE REGULAR MEMORY
       if (memoryText && userData?.uid) {
-        storeMemory(memoryText, userData.uid, botId);
+        await storeMemory(memoryText, userData.uid, botId);
       }
 
       const moodRegex = /\[\[MOOD:\s*(.*?)\]\]/i;
@@ -379,6 +409,11 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
           newIntensity = parseInt(params.get('intensity') || '6');
           
           cleanText = cleanText.replace(moodRegex, '').trim();
+          
+          // ✅ STORE MOOD MEMORY
+          if (userData?.uid) {
+            await storeMoodMemory(newBotMood, newEmotionalState, newIntensity, userData.uid, botId, userText);
+          }
           
           setBotMood(newBotMood);
           setEmotionalState(newEmotionalState);
@@ -567,8 +602,9 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
               onClick={() => setShowGlobalMood(!showGlobalMood)} 
               className={`p-2.5 rounded-xl transition-all ${showGlobalMood ? 'bg-purple-500/20 text-purple-400' : 'bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10'}`}
               title="View Live Mood Matrix"
+              disabled={isLoadingMood}
             >
-              <Activity className="w-5 h-5"/>
+              {isLoadingMood ? <Loader2 className="w-5 h-5 animate-spin"/> : <Activity className="w-5 h-5"/>}
             </button>
 
             <button 
