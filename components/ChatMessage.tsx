@@ -29,7 +29,6 @@ interface ChatMessageProps {
   onMediaClick: (url: string, type: 'image' | 'video' | 'embed' | 'youtube') => void;
   onAnimateRequest: (message: Message) => void;
   onRegenerateImage: (message: Message) => void;
-  // ✅ ADDED TTS STATE PROPS FROM MAINCHATAREA
   isCurrentlyPlaying?: boolean;
   onToggleTTS?: (text: string, messageId: string) => void;
 }
@@ -104,7 +103,8 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
     }
   };
 
-  // --- HELPER: FORMAT TEXT WITH ASTERISKS ---
+  // --- HELPER: FORMAT TEXT WITH ASTERISKS FOR ITALICS ---
+  // ✅ NOW PROPERLY HANDLES *italic text* WITH COLORED STYLING
   const formatMessageText = (text: string) => {
     if (!text) return null;
     
@@ -112,16 +112,19 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
     let i = 0;
 
     while (i < text.length) {
-      if (text[i] === '*' && (i === 0 || text[i - 1] !== '*') && text[i + 1] !== '*') {
+      // Look for single asterisk
+      if (text[i] === '*') {
+        // Find the closing asterisk
         let j = i + 1;
         let foundClosing = false;
-        let italicContent = '';
-        
+
         while (j < text.length) {
-          if (text[j] === '*' && (j === text.length - 1 || text[j + 1] !== '*')) {
-            italicContent = text.substring(i + 1, j);
+          if (text[j] === '*') {
+            // Found closing asterisk
+            const italicContent = text.substring(i + 1, j);
+            
             parts.push(
-              <em key={parts.length} className="italic opacity-75 text-purple-300">
+              <em key={parts.length} className="italic text-pink-300 font-semibold">
                 {italicContent}
               </em>
             );
@@ -131,21 +134,23 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
           }
           j++;
         }
-        
+
         if (!foundClosing) {
+          // No closing asterisk found, treat as regular text
           parts.push(<span key={parts.length}>{text[i]}</span>);
           i++;
         }
       } else {
+        // Regular text - collect until next asterisk
         let j = i;
         while (j < text.length && text[j] !== '*') {
           j++;
         }
-        
+
         if (j > i) {
           parts.push(<span key={parts.length}>{text.substring(i, j)}</span>);
-          i = j;
         }
+        i = j;
       }
     }
 
