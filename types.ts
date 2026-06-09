@@ -11,6 +11,11 @@ export interface Message {
   isVideoLoading?: boolean;
   motionStatus?: 'idle' | 'synthesizing' | 'completed' | 'failed';
   timestamp: number;
+  
+  // ✅ NEW: Emotional state attached to each bot message
+  botMood?: BotMood;
+  emotionalState?: EmotionalState;
+  emotionalIntensity?: number; // 0-10
 }
 
 /**
