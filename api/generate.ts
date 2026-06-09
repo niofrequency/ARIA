@@ -87,12 +87,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 if (visualDescription && conversationHistory && conversationHistory.length > 0) {
   console.log("🧠 Applying Server-Side Prompt Enrichment...");
   
-  const enrichedContextTags = await enrichImagePrompt(
-    visualDescription,
-    conversationHistory,
-    ariaPersonality || "casual",
-    previousPrompts || []
-  );
+// Replace the current enrichImagePrompt() call with:
+const enrichedContextTags = buildEnrichedImagePrompt(metadata, visualDescription, ariaPersonality);
 
   console.log("✨ Enriched Tags:", enrichedContextTags);  // ✅ Add visibility
 
