@@ -1,3 +1,5 @@
+import { ShotType, CameraAngle, SexualPosition } from './lib/imageConsistency';
+
 export interface Message {
   id: string;
   role: 'user' | 'model' | 'assistant';
@@ -62,6 +64,8 @@ export interface VisualState {
   fluids: string[]; // e.g., "sweaty", "tears", etc.
   arousalLevel: number; // 0-10
   timestamp: number;
+  
+  // ✅ IMAGE CONSISTENCY FIELDS
   shotType?: ShotType;
   cameraAngle?: CameraAngle;
   sexualPosition?: SexualPosition;
