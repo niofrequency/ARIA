@@ -117,7 +117,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
   // --- HELPER: FORMAT TEXT WITH ASTERISKS & PARENTHESES ---
   /**
    * Handles:
-   * **text** → italic (internal feelings)
+   * *text* or **text** → italic (internal feelings)
    * (command) → stripped from display for bot, shown as badge for user
    * Regular text → normal
    */
@@ -129,33 +129,42 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
     let i = 0;
 
     while (i < text.length) {
-      // Check for **italic**
-      if (text[i] === '*' && text[i + 1] === '*') {
+      // Check for *italic* or **italic**
+      if (text[i] === '*') {
+        const isDouble = text[i + 1] === '*';
+        const tokenLength = isDouble ? 2 : 1;
+        
         if (buffer) {
           parts.push(<span key={parts.length}>{buffer}</span>);
           buffer = '';
         }
         
-        // Find closing **
-        let j = i + 2;
+        let j = i + tokenLength;
         let italicContent = '';
-        while (j < text.length - 1) {
-          if (text[j] === '*' && text[j + 1] === '*') {
-            italicContent = text.substring(i + 2, j);
-            parts.push(
-              <em key={parts.length} className="italic opacity-75 text-purple-300">
-                {italicContent}
-              </em>
-            );
-            i = j + 2;
+        let foundClose = false;
+        
+        while (j <= text.length - tokenLength) {
+          const matchDouble = text[j] === '*' && text[j + 1] === '*';
+          
+          if ((isDouble && matchDouble) || (!isDouble && text[j] === '*')) {
+            foundClose = true;
+            italicContent = text.substring(i + tokenLength, j);
             break;
           }
           j++;
         }
         
-        if (j >= text.length - 1) {
-          buffer += text[i];
-          i++;
+        if (foundClose) {
+          parts.push(
+            <em key={parts.length} className="italic opacity-75 text-purple-300">
+              {italicContent}
+            </em>
+          );
+          i = j + tokenLength;
+        } else {
+          // If no closing tag, just add the starting asterisk(s) to buffer and move on
+          buffer += isDouble ? '**' : '*';
+          i += tokenLength;
         }
       } else {
         buffer += text[i];
