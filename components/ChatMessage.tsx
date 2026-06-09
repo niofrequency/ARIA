@@ -15,9 +15,12 @@ import {
   Youtube,
   Play,
   Volume2,
-  VolumeX // ✅ ADDED VOLUMEX ICON FOR STOP STATE
+  VolumeX,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { playAriaSpeech } from '../services/ttsService';
+import MoodIndicator from './MoodIndicator';
 
 interface ChatMessageProps {
   message: Message;
@@ -38,16 +41,16 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
   onMediaClick,
   onAnimateRequest,
   onRegenerateImage,
-  isCurrentlyPlaying = false, // ✅ Default to false
-  onToggleTTS // ✅ Extracted prop
+  isCurrentlyPlaying = false,
+  onToggleTTS
 }) => {
   const isUser = message.role === 'user';
   const [viewMode, setViewMode] = useState<'video' | 'image'>('video');
   const [isDownloading, setIsDownloading] = useState(false);
   const [showMobileOverlay, setShowMobileOverlay] = useState(false);
+  const [showMoodIndicator, setShowMoodIndicator] = useState(false);
 
   // --- HELPER: EXTRACT COMMANDS FROM PARENTHESES ---
-  // Commands are stripped from display text but kept internally
   const extractCommands = (text: string | undefined) => {
     if (!text) return { displayText: '', commands: [] };
     
@@ -62,13 +65,12 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
   const cleanMessageForUI = (rawText: string | undefined) => {
     if (!rawText) return '';
     return rawText
-      .replace(/<[^>]+>/g, '')      // removes wrapping tags like <whisper>
-      .replace(/\[[^\]]+\]/g, '')   // removes instant tags like [breath]
-      .replace(/\s{2,}/g, ' ')      // cleans up any double spaces left behind
+      .replace(/<[^>]+>/g, '')
+      .replace(/\[[^\]]+\]/g, '')
+      .replace(/\s{2,}/g, ' ')
       .trim();
   };
 
-  // The clean text that the user will actually see
   const { displayText: cleanedText } = extractCommands(message.text);
   const uiText = cleanMessageForUI(cleanedText);
 
@@ -84,17 +86,9 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
   // --- HELPER: DETECT LINK TYPE ---
   const getMediaType = (url: string | undefined) => {
     if (!url) return 'none';
-    
-    // 1. YouTube
     if (url.includes('youtube.com') || url.includes('youtu.be')) return 'youtube';
-    
-    // 2. EMBEDS (Pornhub, Redtube, etc.)
     if (url.includes('/embed/') || url.includes('embed.redtube')) return 'embed'; 
-    
-    // 3. Native Files (MP4/Blob)
     if (url.match(/\.(mp4|webm|ogg)$/i) || url.startsWith('blob:') || url.includes('firebasestorage')) return 'video_file';
-    
-    // 4. Fallback (Generic Links)
     return 'external_link'; 
   };
 
@@ -111,13 +105,6 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
   };
 
   // --- HELPER: FORMAT TEXT WITH ASTERISKS ---
-  /**
-   * Handles:
-   * *text* → italic (internal feelings)
-   * Regular text → normal
-   * 
-   * Note: Commands in () are already stripped by extractCommands()
-   */
   const formatMessageText = (text: string) => {
     if (!text) return null;
     
@@ -125,9 +112,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
     let i = 0;
 
     while (i < text.length) {
-      // Check for *italic* (single asterisks, not double)
       if (text[i] === '*' && (i === 0 || text[i - 1] !== '*') && text[i + 1] !== '*') {
-        // Find closing *
         let j = i + 1;
         let foundClosing = false;
         let italicContent = '';
@@ -147,13 +132,11 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
           j++;
         }
         
-        // If no closing * found, treat it as regular text
         if (!foundClosing) {
           parts.push(<span key={parts.length}>{text[i]}</span>);
           i++;
         }
       } else {
-        // Regular text - collect until next * or end
         let j = i;
         while (j < text.length && text[j] !== '*') {
           j++;
@@ -209,13 +192,11 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
 
     setIsDownloading(true);
     try {
-      // Direct open for external links/embeds
       if (mediaType === 'youtube' || mediaType === 'external_link' || mediaType === 'embed') {
           window.open(urlToDownload, '_blank');
           setIsDownloading(false);
           return;
       }
-      // Blob download for native files
       const response = await fetch(urlToDownload);
       const blob = await response.blob();
       const blobUrl = window.URL.createObjectURL(blob);
@@ -240,13 +221,15 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
     return 'aspect-[3/4]'; 
   };
 
-  // Helper to check if we should show the footer
   const shouldShowFooter = !message.isVideoLoading && (
     mediaType === 'video_file' || 
     mediaType === 'embed' || 
     mediaType === 'youtube' || 
     (!message.videoUrl && message.imageUrl)
   );
+
+  // Check if bot message has mood data
+  const hasMoodData = !isUser && (message.botMood || message.emotionalState);
 
   return (
     <div className={`flex w-full mb-8 ${isUser ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2 duration-300`}>
@@ -259,6 +242,17 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
                 {isUser ? 'User Protocol' : `${characterName} Interface`}
             </span>
             {isUser && <User className="w-3 h-3 text-zinc-500" />}
+            
+            {/* Mood Toggle Button for Bot Messages */}
+            {hasMoodData && (
+              <button 
+                onClick={() => setShowMoodIndicator(!showMoodIndicator)}
+                className="ml-auto p-1 text-purple-400 hover:text-purple-300 transition-colors"
+                title="Toggle mood indicator"
+              >
+                {showMoodIndicator ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </button>
+            )}
         </div>
 
         {/* TEXT BUBBLE */}
@@ -274,6 +268,16 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
               {!isTypingComplete && !isUser && <span className="inline-block w-1.5 h-3.5 ml-1 bg-purple-400 align-middle animate-pulse" />}
             </p>
           </div>
+        )}
+
+        {/* MOOD INDICATOR */}
+        {showMoodIndicator && hasMoodData && (
+          <MoodIndicator 
+            botMood={message.botMood}
+            emotionalState={message.emotionalState}
+            emotionalIntensity={message.emotionalIntensity}
+            compact={false}
+          />
         )}
 
         {/* LOADING SKELETON (Imaging Protocol) */}
@@ -295,7 +299,6 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
           <div className="flex flex-col gap-2 mt-3">
             <div className={`group relative overflow-hidden rounded-2xl border border-white/10 transition-all duration-500 ${isUser ? '' : 'rounded-tl-none'}`}>
               
-              {/* --- CASE 1: YOUTUBE LINK (Embed) --- */}
               {mediaType === 'youtube' && message.videoUrl ? (
                  <iframe 
                    src={getYoutubeEmbed(message.videoUrl)}
@@ -306,8 +309,6 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
                    allowFullScreen
                  />
               ) 
-              
-              /* --- CASE 2: SPICY EMBED (Iframe) --- */
               : mediaType === 'embed' && message.videoUrl ? (
                  <iframe 
                    src={message.videoUrl}
@@ -319,8 +320,6 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
                    scrolling="no"
                  />
               )
-
-              /* --- CASE 3: GENERIC EXTERNAL LINK (Smart Card) --- */
               : mediaType === 'external_link' && message.videoUrl ? (
                  <a 
                    href={message.videoUrl} 
@@ -337,8 +336,6 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
                     </div>
                  </a>
               )
-              
-              /* --- CASE 4: NATIVE VIDEO FILE (MP4/Blob) --- */
               : message.videoUrl && viewMode === 'video' ? (
                 <video 
                   key={message.videoUrl}
@@ -348,8 +345,6 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
                   className="w-[280px] md:w-[360px] h-auto block bg-black shadow-inner rounded-2xl cursor-pointer"
                 />
               ) 
-              
-              /* --- CASE 5: STATIC IMAGE --- */
               : (
                 <img 
                   key={message.imageUrl}
@@ -367,7 +362,6 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
                 />
               )}
 
-              {/* === OVERLAYS (Only for Native Video/Image) === */}
               {(mediaType === 'video_file' || (!message.videoUrl && message.imageUrl)) && (
                   <>
                     <div className={`absolute inset-0 flex flex-col items-center justify-center gap-3 backdrop-blur-[2px] transition-all duration-300 pointer-events-none ${showMobileOverlay ? 'bg-black/60' : 'bg-black/0 group-hover:bg-black/50'}`}>
@@ -385,7 +379,6 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
                         </button>
                     </div>
                     
-                    {/* LOADING OVERLAY: "Synthesizing" */}
                     {message.isVideoLoading && (
                         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 backdrop-blur-md pointer-events-none">
                             <div className="relative mb-3">
@@ -398,7 +391,6 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
                         </div>
                     )}
                     
-                    {/* ZOOM ICON (Top Right) */}
                     {!message.isVideoLoading && (
                         <div className={`absolute top-3 right-3 transition-opacity pointer-events-none ${showMobileOverlay ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
                             <div className="bg-black/50 backdrop-blur-md p-1.5 rounded-lg border border-white/10">
@@ -410,11 +402,9 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
               )}
             </div>
 
-            {/* === FOOTER / CONTROL BAR === */}
             {shouldShowFooter && (
               <div className="flex items-center justify-between w-[280px] md:w-[360px] px-1">
                 
-                {/* LEFT BUTTONS: THEATER MODE or NATIVE CONTROLS */}
                 {mediaType === 'embed' || mediaType === 'youtube' ? (
                    <button onClick={() => onMediaClick(message.videoUrl!, mediaType as any)} className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-purple-400 hover:text-purple-300 transition-colors">
                      <Maximize2 className="w-3 h-3" /> Theater Mode
@@ -432,7 +422,6 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
                    </button>
                 )}
                 
-                {/* RIGHT BUTTONS: DOWNLOAD / REFRESH */}
                 {mediaType !== 'embed' && mediaType !== 'youtube' && (
                     <div className="flex items-center gap-3">
                         <button onClick={() => { if (message.videoUrl && viewMode === 'video') onAnimateRequest(message); else onRegenerateImage(message); }} className="text-zinc-600 hover:text-purple-400 transition-colors">
@@ -456,13 +445,11 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
           {mediaType === 'youtube' && <span className="text-red-500 font-bold flex items-center gap-1"><Youtube className="w-3 h-3"/> YouTube</span>}
           {mediaType === 'embed' && <span className="text-purple-500 font-bold flex items-center gap-1"><Play className="w-3 h-3 fill-current"/> Video Feed</span>}
 
-          {/* ✅ DYNAMIC TTS CONTROL BUTTON FOR AI MESSAGES */}
           {!isUser && message.text && (
               <>
                   <span className="text-zinc-700">•</span>
                   <button 
                       onClick={() => {
-                          // The TTS engine STILL GETS the raw tags for speech!
                           const speechText = message.text?.replace(/\*.*?\*/g, '').trim();
                           if (speechText) {
                               if (onToggleTTS) {
@@ -496,6 +483,8 @@ export default React.memo(ChatMessage, (prevProps, nextProps) => {
     prevProps.message.isVideoLoading === nextProps.message.isVideoLoading &&
     prevProps.characterName === nextProps.characterName &&
     prevProps.characterVoiceId === nextProps.characterVoiceId &&
-    prevProps.isCurrentlyPlaying === nextProps.isCurrentlyPlaying
+    prevProps.isCurrentlyPlaying === nextProps.isCurrentlyPlaying &&
+    prevProps.message.botMood === nextProps.message.botMood &&
+    prevProps.message.emotionalState === nextProps.message.emotionalState
   );
 });
