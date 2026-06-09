@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { buildImageConsistencyPrompt, buildEnrichedImagePrompt, VisualContextMemory } from '../lib/imageConsistency';
+import { buildImageConsistencyPrompt, buildEnrichedImagePrompt, VisualContextMemory } from '../lib/imageConsistency.js';
 
 /**
  * ARIA NEURAL IMAGE PROXY (RunPod Serverless)
