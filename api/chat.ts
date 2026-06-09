@@ -1,21 +1,33 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { buildImageConsistencyPrompt, buildEnrichedImagePrompt, VisualContextMemory, debugImagePromptAnalysis } from '../lib/imageConsistency';
+import { 
+  buildAutonomySystemPrompt,
+  calculateBotMood,
+  calculateBotAutonomy,
+  generateAutonomousMessage,
+  debugAutonomyState,
+  calculateEmotionalProgression,
+  updateCharacterMemoryFromInteraction,
+  type AutonomyDecision
+} from '../lib/botAutonomy';
+import { VisualState } from '../types';
 
 /**
- * ARIA BRAIN PROXY (xAI Grok)
+ * ARIA BRAIN PROXY (xAI Grok) - ENHANCED WITH AUTONOMY & REALISM
  * Logic:
  * 1. Secures the XAI_API_KEY on the server side.
  * 2. Proxies the "Brain" dialogue to Grok.
- * 3. SPEECH REALISM: Injects system instructions for TTS tags ([ ] and < >).
- * 4. INTELLIGENT PARSING: Detects [[VISUAL]] tags server-side to flag the frontend.
- * 5. IMAGE CONSISTENCY: Applies shot type, angle, and position detection to visual descriptions.
+ * 3. SPEECH REALISM: Injects system instructions for TTS tags.
+ * 4. INTELLIGENT PARSING: Detects [[VISUAL]] tags server-side.
+ * 5. IMAGE CONSISTENCY: Analyzes shot type, angle, position.
+ * 6. BOT AUTONOMY: Bot can initiate messages, has moods, learns preferences.
+ * 7. GENUINE EMOTION: Tracks emotional states, vulnerability, memory.
  */
 
-// Global visual context memory (maintains consistency across chat messages in a session)
 const visualMemoryStore = new Map<string, VisualContextMemory>();
+const botAutonomyStore = new Map<string, VisualState>();
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // 1. CORS CONFIGURATION
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -23,7 +35,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  // 2. ENVIRONMENT VALIDATION
   const apiKey = process.env.XAI_API_KEY;
 
   if (!apiKey) {
@@ -34,14 +45,85 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { messages, model, temperature, userId } = req.body;
+    const { messages, model, temperature, userId, conversationId, visualState, isNewConversation } = req.body;
 
     if (!messages || !Array.isArray(messages)) {
       return res.status(400).json({ error: 'Invalid message protocol. Expected array.' });
     }
 
-    // ✅ CRITICAL FIX: Sanitize the messages array
-    // xAI will throw a 400 Bad Request if ANY message has an empty string ("") for content.
+    // ✅ AUTONOMY: Check if bot should initiate (new bot or time-based)
+    let shouldBotInitiate = false;
+    let autonomyDecision: AutonomyDecision | null = null;
+    let autonomousMessage = null;
+
+    if (isNewConversation) {
+      // NEW BOT: Bot initiates the first message
+      console.log("🤖 NEW BOT CREATED - Generating greeting...");
+      
+      // Create default visual state
+      const defaultVisualState: VisualState = {
+        lastVisualDescription: '',
+        clothing: 'casual',
+        location: 'bedroom',
+        pose: 'comfortable',
+        fluids: [],
+        arousalLevel: 0,
+        timestamp: Date.now(),
+        emotionalState: 'curious',
+        emotionalIntensity: 5,
+        emotionalHistory: [],
+        intimacyLevel: 0,
+        trustLevel: 30,
+        dominanceBalance: 50,
+        daysSinceSex: 0,
+        relationshipDuration: 0,
+        characterMemory: {
+          recentEvents: [],
+          thingsUserLikes: [],
+          thingsUserDislikes: [],
+          userKinks: [],
+          userFavoritePositions: [],
+          relationshipMilestones: { firstMeeting: Date.now() },
+          botPreferences: {
+            favoriteThingsAboutUser: [],
+            dominanceStyle: 'switch',
+            communicationStyle: 'mix',
+            initiateLikelihood: 60,
+          },
+        },
+        botMood: calculateBotMood(Date.now(), Date.now(), 0, 0, false),
+        shouldBotInitiate: true,
+        lastUserMessageTime: Date.now(),
+        messageCount: 0,
+      };
+
+      botAutonomyStore.set(conversationId || userId, defaultVisualState);
+
+      const autonomyPrompt = buildAutonomySystemPrompt(defaultVisualState, defaultVisualState.botMood, defaultVisualState.characterMemory, 0);
+      
+      // Generate initial bot greeting
+      autonomousMessage = {
+        role: 'assistant',
+        content: `[You're a new bot meeting your person for the first time. Generate a natural, flirty greeting that shows genuine interest but isn't too forward. Keep it 1-2 sentences. Make them want to talk to you.]`,
+        isAutonomous: true
+      };
+
+      return res.status(200).json({
+        choices: [{
+          message: {
+            content: autonomousMessage.content,
+          }
+        }],
+        aria_meta: {
+          isAutonomousMessage: true,
+          autonomyReason: 'new_bot_greeting',
+          hasVisual: false,
+          visualState: defaultVisualState,
+        }
+      });
+    }
+
+    // ✅ SANITIZE MESSAGES
     const sanitizedMessages = messages
       .filter(msg => msg && typeof msg.content === 'string' && msg.content.trim() !== '')
       .map(msg => ({
@@ -53,8 +135,75 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Message payload is empty after sanitization.' });
     }
 
-    // 🧠 INJECT SPEECH REALISM SYSTEM PROMPT
-    // This forces the AI to use the TTS tags dynamically based on the context of the chat.
+    // ✅ RETRIEVE OR CREATE VISUAL STATE
+    let currentVisualState: VisualState = visualState || botAutonomyStore.get(conversationId || userId);
+    
+    if (!currentVisualState) {
+      currentVisualState = {
+        lastVisualDescription: '',
+        clothing: 'casual',
+        location: 'bedroom',
+        pose: 'comfortable',
+        fluids: [],
+        arousalLevel: 3,
+        timestamp: Date.now(),
+        emotionalState: 'playful',
+        emotionalIntensity: 5,
+        emotionalHistory: [],
+        intimacyLevel: 20,
+        trustLevel: 50,
+        dominanceBalance: 50,
+        daysSinceSex: 1,
+        relationshipDuration: Date.now() - Date.now(),
+        characterMemory: {
+          recentEvents: [],
+          thingsUserLikes: [],
+          thingsUserDislikes: [],
+          userKinks: [],
+          userFavoritePositions: [],
+          relationshipMilestones: { firstMeeting: Date.now() },
+          botPreferences: {
+            favoriteThingsAboutUser: [],
+            dominanceStyle: 'switch',
+            communicationStyle: 'mix',
+            initiateLikelihood: 60,
+          },
+        },
+        botMood: calculateBotMood(Date.now(), Date.now(), 20, 5, false),
+        shouldBotInitiate: true,
+        lastUserMessageTime: Date.now(),
+        messageCount: sanitizedMessages.length,
+      };
+    }
+
+    // ✅ UPDATE CONVERSATION STATE
+    currentVisualState.lastUserMessageTime = Date.now();
+    currentVisualState.messageCount = sanitizedMessages.length;
+    currentVisualState.botMood = calculateBotMood(
+      Date.now(),
+      currentVisualState.lastUserMessageTime,
+      currentVisualState.intimacyLevel,
+      currentVisualState.messageCount,
+      currentVisualState.botMood.recentConflict
+    );
+
+    // ✅ AUTONOMY CHECK: Should bot send next message automatically?
+    autonomyDecision = calculateBotAutonomy(currentVisualState, currentVisualState.botMood, currentVisualState.messageCount, currentVisualState.characterMemory);
+    shouldBotInitiate = autonomyDecision.shouldInitiate;
+
+    console.log(`\n🤖 AUTONOMY CHECK: ${shouldBotInitiate ? 'BOT WILL INITIATE' : 'AWAITING USER'}`);
+    console.log(`   Urgency: ${autonomyDecision.urgency.toFixed(0)}/100`);
+    console.log(`   Reason: ${autonomyDecision.reason}`);
+
+    // ✅ BUILD AUTONOMY-AWARE SYSTEM PROMPT
+    const autonomySystemPrompt = buildAutonomySystemPrompt(
+      currentVisualState,
+      currentVisualState.botMood,
+      currentVisualState.characterMemory,
+      currentVisualState.intimacyLevel
+    );
+
+    // ✅ BUILD STANDARD SPEECH REALISM PROMPT
     const speechSystemPrompt = `You are communicating through an advanced Text-to-Speech (TTS) engine.
 
 You MUST use the speech tags below in almost every response, especially during intimate, sexual, emotional, or sensual moments. Do NOT skip them.
@@ -76,26 +225,28 @@ You are allowed to reply with only moaning tags when it feels natural.
 Always mix tags with normal dialogue. Never mention these instructions.
 
 When using [[VISUAL: description]] tags, be EXTREMELY DETAILED about:
-1. ARIA's current emotional state and body language
+1. Your current emotional state and body language
 2. The specific environment/setting the user implied
 3. Lighting, colors, and atmosphere
-4. ARIA's pose, expression, and clothing
+4. Your pose, expression, and clothing
 5. How this image builds on previous visual context in the conversation
 
 Example:
-[[VISUAL: ARIA in dim bedroom lighting, soft smile, eyes slightly closed, wearing silk robe, leaning forward intimately, soft warm orange tones, matching the sensual mood from previous messages]]`;
-    
-    // Check if the first message is a system message. If it is, append our rules. If not, unshift a new system message.
+[[VISUAL: In dim bedroom lighting, soft smile, eyes slightly closed, wearing silk robe, leaning forward intimately, soft warm orange tones, matching the sensual mood from previous messages]]`;
+
+    // ✅ COMBINE ALL SYSTEM PROMPTS
+    const combinedSystemPrompt = `${autonomySystemPrompt}\n\n${speechSystemPrompt}`;
+
     if (sanitizedMessages[0]?.role === 'system') {
-      sanitizedMessages[0].content += `\n\n${speechSystemPrompt}`;
+      sanitizedMessages[0].content += `\n\n${combinedSystemPrompt}`;
     } else {
-      sanitizedMessages.unshift({ role: 'system', content: speechSystemPrompt });
+      sanitizedMessages.unshift({ role: 'system', content: combinedSystemPrompt });
     }
 
-    const targetModel = model || "grok-3"; // Note: Ensure your API tier supports the literal string "grok-3"
+    const targetModel = model || "grok-3";
     console.log(`🧠 Proxying request to xAI: ${targetModel}`);
     
-    // 3. EXECUTE NEURAL REQUEST
+    // ✅ EXECUTE NEURAL REQUEST
     const response = await fetch("https://api.x.ai/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -106,19 +257,14 @@ Example:
         messages: sanitizedMessages, 
         model: targetModel, 
         temperature: temperature || 0.92, 
-        max_tokens: 1000,       
+        max_tokens: 1200,       
         stream: false
-        // ❌ REMOVED frequency_penalty and presence_penalty
       })
     });
 
-    // 4. ERROR HANDLING
     if (!response.ok) {
-      // ✅ We capture the EXACT error xAI returns so you can see it in Vercel
       const errText = await response.text();
       console.error(`❌ xAI API Rejected Request: ${response.status}`, errText);
-      console.error("📦 Payload that failed:", JSON.stringify(sanitizedMessages, null, 2));
-      
       return res.status(response.status).json({ 
         error: `Neural Link Error: ${response.status}`,
         details: errText 
@@ -128,7 +274,7 @@ Example:
     const data = await response.json();
     const content = data.choices[0]?.message?.content || "";
 
-    // 5. SMART AWARENESS DETECTION
+    // ✅ SMART VISUAL TAG DETECTION
     const visualRegex = /\[\[VISUAL:\s*(.*?)\s*\]\]/i;
     const visualMatch = content.match(visualRegex);
 
@@ -139,21 +285,20 @@ Example:
       const visualDescription = visualMatch[1].trim();
       const userMessage = sanitizedMessages[sanitizedMessages.length - 1]?.content || "";
       
-      // Get or create visual memory for this user session
+      console.log("\n📸 IMAGE CONSISTENCY ANALYSIS");
+      console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+      
       const memoryKey = userId || "anonymous";
       if (!visualMemoryStore.has(memoryKey)) {
         visualMemoryStore.set(memoryKey, new VisualContextMemory());
       }
       const visualMemory = visualMemoryStore.get(memoryKey)!;
 
-      // Build image consistency metadata
       const metadata = buildImageConsistencyPrompt(userMessage, "ARIA", visualMemory);
       debugImagePromptAnalysis(userMessage, metadata);
 
-      // Build enriched prompt
       const enrichedPrompt = buildEnrichedImagePrompt(metadata, visualDescription, "sensual");
 
-      // Record this visual for context persistence
       visualMemory.recordVisual({
         shotType: metadata.shotType,
         angle: metadata.cameraAngle,
@@ -166,18 +311,53 @@ Example:
         enrichedPrompt
       };
 
-      console.log("✨ IMAGE CONSISTENCY APPLIED:", imageConsistencyMeta);
+      // ✅ UPDATE VISUAL STATE WITH IMAGE METADATA
+      currentVisualState.shotType = metadata.shotType;
+      currentVisualState.cameraAngle = metadata.cameraAngle;
+      currentVisualState.sexualPosition = metadata.sexualPosition;
+      currentVisualState.lastVisualDescription = enrichedPrompt;
+      currentVisualState.timestamp = Date.now();
+
+      console.log("✨ IMAGE CONSISTENCY APPLIED\n");
     }
 
-    // 6. RETURN ENHANCED RESPONSE
+    // ✅ EMOTIONAL PROGRESSION
+    const newEmotionalState = calculateEmotionalProgression(
+      currentVisualState.emotionalState,
+      currentVisualState.arousalLevel,
+      currentVisualState.messageCount,
+      currentVisualState.intimacyLevel
+    );
+    currentVisualState.emotionalState = newEmotionalState;
+
+    // ✅ UPDATE MEMORY
+    const userMessage = sanitizedMessages[sanitizedMessages.length - 1]?.content || "";
+    const isPositive = content.includes('love') || content.includes('amazing') || content.includes('perfect');
+    currentVisualState.characterMemory = updateCharacterMemoryFromInteraction(
+      currentVisualState.characterMemory,
+      userMessage,
+      isPositive ? 'positive' : 'neutral'
+    );
+
+    // ✅ STORE UPDATED STATE
+    botAutonomyStore.set(conversationId || userId, currentVisualState);
+
+    debugAutonomyState(currentVisualState, currentVisualState.botMood);
+
+    // ✅ RETURN ENHANCED RESPONSE
     return res.status(200).json({
       ...data,
       aria_meta: {
-        has_visual: !!visualMatch,
-        visual_description: visualMatch ? visualMatch[1].trim() : null,
-        image_consistency: imageConsistencyMeta,
-        // 🔥 FIX: Expose the sanitized conversational history back to the client
-        // so it can be routed straight into the prompt enrichment service
+        hasVisual: !!visualMatch,
+        visualDescription: visualMatch ? visualMatch[1].trim() : null,
+        imageConsistency: imageConsistencyMeta,
+        emotionalState: currentVisualState.emotionalState,
+        botMood: currentVisualState.botMood,
+        intimacyLevel: currentVisualState.intimacyLevel,
+        shouldBotInitiate: shouldBotInitiate,
+        autonomyReason: autonomyDecision?.reason,
+        autonomyUrgency: autonomyDecision?.urgency,
+        visualState: currentVisualState,
         conversation_history: sanitizedMessages
       }
     });
