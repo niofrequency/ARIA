@@ -32,33 +32,58 @@ export interface ImagePromptMetadata {
 }
 
 /**
- * SHOT TYPE DETECTION
+ * SHOT TYPE DETECTION - PRIORITIZES SEXUAL POSITIONS OVER GENERIC CLOSEUP
  * Categorizes user request into visual framing
  */
 function detectShotType(text: string): ShotType {
   const lowerText = text.toLowerCase();
   
-  // Closeup indicators
-  if (/\b(closeup|close-up|close up|zoom in|head shot|face|mouth|lips|cock sucking|blowjob|bj|lick|tongue|suck)\b/i.test(lowerText)) {
-    return 'closeup';
+  // 1. FIRST CHECK: Sexual positions → use their natural shot types
+  const positionMap: Record<string, ShotType> = {
+    'doggy': 'medium', // Ass prominent, not extreme closeup
+    'missionary': 'medium', // Full view of bodies
+    'cowgirl': 'medium', // Both bodies visible
+    'reverse_cowgirl': 'medium', // Back and ass prominent
+    'spooning': 'medium', // Side profile, bodies together
+    'standing': 'full_body', // Full bodies needed
+    'bending': 'medium', // Bent torso and ass
+    'on_knees': 'medium', // Kneeling position
+    'on_back': 'medium', // Torso and legs visible
+    'face_sitting': 'closeup', // This one IS a closeup
+  };
+  
+  for (const [position, shotType] of Object.entries(positionMap)) {
+    if (new RegExp(`\\b${position}\\b|\\b${position.replace('_', '\\s')}\\b`, 'i').test(lowerText)) {
+      return shotType;
+    }
   }
   
-  // Full body indicators
-  if (/\b(full body|full-body|standing|walk|walk around|entire body|whole body|feet|legs visible|from head to toe)\b/i.test(lowerText)) {
+  // 2. Full body indicators (explicit requests)
+  if (/\b(full body|full-body|standing|walk|walk around|entire body|whole body|feet|legs visible|from head to toe|show me you|see you|look at you)\b/i.test(lowerText)) {
     return 'full_body';
   }
   
-  // Medium (half body) indicators
+  // 3. Medium (half body) indicators
   if (/\b(medium|half body|half-body|waist up|torso|upper body|bust)\b/i.test(lowerText)) {
     return 'medium';
   }
   
-  // Default heuristic
-  if (/\b(show me|see you|look at you)\b/i.test(lowerText)) {
-    return 'full_body';
+  // 4. STRICT CLOSEUP - Only for explicit visual requests, NOT generic actions
+  // Must have intentional closeup keywords (not "mouth" from normal speech)
+  if (/\b(closeup|close-up|close up|zoom in|head shot|extreme close|macro|extreme closeup)\b/i.test(lowerText)) {
+    // But verify it's not part of a sexual action phrase
+    if (!/\b(fuck|suck|lick|ride|penetrat)\b.*\b(you|me)\b/i.test(lowerText)) {
+      return 'closeup';
+    }
   }
   
-  return 'medium'; // Safe default
+  // 5. Explicit blowjob/oral → closeup
+  if (/\b(blowjob|bj|suck|sucking|cock in mouth|dick in mouth|face fucking|fuck my face|suck my cock|suck my dick)\b/i.test(lowerText)) {
+    return 'closeup';
+  }
+  
+  // 6. Default to medium (safest fallback)
+  return 'medium';
 }
 
 /**
@@ -69,12 +94,12 @@ function detectCameraAngle(text: string): CameraAngle {
   const lowerText = text.toLowerCase();
   
   // First-person POV (user's perspective looking down at bot)
-  if (/\b(my cock|my dick|my pussy|my ass|i'm|i am|from my perspective|pov|point of view|first person|my view)\b/i.test(lowerText)) {
+  if (/\b(my cock|my dick|my pussy|my ass|i'm fucking|i'm pounding|i'm pummeling|from my perspective|pov|point of view|first person|my view)\b/i.test(lowerText)) {
     return 'pov_first_person';
   }
   
-  // Back view
-  if (/\b(back view|from behind|backside|rear view|ass view|back of|behind her|turn around|show your back)\b/i.test(lowerText)) {
+  // Back view - check BEFORE front (more specific)
+  if (/\b(back view|from behind|backside|rear view|ass view|back of|behind her|turn around|show your back|flip over|ass first)\b/i.test(lowerText)) {
     return 'back';
   }
   
@@ -88,7 +113,7 @@ function detectCameraAngle(text: string): CameraAngle {
 }
 
 /**
- * SEXUAL POSITION DETECTION
+ * SEXUAL POSITION DETECTION - IMPROVED MATCHING
  * Parses explicit sexual positions from user input
  * Returns 'none' if no position is mentioned
  */
@@ -96,16 +121,16 @@ function detectSexualPosition(text: string): SexualPosition {
   const lowerText = text.toLowerCase();
   
   const positionMap: Record<string, SexualPosition> = {
-    'doggy': /\b(doggy|doggystyle|doggy style|from behind|on all fours)\b/i,
-    'missionary': /\b(missionary|on top of me|missionary style)\b/i,
-    'cowgirl': /\b(cowgirl|riding|ride me|on top)\b/i,
-    'reverse_cowgirl': /\b(reverse cowgirl|reverse|facing away)\b/i,
-    'spooning': /\b(spoon|spooning|from the side)\b/i,
-    'standing': /\b(standing|standing up|against wall|wall)\b/i,
-    'bending': /\b(bend over|bending|bent over)\b/i,
-    'on_knees': /\b(on knees|kneeling|on her knees)\b/i,
-    'on_back': /\b(on her back|on back|lay on back|lying down)\b/i,
-    'face_sitting': /\b(face sit|face sitting|sit on my face)\b/i,
+    'doggy': /\b(doggy|doggystyle|doggy style|from behind|on all fours|ass up|rear entry)\b/i,
+    'missionary': /\b(missionary|on top of me|missionary style|on me|fucking me like that)\b/i,
+    'cowgirl': /\b(cowgirl|riding|ride me|on top|bouncing)\b/i,
+    'reverse_cowgirl': /\b(reverse cowgirl|reverse|facing away|back to you)\b/i,
+    'spooning': /\b(spoon|spooning|from the side|side fucking|side by side)\b/i,
+    'standing': /\b(standing|standing up|against wall|wall|standing fuck)\b/i,
+    'bending': /\b(bend over|bending|bent over|bend me|bent)\b/i,
+    'on_knees': /\b(on knees|kneeling|on her knees|knees)\b/i,
+    'on_back': /\b(on her back|on back|lay on back|lying down|on my back)\b/i,
+    'face_sitting': /\b(face sit|face sitting|sit on my face|face ride)\b/i,
   };
   
   for (const [position, regex] of Object.entries(positionMap)) {
@@ -118,7 +143,7 @@ function detectSexualPosition(text: string): SexualPosition {
 }
 
 /**
- * POV ACTION DETECTION
+ * POV ACTION DETECTION - IMPROVED
  * Identifies if user is performing an action ON the bot (first-person active)
  * Returns: { isPOVAction: boolean, actionDescription: string }
  */
@@ -127,13 +152,15 @@ function detectPOVAction(text: string): { isPOVAction: boolean; actionDescriptio
   
   // First-person possessive/active indicators
   const povActionPatterns = [
-    /my (\w+) (in|inside|at|into) (?:your|her)/i,
-    /(i'm fucking|i'm fucking|i'm pounding|i'm slamming|i'm thrusting|i'm filling|i'm stretching) (?:your|her|you)/i,
+    /my (\w+) (in|inside|at|into) (?:your|her|you)/i,
+    /(i'm fucking|i'm pounding|i'm slamming|i'm thrusting|i'm filling|i'm stretching|i'm pummeling) (?:your|her|you)/i,
     /(?:your|her) mouth on my/i,
     /my cock (in your|in her|down your|down her|deep in)/i,
     /my dick (in your|in her|down your|down her)/i,
     /my pussy (on your|on her|against your|against her)/i,
-    /(cum|coming|cumming) (in your|in her|on you|on her)/i,
+    /(cum|coming|cumming) (in your|in her|on you|on her|deep)/i,
+    /fuck (?:your|my|her|me)/i,
+    /let me (fuck|pound|slam|thrust) (?:your|you)/i,
   ];
   
   for (const pattern of povActionPatterns) {
@@ -199,54 +226,54 @@ function buildSexualPositionPrompt(
   
   const basePrompts: Record<SexualPosition, Record<ShotType, string>> = {
     doggy: {
-      full_body: 'On all fours, rear facing camera, body stretched out, penetration visible',
-      medium: 'On all fours, chest and ass prominent, eyes closed in pleasure, wet glistening skin',
-      closeup: 'Close shot of ass, on knees, penetration focused, muscles tensed'
+      full_body: 'On all fours, rear facing camera, body stretched out, penetration visible, full body in frame',
+      medium: 'On all fours, chest and ass prominent, eyes closed in pleasure, wet glistening skin, back arched',
+      closeup: 'Close shot of ass, on knees, penetration focused, muscles tensed, sweat dripping'
     },
     missionary: {
-      full_body: 'Lying on back, legs spread, receiving penetration, full body writhing',
-      medium: 'Torso visible, chest heaving, breasts bouncing, pleasure on face',
-      closeup: 'Face extremely close, eyes rolled back, mouth open in ecstasy, sweat visible'
+      full_body: 'Lying on back, legs spread, receiving penetration, full body writhing, both bodies visible',
+      medium: 'Torso visible, chest heaving, breasts bouncing, pleasure on face, intimate close contact',
+      closeup: 'Face extremely close, eyes rolled back, mouth open in ecstasy, sweat visible, deep passion'
     },
     cowgirl: {
-      full_body: 'Straddling, riding motion captured, full body bouncing, hands on thighs',
-      medium: 'Seated on top, torso prominent, breasts bouncing, focused expression',
-      closeup: 'Face close, biting lip, eyes intense, sweat dripping'
+      full_body: 'Straddling, riding motion captured, full body bouncing, hands on thighs, dynamic movement',
+      medium: 'Seated on top, torso prominent, breasts bouncing, focused expression, muscles engaged',
+      closeup: 'Face close, biting lip, eyes intense, sweat dripping, expressions of pleasure'
     },
     reverse_cowgirl: {
-      full_body: 'Straddling facing away, back and ass visible, full body motion',
-      medium: 'Back and ass prominent, sweat glistening, hands gripping',
-      closeup: 'Close shot of ass and penetration, muscles contracting'
+      full_body: 'Straddling facing away, back and ass visible, full body motion, muscles flexing',
+      medium: 'Back and ass prominent, sweat glistening, hands gripping, muscles tensing',
+      closeup: 'Close shot of ass and penetration, muscles contracting, intense engagement'
     },
     spooning: {
-      full_body: 'Side view, spooning position, back against front, full bodies visible',
-      medium: 'Bodies intertwined, back and side profile visible, intimate close contact',
-      closeup: 'Close side shot, kissing, moaning, deep connection'
+      full_body: 'Side view, spooning position, back against front, full bodies visible, intimate embrace',
+      medium: 'Bodies intertwined, back and side profile visible, intimate close contact, gentle motion',
+      closeup: 'Close side shot, kissing, moaning, deep emotional connection, tender moment'
     },
     standing: {
-      full_body: 'Standing position, full body visible, penetration active, wall or furniture support',
-      medium: 'Torso prominent, hands gripping, legs partially visible, pleasure face',
-      closeup: 'Face and neck, hair grabbed, breathing heavy, mouth open'
+      full_body: 'Standing position, full body visible, penetration active, wall or furniture support, dynamic',
+      medium: 'Torso prominent, hands gripping, legs partially visible, pleasure on face, passionate',
+      closeup: 'Face and neck, hair grabbed, breathing heavy, mouth open, intense energy'
     },
     bending: {
-      full_body: 'Bent over, touching ground/furniture, full back visible, receiving penetration',
-      medium: 'Bent at waist, ass and back prominent, arch in back, pleasure expression',
-      closeup: 'Rear closeup, hands gripping furniture, glistening skin, stretched position'
+      full_body: 'Bent over, touching ground/furniture, full back visible, receiving penetration, power dynamic',
+      medium: 'Bent at waist, ass and back prominent, arch in back, pleasure expression, engaged',
+      closeup: 'Rear closeup, hands gripping furniture, glistening skin, stretched position, intensity'
     },
     on_knees: {
-      full_body: 'On knees, posture varies (bent, upright), full body framed',
-      medium: 'Kneeling, torso visible, pleading expression, hands active',
-      closeup: 'Face and upper body, focus on pleasure, mouth open'
+      full_body: 'On knees, posture varies (bent, upright), full body framed, vulnerable yet strong',
+      medium: 'Kneeling, torso visible, pleading expression, hands active, engaged',
+      closeup: 'Face and upper body, focus on pleasure, mouth open, passionate expression'
     },
     on_back: {
-      full_body: 'Lying flat, full body exposed, legs spread, full penetration view',
-      medium: 'Chest and pelvis, breasts and pubic area visible, pleasure face',
-      closeup: 'Face extreme closeup, rolling head, ecstasy expression, sweat'
+      full_body: 'Lying flat, full body exposed, legs spread, full penetration view, vulnerable position',
+      medium: 'Chest and pelvis, breasts and pubic area visible, pleasure face, responsive',
+      closeup: 'Face extreme closeup, rolling head, ecstasy expression, sweat, pure passion'
     },
     face_sitting: {
-      full_body: 'Sitting on face, both bodies visible in full frame',
-      medium: 'Seated on face, posterior prominent, pleasure and satisfaction visible',
-      closeup: 'Extreme closeup of connection, ecstasy, dominant pleasure'
+      full_body: 'Sitting on face, both bodies visible in full frame, dominant pleasure',
+      medium: 'Seated on face, posterior prominent, pleasure and satisfaction visible, dominant',
+      closeup: 'Extreme closeup of connection, ecstasy, dominant pleasure, intimate intensity'
     },
     none: ''
   };
@@ -255,7 +282,7 @@ function buildSexualPositionPrompt(
   
   // Add POV action enhancement
   if (isPOVAction && povActionDescription) {
-    prompt += `, ${povActionDescription} visible, motion dynamic, pleasure intense`;
+    prompt += `, ${povActionDescription} visible in scene, dynamic active motion, intense pleasure`;
   }
   
   return prompt;
@@ -364,13 +391,15 @@ export function buildEnrichedImagePrompt(
 ): string {
   let enrichedPrompt = basePrompt;
 
-  // 1. Add shot type specification
-  const shotTypeSpecs = {
-    full_body: 'Full body shot from head to toe, entire subject visible in frame',
-    medium: 'Medium shot from waist up, torso and face prominently featured',
-    closeup: 'Extreme closeup, face and upper body fill the frame'
-  };
-  enrichedPrompt += `, ${shotTypeSpecs[metadata.shotType]}`;
+  // 1. Add shot type specification - but SKIP if already explicit in sexual position
+  if (metadata.sexualPosition === 'none') {
+    const shotTypeSpecs = {
+      full_body: 'Full body shot from head to toe, entire subject visible in frame',
+      medium: 'Medium shot from waist up, torso and face prominently featured',
+      closeup: 'Extreme closeup, face and upper body fill the frame'
+    };
+    enrichedPrompt += `, ${shotTypeSpecs[metadata.shotType]}`;
+  }
 
   // 2. Add camera angle specifications
   if (metadata.cameraAngle === 'back') {
@@ -408,7 +437,7 @@ export function buildEnrichedImagePrompt(
   }
 
   // 6. Add quality/detail tokens
-  enrichedPrompt += ', high quality, photorealistic, detailed, professional lighting';
+  enrichedPrompt += ', high quality, photorealistic, detailed, professional lighting, natural skin, accurate anatomy';
 
   return enrichedPrompt;
 }
