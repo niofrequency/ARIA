@@ -489,13 +489,6 @@ const ChatDashboard: React.FC<ChatDashboardProps> = ({
             setIsLoading={setIsLoadingResponse}
           />
         )}
-        
-        {/* DEBUG: Autonomy Status Indicator */}
-        <div className="absolute bottom-2 right-2 text-xs text-purple-400 font-mono z-20 bg-black/50 px-2 py-1 rounded">
-          {isLoadingResponse && '🔄 Bot generating...'}
-          {!isLoadingResponse && autonomyEnabled && currentMessages.length > 0 && '✅ Autonomy: ON'}
-          {!autonomyEnabled && '⏸️ Autonomy: OFF'}
-        </div>
       </main>
 
       {/* Settings Modal stays as an overlay */}
