@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'; 
+import React, { useState, useEffect, useMemo } from 'react';
 import ChatMessage from './ChatMessage';
 import { Message, CharacterProfile, UserData, BotMood, EmotionalState } from '../types';
 import { generateAriaImage } from '../services/generateAriaImage'; 
@@ -50,7 +50,7 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
   const [lastScrollY, setLastScrollY] = useState(0);
   const [isDownloading, setIsDownloading] = useState(false);
   
-  // ✅ Global Mood State
+  // ✅ Global Mood State - REACTIVE
   const [showGlobalMood, setShowGlobalMood] = useState(false);
   const [isLoadingMood, setIsLoadingMood] = useState(false);
   
@@ -72,7 +72,9 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
   };
   
   // ✅ 1. Initialize mood state - Priority: message history > memory service > defaults
-  const lastKnownMoodMsg = [...messages].reverse().find(m => m.role === 'model' && m.botMood);
+  const lastKnownMoodMsg = useMemo(() => {
+    return [...messages].reverse().find(m => m.role === 'model' && m.botMood);
+  }, [messages]);
   
   const [botMood, setBotMood] = useState<BotMood>(lastKnownMoodMsg?.botMood || DEFAULT_BOT_MOOD);
   const [emotionalState, setEmotionalState] = useState<EmotionalState>(lastKnownMoodMsg?.emotionalState || 'playful');
@@ -110,17 +112,21 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
     fetchMoodFromMemory();
   }, [userData?.uid, botId]);
 
-  // ✅ 3. AUTO-SYNC MOOD WHEN SWITCHING BOTS OR LOADING HISTORY
+  // ✅ 3. AUTO-SYNC MOOD WHEN NEW MESSAGE ARRIVES - FIXED
+  // This watches the latest message and updates mood in real-time
   useEffect(() => {
     if (messages && messages.length > 0) {
-      const latestMsg = [...messages].reverse().find(m => m.role === 'model' && m.botMood);
-      if (latestMsg && latestMsg.botMood) {
+      const latestMsg = messages[messages.length - 1];
+      
+      // Only update if this is a bot message with mood data
+      if (latestMsg.role === 'model' && latestMsg.botMood) {
+        console.log("🎭 MainChatArea: Updating mood from latest message:", latestMsg);
         setBotMood(latestMsg.botMood);
         setEmotionalState(latestMsg.emotionalState || 'playful');
         setEmotionalIntensity(latestMsg.emotionalIntensity || 6);
       }
     }
-  }, [botId, messages]);
+  }, [messages, messages.length]); // Watch for new messages
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -415,9 +421,7 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
             await storeMoodMemory(newBotMood, newEmotionalState, newIntensity, userData.uid, botId, userText);
           }
           
-          setBotMood(newBotMood);
-          setEmotionalState(newEmotionalState);
-          setEmotionalIntensity(newIntensity);
+          console.log("🎭 Mood Updated:", { newBotMood, newEmotionalState, newIntensity });
         } catch (e) {
           console.error('⚠️ Mood parse error:', e);
         }
@@ -458,6 +462,7 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
 
       const shouldGenerateImage = !!contextPrompt && !finalVideoUrl && !finalImageUrl;
 
+      // ✅ CRITICAL: Send message with mood data immediately
       onSendMessage({
           id: responseMessageId,
           role: 'model',
@@ -470,6 +475,11 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
           emotionalIntensity: newIntensity,
           timestamp: Date.now()
       });
+
+      // ✅ CRITICAL: Update local state to trigger MoodIndicator re-render
+      setBotMood(newBotMood);
+      setEmotionalState(newEmotionalState);
+      setEmotionalIntensity(newIntensity);
 
       if (cleanText && autoTTS) {
         const speechText = cleanText.replace(/\*.*?\*/g, '').trim();
@@ -562,6 +572,9 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
     }
   };
 
+  // ✅ CRITICAL: MoodIndicator must always render with current state
+  const moodIndicatorKey = `mood-${botMood.energy}-${botMood.horniness}-${emotionalState}-${emotionalIntensity}`;
+
   return (
     <div className={`relative flex flex-col h-[100dvh] flex-1 bg-zinc-950 overflow-hidden transition-all duration-300 ease-in-out ${isDesktopSidebarOpen ? 'lg:ml-0' : 'lg:ml-0'}`}>
       
@@ -622,7 +635,7 @@ const MainChatArea: React.FC<MainChatAreaProps> = ({
         </div>
 
         {showGlobalMood && (
-          <div className="absolute top-full right-6 mt-2 w-[300px] z-50 animate-in slide-in-from-top-2 fade-in duration-200 shadow-2xl">
+          <div key={moodIndicatorKey} className="absolute top-full right-6 mt-2 w-[300px] z-50 animate-in slide-in-from-top-2 fade-in duration-200 shadow-2xl">
              <MoodIndicator 
                botMood={botMood} 
                emotionalState={emotionalState} 
