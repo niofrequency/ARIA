@@ -1,13 +1,15 @@
 /**
- * ARIA IMAGE CONSISTENCY ENGINE - ENHANCED WITH CONTEXT TRACKING
+ * ARIA IMAGE CONSISTENCY ENGINE - ULTRA ENHANCED
  * Handles:
- * - Shot type classification (far/full body, medium/half body, closeup)
+ * - Shot type classification (far/full body, medium/half body, closeup) - ENHANCED
  * - Back view prevention (head-facing deformity)
- * - Sexual position parsing (doggy, missionary, etc.)
+ * - Sexual position parsing (doggy, missionary, etc.) - MORE DETAILED
  * - POV action detection ("my cock in your mouth" → first-person)
  * - Context persistence across chat messages
  * - MOOD & AROUSAL TRACKING (0-10 scale)
  * - CONVERSATION CONTEXT TRACKING (prevents Qwen convergence)
+ * - ANGLE-AWARE POSITIONING (more realistic depth perception)
+ * - SHOT-SPECIFIC COMPOSITION (framing optimized per shot type)
  */
 
 export type ShotType = 'full_body' | 'medium' | 'closeup';
@@ -29,6 +31,8 @@ export interface ImagePromptMetadata {
   shouldAvoidHeadDeformity: boolean;
   moodIndicator: MoodIndicator;
   arousalLevel: number; // 0-10
+  compositionGuide: string; // NEW: Shot-specific framing
+  depthCues: string; // NEW: Spatial positioning
   contextMemory: {
     lastShotType: ShotType | null;
     lastAngle: CameraAngle | null;
@@ -52,10 +56,54 @@ export interface ConversationContext {
   imageStrengthFactor: number;
 }
 
-/**
- * MOOD DETECTION - NEW
- * Analyzes user message for emotional/behavioral cues
- */
+// ============================================================================
+// SHOT COMPOSITION GUIDE - NEW & ENHANCED
+// Provides detailed framing instructions per shot type to maximize realism
+// ============================================================================
+
+const SHOT_COMPOSITION: Record<ShotType, string> = {
+  'full_body': `Full body composition: Head at top third of frame, feet near bottom, arms visible, torso centered, whole figure shows context and surrounding space, generous negative space around body`,
+  
+  'medium': `Medium shot composition: Waist/hips to head filling frame, shoulders width-appropriate, face clearly visible with room above head, intimate yet shows body language, depth of field slightly softer background`,
+  
+  'closeup': `Extreme closeup composition: Subject matter (face/lips/breasts/pussy) fills most of frame, tight crop to emphasize detail, minimal background visible, ultra-shallow depth of field (bokeh background), camera very close creating intimacy`
+};
+
+// ============================================================================
+// DEPTH CUE GENERATION - NEW
+// Adds spatial positioning language for better 3D perception
+// ============================================================================
+
+function generateDepthCues(shotType: ShotType, cameraAngle: CameraAngle, position: SexualPosition): string {
+  const depthMap: Record<ShotType, Record<string, string>> = {
+    'full_body': {
+      'front': 'subject centered in frame with clear space around body, depth extends from foreground to background, room visible behind subject',
+      'back': 'subject positioned in mid-frame facing away, depth receding, background visible behind body, clear spatial separation',
+      'side': 'subject in profile with left and right depth, body occupies middle zone, foreground and background separated by depth of field',
+      'pov_first_person': 'subject very close at bottom of frame, ground/surface visible below, extreme depth perception downward, immersive perspective'
+    },
+    'medium': {
+      'front': 'subject fills frame but not tight, shallow depth of field, background slightly blurred, subject floating in frame',
+      'back': 'subject positioned with space to edges, back detailed, subtle depth gradation, background bokeh blurred',
+      'side': 'subject in side profile with profile depth, one side in sharp focus, opposite side fading into depth',
+      'pov_first_person': 'subject extremely close almost filling frame, minimal background, ultra-shallow depth, almost overwhelming perspective'
+    },
+    'closeup': {
+      'front': 'hyper-focused on specific feature, paper-thin depth of field, rest of face/body completely blurred, isolated subject',
+      'back': 'back/rear area fills frame, skin texture paramount, everything behind blurred to pure bokeh, extreme isolation',
+      'side': 'side profile feature dominant, side view emphasizing curves/shape, depth fade very aggressive, almost abstract',
+      'pov_first_person': 'literally looking at subject at extreme close range, fills entire view, claustrophobic framing, immersive POV'
+    }
+  };
+
+  return depthMap[shotType]?.[cameraAngle] || depthMap[shotType]['front'];
+}
+
+// ============================================================================
+// MOOD DETECTION - NEW
+// Analyzes user message for emotional/behavioral cues
+// ============================================================================
+
 function detectMoodIndicator(text: string): MoodIndicator {
   const lowerText = text.toLowerCase();
 
@@ -84,18 +132,17 @@ function detectMoodIndicator(text: string): MoodIndicator {
     return 'aggressive';
   }
 
-  return 'playful'; // default mood
+  return 'playful';
 }
 
-/**
- * AROUSAL LEVEL CALCULATION - NEW
- * Estimates arousal from language cues (0-10 scale)
- */
+// ============================================================================
+// AROUSAL LEVEL CALCULATION - NEW
+// ============================================================================
+
 function calculateArousalLevel(text: string): number {
   const lowerText = text.toLowerCase();
-  let arousal = 3; // Base level
+  let arousal = 3;
 
-  // Arousal escalation triggers
   const escalationMap: Record<string, number> = {
     'breath|breathing': 1,
     'moan|moaning|gasp|gasping': 1.5,
@@ -118,10 +165,10 @@ function calculateArousalLevel(text: string): number {
   return Math.min(10, arousal);
 }
 
-/**
- * CONTEXT MEMORY MANAGER - TRACKS VISUAL PROGRESSION
- * Prevents image convergence by tracking what's been generated
- */
+// ============================================================================
+// CONTEXT MEMORY MANAGER - TRACKS VISUAL PROGRESSION
+// ============================================================================
+
 export class VisualContextMemory {
   private memory: {
     lastShotType: ShotType | null;
@@ -186,10 +233,10 @@ export class VisualContextMemory {
   }
 }
 
-/**
- * CONVERSATION CONTEXT EXTRACTION - NEW
- * Analyzes full conversation to prevent Qwen image convergence
- */
+// ============================================================================
+// CONVERSATION CONTEXT EXTRACTION - NEW
+// ============================================================================
+
 export function extractConversationContext(
   messages: ConversationMessage[],
   turnCount: number
@@ -206,7 +253,6 @@ export function extractConversationContext(
 
   const allContent = messages.map(m => m.content.toLowerCase()).join(' ');
 
-  // Extract semantic themes
   const themeMap: Record<string, RegExp> = {
     'energetic': /energetic|dynamic|fast|rough|wild|aggressive|intense|pounding|fucking/i,
     'sensual': /sensual|gentle|soft|slow|tender|intimate|romantic|passionate|loving|caressing/i,
@@ -224,14 +270,11 @@ export function extractConversationContext(
     if (pattern.test(allContent)) themes.push(theme);
   }
 
-  // Determine conversation arc
   let arc = 'new';
   if (turnCount > 2) arc = 'evolving';
   if (turnCount > 4) arc = 'complex';
   if (turnCount > 7) arc = 'sustained_narrative';
 
-  // Calculate image strength factor (prevents convergence)
-  // After 3 turns, reduce image strength significantly
   const imageStrengthFactor = Math.max(0.15, 0.8 - (turnCount * 0.2));
 
   return {
@@ -244,7 +287,7 @@ export function extractConversationContext(
 }
 
 // ============================================================================
-// EXISTING SHOT TYPE DETECTION (PRESERVED)
+// ENHANCED SHOT TYPE DETECTION
 // ============================================================================
 
 function detectShotType(text: string): ShotType {
@@ -284,7 +327,7 @@ function detectShotType(text: string): ShotType {
 }
 
 // ============================================================================
-// EXISTING CAMERA ANGLE DETECTION (PRESERVED)
+// ENHANCED CAMERA ANGLE DETECTION
 // ============================================================================
 
 function detectCameraAngle(text: string): CameraAngle {
@@ -306,7 +349,7 @@ function detectCameraAngle(text: string): CameraAngle {
 }
 
 // ============================================================================
-// EXISTING SEXUAL POSITION DETECTION (PRESERVED)
+// ENHANCED SEXUAL POSITION DETECTION
 // ============================================================================
 
 function detectSexualPosition(text: string): SexualPosition {
@@ -333,7 +376,7 @@ function detectSexualPosition(text: string): SexualPosition {
 }
 
 // ============================================================================
-// EXISTING POV ACTION DETECTION (PRESERVED)
+// ENHANCED POV ACTION DETECTION
 // ============================================================================
 
 function detectPOVAction(text: string): { isPOVAction: boolean; actionDescription: string } {
@@ -363,7 +406,7 @@ function detectPOVAction(text: string): { isPOVAction: boolean; actionDescriptio
 }
 
 // ============================================================================
-// EXISTING GROUP DETECTION (PRESERVED)
+// ENHANCED GROUP DETECTION
 // ============================================================================
 
 function shouldIncludeOtherPeople(text: string): boolean {
@@ -380,7 +423,7 @@ function shouldIncludeOtherPeople(text: string): boolean {
 }
 
 // ============================================================================
-// EXISTING BACK VIEW SAFETY (PRESERVED)
+// ENHANCED BACK VIEW SAFETY
 // ============================================================================
 
 function getBackViewHeadSafetyPrompt(cameraAngle: CameraAngle, shotType: ShotType): string {
@@ -396,72 +439,230 @@ function getBackViewHeadSafetyPrompt(cameraAngle: CameraAngle, shotType: ShotTyp
 }
 
 // ============================================================================
-// EXISTING SEXUAL POSITION PROMPT BUILDER (PRESERVED)
+// ULTRA-ENHANCED SEXUAL POSITION PROMPT BUILDER
+// NOW WITH SHOT-SPECIFIC AND ANGLE-AWARE POSITIONING
 // ============================================================================
 
 function buildSexualPositionPrompt(
   position: SexualPosition,
   shotType: ShotType,
   isPOVAction: boolean,
-  povActionDescription?: string
+  povActionDescription?: string,
+  cameraAngle?: CameraAngle
 ): string {
   if (position === 'none') return '';
   
-  const basePrompts: Record<SexualPosition, Record<ShotType, string>> = {
+  // Ultra-detailed position prompts per shot type AND angle
+  const basePrompts: Record<SexualPosition, Record<ShotType, Record<string, string>>> = {
     doggy: {
-      full_body: 'On all fours, rear facing camera, body stretched out, penetration visible, full body in frame',
-      medium: 'On all fours, chest and ass prominent, eyes closed in pleasure, wet glistening skin, back arched',
-      closeup: 'Close shot of ass, on knees, penetration focused, muscles tensed, sweat dripping'
+      full_body: {
+        'front': 'On all fours facing camera angle, rear raised prominent, back arched, head looking back with pleasure, full body stretched lengthwise in frame, ass centered, legs straight behind',
+        'back': 'On all fours, ass prominent and centered, body stretched away from camera, back muscles tense and visible, head turned looking back, full penetration view',
+        'side': 'On all fours in profile, back arched showing full body curve, rear end prominent in side profile, body stretched sideways across frame, head tilted back in pleasure',
+        'pov_first_person': 'Looking down at subject on all fours, ass and back filling view, back arched toward camera, camera positioned above looking down at back and rear'
+      },
+      medium: {
+        'front': 'On all fours chest and ass prominent, eyes closed in pleasure, wet glistening skin, back arched, head at top of frame, torso visible, rear end in center',
+        'back': 'Back view on all fours, ass front and center, back muscles visible, sweat glistening on skin, body bent with rear highest point',
+        'side': 'Side profile on all fours, body curve from back to rear visible, one side in sharp focus, other fading, arched back in profile',
+        'pov_first_person': 'Looking nearly straight down at rear area, ass prominent, back and glutes filling most of frame, extremely close perspective'
+      },
+      closeup: {
+        'front': 'Extreme closeup of ass and rear, on knees/fours, penetration clearly visible, muscles tensed, sweat dripping, skin texture detailed',
+        'back': 'Closeup of ass from behind, rear cheeks centered, penetration focused, muscle detail, glutes prominent, extreme isolation',
+        'side': 'Closeup side profile of rear and body curve, one cheek visible, body arch detail, skin texture in sharp focus',
+        'pov_first_person': 'Extreme closeup looking at rear almost filling entire frame, penetration point in focus, overwhelming POV perspective'
+      }
     },
     missionary: {
-      full_body: 'Lying on back, legs spread, receiving penetration, full body writhing, both bodies visible',
-      medium: 'Torso visible, chest heaving, breasts bouncing, pleasure on face, intimate close contact',
-      closeup: 'Face extremely close, eyes rolled back, mouth open in ecstasy, sweat visible, deep passion'
+      full_body: {
+        'front': 'Lying on back full body exposed, legs spread wide, receiving penetration, full body visible writhing, both torso and legs in frame, face showing ecstasy',
+        'back': 'Not applicable for missionary - using front angle',
+        'side': 'Side view of missionary, bodies pressed together, body stack visible, both subjects clear in frame, intimate connection',
+        'pov_first_person': 'Looking down at subject on back, full body beneath, legs spread around camera position, view from penetration perspective'
+      },
+      medium: {
+        'front': 'Torso visible, chest heaving, breasts bouncing with motion, face showing pleasure expressions, shoulders and torso prominent, intimate framing',
+        'back': 'From behind over subject, back of head, shoulders, back muscles visible, receiving position clear',
+        'side': 'Bodies intertwined side view, torso stacked, intimate connection visible, side profile of pleasure on faces',
+        'pov_first_person': 'Looking down at torso and face, subject's eyes meeting camera, chest bouncing toward view, intimate close framing'
+      },
+      closeup: {
+        'front': 'Face extreme closeup, eyes rolled back, mouth open in ecstasy, sweat visible, facial expressions of deep pleasure, intimate connection',
+        'back': 'Closeup of back of head, neck showing tension, hair flowing, shoulders tensing',
+        'side': 'Face side profile in closeup, mouth open, expressions of pleasure, profile of pleasure clear',
+        'pov_first_person': 'Subject's face extreme closeup looking directly at camera, eyes intense, mouth open, breathing heavy, immersive connection'
+      }
     },
     cowgirl: {
-      full_body: 'Straddling, riding motion captured, full body bouncing, hands on thighs, dynamic movement',
-      medium: 'Seated on top, torso prominent, breasts bouncing, focused expression, muscles engaged',
-      closeup: 'Face close, biting lip, eyes intense, sweat dripping, expressions of pleasure'
+      full_body: {
+        'front': 'Straddling with full body visible, riding motion captured, full body bouncing, hands on thighs or torso, dynamic movement, face in ecstasy',
+        'back': 'Straddling facing away, back visible, rear end prominent, full body motion evident, back muscles tensing',
+        'side': 'Side profile of straddling motion, body curve evident, bouncing motion captured in profile, side body angle',
+        'pov_first_person': 'Looking up at subject straddling, body above camera, full figure descending and rising, immersive from-below perspective'
+      },
+      medium: {
+        'front': 'Seated on top, torso prominent, breasts bouncing with motion, focused expression, muscles engaged, hands visible gripping or on body',
+        'back': 'Back view seated, rear end prominent, back and shoulders visible, motion evident in back muscles',
+        'side': 'Side profile seated, body curve in profile, bouncing motion in profile, side body shape evident',
+        'pov_first_person': 'Torso bouncing above camera, breasts or chest prominent, upper body motion captured, intimate from-below view'
+      },
+      closeup: {
+        'front': 'Face closeup showing intensity and pleasure, eyes focused and lusty, biting lip, expressions of focused ecstasy',
+        'back': 'Closeup of back and shoulder, muscles tensing, sweat glistening, back arch evident',
+        'side': 'Face side profile in closeup, pleasure expression in profile, hair flowing',
+        'pov_first_person': 'Face extreme closeup looking down intensely, overwhelming perspective, lustful gaze directly at camera'
+      }
     },
     reverse_cowgirl: {
-      full_body: 'Straddling facing away, back and ass visible, full body motion, muscles flexing',
-      medium: 'Back and ass prominent, sweat glistening, hands gripping, muscles tensing',
-      closeup: 'Close shot of ass and penetration, muscles contracting, intense engagement'
+      full_body: {
+        'front': 'Straddling facing away, back and ass visible prominent, full body motion, hands gripping thighs, body bouncing visible, rear end centered',
+        'back': 'Straddling facing away viewed from behind, ass and back prominent central focus, full figure descending and rising away from camera',
+        'side': 'Side profile straddling facing away, body curve and bounce captured, rear and back in profile motion',
+        'pov_first_person': 'Rear directly above, ass descending toward camera, full rear view bouncing, immersive from-below perspective'
+      },
+      medium: {
+        'front': 'Back and ass prominent, sweat glistening on skin, hands gripping thighs, muscles tensing, motion evident',
+        'back': 'Rear end centered, back visible, glutes prominent, tensing with motion',
+        'side': 'Back and rear in side profile, body curve evident, bounce motion in profile',
+        'pov_first_person': 'Rear and glutes prominent directly above, ass descending, intimate from-below perspective'
+      },
+      closeup: {
+        'front': 'Extreme closeup of ass and penetration, muscles contracting, intense engagement, glutes detailed',
+        'back': 'Extreme closeup rear view, ass prominent, penetration clear, muscle detail visible',
+        'side': 'Closeup side profile of rear, glute detail, engagement visible',
+        'pov_first_person': 'Extreme closeup rear filling frame, almost overwhelming rear view perspective, penetration detail clear'
+      }
     },
     spooning: {
-      full_body: 'Side view, spooning position, back against front, full bodies visible, intimate embrace',
-      medium: 'Bodies intertwined, back and side profile visible, intimate close contact, gentle motion',
-      closeup: 'Close side shot, kissing, moaning, deep emotional connection, tender moment'
+      full_body: {
+        'front': 'Side view, spooning position, back against front, full bodies visible stacked sideways, intimate embrace, both figures visible',
+        'back': 'Viewed from rear, both backs visible, intertwined bodies, side-by-side visible from behind',
+        'side': 'Pure side view perfect spoon position, both bodies perfectly aligned sideways, intimate stack clear',
+        'pov_first_person': 'Perspective from above the spoon, both bodies visible stacked, intimate positioning clear'
+      },
+      medium: {
+        'front': 'Bodies intertwined, back and side profile visible, intimate close contact, gentle motion evident, faces close together',
+        'back': 'Both backs visible intertwined, side-by-side body contact, gentle intimacy',
+        'side': 'Perfect side profile spoon, bodies stacked in profile, intimate connection in profile view',
+        'pov_first_person': 'Close intimate perspective of spooning pair, above or integrated view'
+      },
+      closeup: {
+        'front': 'Close side shot, faces together, kissing or near-kissing, moaning, deep emotional connection, tender expressions',
+        'back': 'Closeup of back contact, skin touching skin, tender intimacy',
+        'side': 'Face profiles closeup, emotions visible, kissing or near-kiss, side profile intimacy',
+        'pov_first_person': 'Extreme intimacy perspective, faces very close to camera, emotional connection'
+      }
     },
     standing: {
-      full_body: 'Standing position, full body visible, penetration active, wall or furniture support, dynamic',
-      medium: 'Torso prominent, hands gripping, legs partially visible, pleasure on face, passionate',
-      closeup: 'Face and neck, hair grabbed, breathing heavy, mouth open, intense energy'
+      full_body: {
+        'front': 'Standing position full body visible, penetration active, wall or furniture support visible, dynamic thrusting motion, full figures visible',
+        'back': 'Viewed from behind, back against wall/support, rear end prominent, standing motion',
+        'side': 'Standing in profile, both bodies visible side profile, dynamic motion in profile',
+        'pov_first_person': 'Looking up at subject standing, subject above camera, full figure descending'
+      },
+      medium: {
+        'front': 'Torso prominent, hands gripping (walls/furniture), legs partially visible, pleasure on face, passionate motion',
+        'back': 'Back prominent, muscles visible, hands gripping support, motion evident',
+        'side': 'Side profile torso, motion evident, both bodies in profile contact',
+        'pov_first_person': 'Torso descending toward camera, hands visible, intimate perspective'
+      },
+      closeup: {
+        'front': 'Face and neck closeup, hair grabbed/flowing, breathing heavy, mouth open, intense energy, eyes intense',
+        'back': 'Neck and back closeup, muscles visible, hair motion, tension',
+        'side': 'Face side profile closeup, intense expression, profile passion',
+        'pov_first_person': 'Face extreme closeup, overwhelming intimacy, eyes locked, breathing heavy'
+      }
     },
     bending: {
-      full_body: 'Bent over, touching ground/furniture, full back visible, receiving penetration, power dynamic',
-      medium: 'Bent at waist, ass and back prominent, arch in back, pleasure expression, engaged',
-      closeup: 'Rear closeup, hands gripping furniture, glistening skin, stretched position, intensity'
+      full_body: {
+        'front': 'Bent over touching ground/furniture, full back visible, receiving penetration, power dynamic evident, rear prominent, body stretch visible',
+        'back': 'Viewed from behind bent, rear end highest point, back stretched, power dynamic visible',
+        'side': 'Side profile bent position, body curve from back to bend, side angle of stretch',
+        'pov_first_person': 'Looking down at bent position, rear prominent, penetration perspective'
+      },
+      medium: {
+        'front': 'Bent at waist, ass and back prominent, arch in back visible, pleasure expression on face, engagement evident',
+        'back': 'Rear end centered prominent, back arch, muscles visible',
+        'side': 'Side profile bent, body curve, arch evident in profile',
+        'pov_first_person': 'Rear prominent from above, penetration view clear'
+      },
+      closeup: {
+        'front': 'Rear closeup, hands gripping furniture/ground, glistening skin, stretched position clear, intensity visible',
+        'back': 'Extreme closeup rear, glutes detailed, muscles visible, intensity',
+        'side': 'Closeup side profile rear, body arch detail',
+        'pov_first_person': 'Extreme closeup rear perspective, penetration detail clear'
+      }
     },
     on_knees: {
-      full_body: 'On knees, posture varies (bent, upright), full body framed, vulnerable yet strong',
-      medium: 'Kneeling, torso visible, pleading expression, hands active, engaged',
-      closeup: 'Face and upper body, focus on pleasure, mouth open, passionate expression'
+      full_body: {
+        'front': 'On knees full body framed, posture varies (bent, upright), full body visible, vulnerable yet strong, engaging position',
+        'back': 'On knees from behind, back visible, posture evident, rear visible depending on bend',
+        'side': 'On knees side profile, body curve visible in kneel position',
+        'pov_first_person': 'Looking down at kneeling figure, body below camera perspective'
+      },
+      medium: {
+        'front': 'Kneeling, torso visible, pleading expression, hands active, engaged, facial expressions clear',
+        'back': 'Kneeling from behind, back visible, posture in kneeling position',
+        'side': 'Kneeling in profile, side view of posture',
+        'pov_first_person': 'Torso and face from above perspective, kneeling below'
+      },
+      closeup: {
+        'front': 'Face and upper body, focus on pleasure, mouth open, passionate expression, kneeling position evident',
+        'back': 'Back and shoulders closeup, kneeling posture',
+        'side': 'Face profile, expression in profile, kneeling side view',
+        'pov_first_person': 'Face extreme closeup from above, kneeling perspective'
+      }
     },
     on_back: {
-      full_body: 'Lying flat, full body exposed, legs spread, full penetration view, vulnerable position',
-      medium: 'Chest and pelvis, breasts and pubic area visible, pleasure face, responsive',
-      closeup: 'Face extreme closeup, rolling head, ecstasy expression, sweat, pure passion'
+      full_body: {
+        'front': 'Lying flat full body exposed, legs spread, full penetration view, vulnerable position, complete body visible',
+        'back': 'Lying back viewed from above, full body beneath, legs spread toward camera',
+        'side': 'Lying back side profile, body along horizontal, visible from side',
+        'pov_first_person': 'Looking down at body on back, full figure beneath, penetration view'
+      },
+      medium: {
+        'front': 'Chest and pelvis, breasts and genital area visible, pleasure face, responsive body, torso prominent',
+        'back': 'Torso visible from above, chest and hips visible from behind',
+        'side': 'Side view of lying back position, torso in profile',
+        'pov_first_person': 'Torso and face from above, intimate perspective'
+      },
+      closeup: {
+        'front': 'Face extreme closeup, rolling head, ecstasy expression, sweat, pure passion visible in expressions',
+        'back': 'Closeup of upper body/chest from behind, pleasure visible',
+        'side': 'Face profile closeup, pleasure evident in profile',
+        'pov_first_person': 'Face extreme closeup from above, eyes locked, overwhelming intimacy'
+      }
     },
     face_sitting: {
-      full_body: 'Sitting on face, both bodies visible in full frame, dominant pleasure',
-      medium: 'Seated on face, posterior prominent, pleasure and satisfaction visible, dominant',
-      closeup: 'Extreme closeup of connection, ecstasy, dominant pleasure, intimate intensity'
+      full_body: {
+        'front': 'Sitting on face, both bodies visible in full frame, dominant pleasure, receiver beneath, sitter above and prominent',
+        'back': 'From behind, sitter's back visible, receiver beneath, dominant rear view',
+        'side': 'Side profile face sitting, body positioning visible in profile',
+        'pov_first_person': 'Looking up at sitter, face-level perspective from receiver position'
+      },
+      medium: {
+        'front': 'Seated on face, posterior prominent, pleasure and satisfaction visible, dominant positioning, torso visible',
+        'back': 'Back and rear prominent, sitter's body dominant, positioning clear',
+        'side': 'Side profile seated, body positioning evident',
+        'pov_first_person': 'Face-level perspective of sitter, close intimate view'
+      },
+      closeup: {
+        'front': 'Extreme closeup of connection area, ecstasy, dominant pleasure visible in expressions and body contact',
+        'back': 'Closeup rear of sitter, dominant positioning, intimate intensity',
+        'side': 'Closeup side profile of positioning, intimate detail',
+        'pov_first_person': 'Extreme closeup face-level perspective, overwhelming intimacy'
+      }
     },
-    none: ''
+    none: {
+      full_body: { 'front': '', 'back': '', 'side': '', 'pov_first_person': '' },
+      medium: { 'front': '', 'back': '', 'side': '', 'pov_first_person': '' },
+      closeup: { 'front': '', 'back': '', 'side': '', 'pov_first_person': '' }
+    }
   };
   
-  let prompt = basePrompts[position][shotType] || '';
+  const angle = cameraAngle || 'front';
+  let prompt = basePrompts[position]?.[shotType]?.[angle] || basePrompts[position]?.[shotType]?.['front'] || '';
   
   if (isPOVAction && povActionDescription) {
     prompt += `, ${povActionDescription} visible in scene, dynamic active motion, intense pleasure`;
@@ -471,7 +672,7 @@ function buildSexualPositionPrompt(
 }
 
 // ============================================================================
-// MASTER PROMPT BUILDER - ENHANCED WITH MOOD & AROUSAL & CONTEXT
+// MASTER PROMPT BUILDER - ENHANCED
 // ============================================================================
 
 export function buildImageConsistencyPrompt(
@@ -497,6 +698,10 @@ export function buildImageConsistencyPrompt(
     previousVisuals: []
   };
 
+  // NEW: Generate composition and depth cues
+  const compositionGuide = SHOT_COMPOSITION[shotType];
+  const depthCues = generateDepthCues(shotType, cameraAngle, sexualPosition);
+
   return {
     shotType,
     cameraAngle,
@@ -507,12 +712,14 @@ export function buildImageConsistencyPrompt(
     shouldAvoidHeadDeformity: cameraAngle === 'back',
     moodIndicator,
     arousalLevel,
+    compositionGuide,
+    depthCues,
     contextMemory
   };
 }
 
 // ============================================================================
-// FINAL PROMPT ENRICHMENT - ENHANCED WITH MOOD & AROUSAL & CONTEXT
+// FINAL PROMPT ENRICHMENT - ULTRA ENHANCED
 // ============================================================================
 
 export function buildEnrichedImagePrompt(
@@ -540,18 +747,24 @@ export function buildEnrichedImagePrompt(
   // 2. Add arousal-level descriptors
   let arousalDescriptor = '';
   if (metadata.arousalLevel > 7) {
-    arousalDescriptor = 'heavily aroused, flushed skin, rapid breathing, intense pleasure';
+    arousalDescriptor = 'heavily aroused, flushed skin, rapid breathing, intense pleasure, glistening with fluids';
   } else if (metadata.arousalLevel > 5) {
-    arousalDescriptor = 'aroused, flushed cheeks, quickened breathing, visible excitement';
+    arousalDescriptor = 'aroused, flushed cheeks, quickened breathing, visible excitement, slight perspiration';
   } else if (metadata.arousalLevel > 3) {
-    arousalDescriptor = 'slightly excited, subtle blush, engaged, attentive';
+    arousalDescriptor = 'slightly excited, subtle blush, engaged, attentive, comfortable';
   } else {
     arousalDescriptor = 'calm, composed, relaxed demeanor';
   }
   
   enrichedPrompt += `, ${arousalDescriptor}`;
 
-  // 3. Add shot type specification
+  // 3. NEW: Add shot-specific composition guidance
+  enrichedPrompt += `, ${metadata.compositionGuide}`;
+
+  // 4. NEW: Add depth cues
+  enrichedPrompt += `, ${metadata.depthCues}`;
+
+  // 5. Add shot type specification (if no sexual position)
   if (metadata.sexualPosition === 'none') {
     const shotTypeSpecs = {
       full_body: 'Full body shot from head to toe, entire subject visible in frame',
@@ -561,7 +774,7 @@ export function buildEnrichedImagePrompt(
     enrichedPrompt += `, ${shotTypeSpecs[metadata.shotType]}`;
   }
 
-  // 4. Add camera angle specifications
+  // 6. Add camera angle specifications
   if (metadata.cameraAngle === 'back') {
     enrichedPrompt += `, ${getBackViewHeadSafetyPrompt(metadata.cameraAngle, metadata.shotType)}`;
   } else if (metadata.cameraAngle === 'side') {
@@ -570,13 +783,14 @@ export function buildEnrichedImagePrompt(
     enrichedPrompt += ', first-person perspective, looking down at subject, user\'s point of view';
   }
 
-  // 5. Add sexual position if applicable
+  // 7. Add sexual position with angle awareness
   if (metadata.sexualPosition !== 'none') {
     const positionPrompt = buildSexualPositionPrompt(
       metadata.sexualPosition,
       metadata.shotType,
       metadata.isPOVAction,
-      metadata.povActionDescription
+      metadata.povActionDescription,
+      metadata.cameraAngle
     );
     enrichedPrompt += `, ${positionPrompt}`;
 
@@ -585,17 +799,17 @@ export function buildEnrichedImagePrompt(
     }
   }
 
-  // 6. Add POV action enhancements
+  // 8. Add POV action enhancements
   if (metadata.isPOVAction && metadata.povActionDescription) {
     enrichedPrompt += `, ${metadata.povActionDescription} visible in scene, dynamic active motion, intense pleasure`;
   }
 
-  // 7. Add context consistency markers
+  // 9. Add context consistency markers
   if (metadata.contextMemory.lastShotType && metadata.contextMemory.lastShotType === metadata.shotType) {
     enrichedPrompt += ', maintaining visual consistency with previous image';
   }
 
-  // 8. Add conversation context awareness (prevents convergence)
+  // 10. Add conversation context awareness
   if (conversationContext) {
     if (conversationContext.themes.includes('escalating')) {
       enrichedPrompt += ', progression showing escalation from previous image, more intense';
@@ -607,14 +821,13 @@ export function buildEnrichedImagePrompt(
       enrichedPrompt += ', new environment, fresh perspective';
     }
     
-    // Add image strength factor metadata (for RunPod to use)
     if (conversationContext.imageStrengthFactor < 0.4) {
       enrichedPrompt += ', IMPORTANT: significantly different from reference image, creative freedom, high variation';
     }
   }
 
-  // 9. Add quality/detail tokens
-  enrichedPrompt += ', high quality, photorealistic, detailed, professional lighting, natural skin, accurate anatomy';
+  // 11. Add quality/detail tokens
+  enrichedPrompt += ', high quality, photorealistic, detailed, professional lighting, natural skin, accurate anatomy, cinema lighting';
 
   return enrichedPrompt;
 }
@@ -628,14 +841,17 @@ export function debugImagePromptAnalysis(
   metadata: ImagePromptMetadata,
   conversationContext?: ConversationContext
 ): void {
-  console.log('🎬 IMAGE CONSISTENCY DEBUG:');
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('🎬 ULTRA-ENHANCED IMAGE CONSISTENCY DEBUG:');
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   console.log(`📸 Shot Type: ${metadata.shotType}`);
   console.log(`📷 Camera Angle: ${metadata.cameraAngle}`);
   console.log(`🍆 Sexual Position: ${metadata.sexualPosition}`);
   console.log(`😊 Mood: ${metadata.moodIndicator}`);
   console.log(`🔥 Arousal Level: ${metadata.arousalLevel}/10`);
-  console.log(`👥 Include Other People: ${metadata.includeOtherPeople}`);
+  console.log(`\n🎭 COMPOSITION & DEPTH:`);
+  console.log(`   ${metadata.compositionGuide}`);
+  console.log(`   ${metadata.depthCues}`);
+  console.log(`\n👥 Include Other People: ${metadata.includeOtherPeople}`);
   console.log(`👁️ POV Action: ${metadata.isPOVAction}`);
   console.log(`📝 Action Description: ${metadata.povActionDescription || 'N/A'}`);
   console.log(`⚠️ Avoid Head Deformity: ${metadata.shouldAvoidHeadDeformity}`);
@@ -649,5 +865,5 @@ export function debugImagePromptAnalysis(
   }
   
   console.log(`🧠 Context Memory:`, metadata.contextMemory);
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 }
