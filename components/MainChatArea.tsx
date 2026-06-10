@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import ChatMessage from './ChatMessage';
 import { Message, CharacterProfile, UserData, BotMood, EmotionalState } from '../types';
 import { generateAriaImage } from '../services/generateAriaImage'; 
