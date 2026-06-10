@@ -690,39 +690,19 @@ cleanContextPrompt = enrichedPrompt;
   }
 
   // ==========================================
-  // FETCH AVATAR IMAGE & PREPARE PAYLOAD GLOBALLY
+  // VISION BRIDGE INJECTION (AVAILABLE FOR BOTH)
   // ==========================================
   let visualContext = "";
-  let imagesPayload: any = undefined;
-  const hasAvatar = !!character.avatarImage;
-
-  if (hasAvatar) {
+  if (character.avatarImage) {
     console.log("👁️ Extracting visual context from reference image...");
     visualContext = await getVisualDescription(character.avatarImage);
     if (visualContext) {
        console.log("👁️ Visual Context Extracted:", visualContext);
     }
-
-    let base64String = character.avatarImage;
-    if (base64String.startsWith('http')) {
-      try {
-        const response = await fetch(base64String);
-        const blob = await response.blob();
-        base64String = await new Promise((resolve) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result as string);
-          reader.readAsDataURL(blob);
-        });
-      } catch(e) {
-        console.error("❌ Failed to convert avatar URL to base64:", e);
-      }
-    }
-    const cleanBase64 = base64String.includes(',') ? base64String.split(',')[1] : base64String;
-    imagesPayload = [ { name: "face_reference.png", image: cleanBase64 } ];
   }
 
   // ==================== SMART MODEL DECISION ====================
-  const useQwen = hasAvatar;
+  const useQwen = !!character.avatarImage;
   console.log(`🎯 Model Decision → ${useQwen ? '🔵 Qwen AIO NSFW (Image to Image Refiner)' : '🔴 Biglust (Text to Image)'}`);
 
   // ✅ ENHANCED: Evaluate Framing based on COMBINED user intent & visual context
@@ -1009,9 +989,10 @@ cleanContextPrompt = enrichedPrompt;
 
   // --- 5. DYNAMIC WORKFLOW ORCHESTRATION ---
   let workflow: any = {};
+  let imagesPayload: any = undefined;
 
   // BRANCH A: Qwen FaceID Workflow
-  if (useQwen && hasAvatar) {
+  if (useQwen && character.avatarImage) {
     console.log("🧠 Using Qwen FaceID Workflow + Biglust Refiner");
 
     const isFirstImage = !visualState || (!visualState.lastVisualDescription && !visualState.pose) || (visualState.lastVisualDescription === "current moment" && !visualState.pose);
@@ -1097,7 +1078,7 @@ cleanContextPrompt = enrichedPrompt;
       currentId++;
     });
 
-    workflow["78"] = { "inputs": { "image": "face_reference.png" }, "class_type": "LoadImage" };
+    workflow["78"] = { "inputs": { "image": "input_image.png" }, "class_type": "LoadImage" };
     workflow["93"] = { "inputs": { "upscale_method": "lanczos", "megapixels": 1, "resolution_steps": 64, "image": ["78", 0] }, "class_type": "ImageScaleToTotalPixels" };
     workflow["88"] = { "inputs": { "pixels": ["93", 0], "vae": ["5", 2] }, "class_type": "VAEEncode" };
     
@@ -1130,23 +1111,7 @@ cleanContextPrompt = enrichedPrompt;
     workflow["202"] = { "inputs": { "text": "masterpiece, best quality, ultra detailed, highly realistic, biglust style, " + promptText, "clip": ["100", 1] }, "class_type": "CLIPTextEncode" };
     workflow["203"] = { "inputs": { "text": negativeText, "clip": ["100", 1] }, "class_type": "CLIPTextEncode" };
 
-    // 🔥 IPADAPTER INJECTION FOR STAGE 2 REFINER 🔥
-    workflow["10000"] = { "inputs": { "image": "face_reference.png" }, "class_type": "LoadImage" };
-    workflow["10001"] = { "inputs": { "model": ["100", 0], "preset": "PLUS FACE (portraits)" }, "class_type": "IPAdapterUnifiedLoader" };
-    workflow["10002"] = {
-      "inputs": {
-        "weight": 0.8,
-        "weight_type": "linear",
-        "combine_embeds": "concat",
-        "embeds_scaling": "V only",
-        "model": ["100", 0],
-        "ipadapter": ["10001", 1],
-        "image": ["10000", 0]
-      },
-      "class_type": "IPAdapterAdvanced"
-    };
-
-    // Refiner KSampler (Modified to use IPAdapter Model)
+    // Refiner KSampler
     workflow["201"] = {
       "inputs": {
         "seed": Math.floor(Math.random() * 1000000), 
@@ -1155,7 +1120,7 @@ cleanContextPrompt = enrichedPrompt;
         "sampler_name": "euler", 
         "scheduler": "simple", 
         "denoise": 0.15, 
-        "model": ["10002", 0], // Replaced ["100", 0] with IPAdapter model output
+        "model": ["100", 0],
         "positive": ["202", 0],
         "negative": ["203", 0],
         "latent_image": ["200", 0]
@@ -1168,6 +1133,23 @@ cleanContextPrompt = enrichedPrompt;
     
     // Output Save Node
     workflow["19"] = { "inputs": { "filename_prefix": "ARIA_QWEN_I2I_REFINED", "images": ["300", 0] }, "class_type": "SaveImage" };
+
+    let base64String = character.avatarImage;
+    if (base64String.startsWith('http')) {
+      try {
+        const response = await fetch(base64String);
+        const blob = await response.blob();
+        base64String = await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(blob);
+        });
+      } catch(e) {
+        console.error("❌ Failed to convert avatar URL to base64:", e);
+      }
+    }
+    const cleanBase64 = base64String.includes(',') ? base64String.split(',')[1] : base64String;
+    imagesPayload = [ { name: "input_image.png", image: cleanBase64 } ];
 
   } else {
     // BRANCH B: Standard Biglust Text-to-Image Workflow
@@ -1224,35 +1206,12 @@ cleanContextPrompt = enrichedPrompt;
     workflow["6"] = { "inputs": { "text": promptText, "clip": clipSource }, "class_type": "CLIPTextEncode" };
     workflow["7"] = { "inputs": { "text": negativeText, "clip": clipSource }, "class_type": "CLIPTextEncode" };
 
-    let finalModelTarget = modelSource;
-
-    // 🔥 IPADAPTER INJECTION FOR TEXT TO IMAGE 🔥
-    if (hasAvatar) {
-      console.log("🔌 Injecting IPAdapter into Standard Text-to-Image Workflow");
-      workflow["10000"] = { "inputs": { "image": "face_reference.png" }, "class_type": "LoadImage" };
-      workflow["10001"] = { "inputs": { "model": modelSource, "preset": "PLUS FACE (portraits)" }, "class_type": "IPAdapterUnifiedLoader" };
-      workflow["10002"] = {
-        "inputs": {
-          "weight": 0.8,
-          "weight_type": "linear",
-          "combine_embeds": "concat",
-          "embeds_scaling": "V only",
-          "model": modelSource,
-          "ipadapter": ["10001", 1],
-          "image": ["10000", 0]
-        },
-        "class_type": "IPAdapterAdvanced"
-      };
-      // Point KSamplers to the IPAdapter output
-      finalModelTarget = ["10002", 0];
-    }
-
     workflow["10"] = {
       "inputs": {
         "steps": 25, "cfg": 7.5, "sampler_name": "dpmpp_2m_sde_gpu", "scheduler": "karras",
         "add_noise": "enable", "noise_seed": seed, "start_at_step": 0, "end_at_step": 20,
         "return_with_leftover_noise": "enable",
-        "model": finalModelTarget, "positive": ["6", 0], "negative": ["7", 0], "latent_image": ["5", 0]
+        "model": modelSource, "positive": ["6", 0], "negative": ["7", 0], "latent_image": ["5", 0]
       },
       "class_type": "KSamplerAdvanced"
     };
@@ -1262,7 +1221,7 @@ cleanContextPrompt = enrichedPrompt;
         "steps": 25, "cfg": 6.5, "sampler_name": "dpmpp_2m_sde_gpu", "scheduler": "karras",
         "add_noise": "disable", "noise_seed": seed, "start_at_step": 20, "end_at_step": 10000,
         "return_with_leftover_noise": "disable",
-        "model": finalModelTarget, "positive": ["6", 0], "negative": ["7", 0], "latent_image": ["10", 0]
+        "model": modelSource, "positive": ["6", 0], "negative": ["7", 0], "latent_image": ["10", 0]
       },
       "class_type": "KSamplerAdvanced"
     };
