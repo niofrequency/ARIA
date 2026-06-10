@@ -136,6 +136,7 @@ export const extractContextPrompt = (text: string) => {
   const youtubeRegex = /[\[\{]{2}\s*YOUTUBE\s*:\s*([\s\S]*?)\s*[\]\}]{2}/i;
   const spicyRegex = /[\[\{]{2}\s*SPICY\s*:\s*([\s\S]*?)\s*[\]\}]{2}/i;
   const ttsRegex = /[\[\{]{2}\s*TTS\s*:\s*([\s\S]*?)\s*[\]\}]{2}/i; 
+  const moodRegex = /[\[\{]{2}\s*MOOD\s*:\s*([\s\S]*?)\s*[\]\}]{2}/i;
 
   const visualMatch = text.match(visualRegex);
   let contextPrompt = visualMatch ? visualMatch[1].trim() : null;
@@ -155,6 +156,9 @@ export const extractContextPrompt = (text: string) => {
   const spicyMatch = text.match(spicyRegex);
   const spicySearchTerm = spicyMatch ? spicyMatch[1].trim() : null;
 
+  const moodMatch = text.match(moodRegex);
+  const moodData = moodMatch ? moodMatch[1].trim() : null;
+
   let cleanText = text
     .replace(visualRegex, '')
     .replace(memoryRegex, '')
@@ -163,6 +167,7 @@ export const extractContextPrompt = (text: string) => {
     .replace(linkRegex, '')
     .replace(spicyRegex, '')
     .replace(ttsRegex, '') 
+    .replace(moodRegex, '')
     .replace(/\*\s*sends\s+.*?\*/gi, '')
     .trim();
 
@@ -198,7 +203,8 @@ export const extractContextPrompt = (text: string) => {
     gifSearchTerm,
     youtubeSearchTerm,
     spicySearchTerm,
-    externalLink
+    externalLink,
+    moodData
   };
 };
 
@@ -445,14 +451,28 @@ export const generateAriaResponse = async (
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(`Grok API Error: ${errorData.error || response.statusText}`);
+      const errorText = await response.text();
+      let errorData;
+      try {
+        errorData = JSON.parse(errorText);
+      } catch (e) {
+        errorData = { error: errorText.substring(0, 200) }; 
+      }
+      throw new Error(`Grok API Error (${response.status}): ${errorData.error || response.statusText}`);
     }
 
     const data = await response.json();
-    const content = data.choices[0]?.message?.content;
+    let content = data.choices[0]?.message?.content || "";
     
-    return content ? content.trim() : "I'm lost in thought... 💕";
+    if (data.aria_meta && data.aria_meta.botMood) {
+      const m = data.aria_meta.botMood;
+      const state = data.aria_meta.emotionalState || 'playful';
+      const intensity = data.aria_meta.emotionalIntensity || 6;
+      const moodStr = `[[MOOD: energy=${m.energy}, confidence=${m.confidence}, horniness=${m.horniness}, affection=${m.affection}, state=${state}, intensity=${intensity}, timeOfDay=${m.timeOfDay}, daysSinceSex=${m.daysSinceSex}, stressLevel=${m.stressLevel}, recentConflict=${m.recentConflict}]]`;
+      content += ` \n${moodStr}`;
+    }
+
+    return content.trim() || "I'm lost in thought... 💕";
 
   } catch (err: any) {
     console.error("❌ AI Service Error:", err);
