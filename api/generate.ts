@@ -79,7 +79,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         characterDescription,
         ariaPersonality,
         previousPrompts,
-        userId
+        userId,
+        useIPAdapter,         // NEW: Flag to enable IPAdapter
+        ipAdapterImageName    // NEW: Filename of the face reference image
       } = req.body;
       
       if (!workflow) {
@@ -87,6 +89,53 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       console.log(`🎨 Dispatching Imaging Workflow to Endpoint: ${ENDPOINT_ID}`);
+
+      // 🔥 IP ADAPTER DYNAMIC INJECTION 🔥
+      if (useIPAdapter) {
+        // Find Checkpoint and Sampler IDs dynamically
+        const ckptNodeId = Object.keys(workflow).find(key => workflow[key].class_type === "CheckpointLoaderSimple");
+        const samplerNodeId = Object.keys(workflow).find(key => workflow[key].class_type === "KSampler" || workflow[key].class_type === "KSamplerAdvanced");
+
+        if (ckptNodeId && samplerNodeId) {
+          console.log(`🔌 Injecting IPAdapter between Checkpoint (${ckptNodeId}) and Sampler (${samplerNodeId})...`);
+
+          // Node 100: Load the reference image sent via the images array
+          workflow["100"] = {
+            "class_type": "LoadImage",
+            "inputs": {
+              "image": ipAdapterImageName || "face_reference.jpg"
+            }
+          };
+
+          // Node 101: Load IPAdapter Model
+          workflow["101"] = {
+            "class_type": "IPAdapterUnifiedLoader",
+            "inputs": {
+              "model": [ckptNodeId, 0],
+              "preset": "PLUS FACE (portraits)" 
+            }
+          };
+
+          // Node 102: Apply IPAdapter Advanced
+          workflow["102"] = {
+            "class_type": "IPAdapterAdvanced",
+            "inputs": {
+              "model": [ckptNodeId, 0],
+              "ipadapter": ["101", 1], 
+              "image": ["100", 0],
+              "weight": 0.8,
+              "weight_type": "linear",
+              "combine_embeds": "concat",
+              "embeds_scaling": "V only"
+            }
+          };
+
+          // Reroute KSampler to use the modified model from IPAdapter
+          workflow[samplerNodeId].inputs.model = ["102", 0];
+        } else {
+          console.warn("⚠️ IPAdapter Skipped: Could not find CheckpointLoaderSimple or KSampler in workflow.");
+        }
+      }
 
       // 🔥 IMAGE CONSISTENCY ENRICHMENT PIPELINE 🔥
       let enrichedContextTags = "";
