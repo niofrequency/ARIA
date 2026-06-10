@@ -485,13 +485,13 @@ function buildSexualPositionPrompt(
         'front': 'Torso visible, chest heaving, breasts bouncing with motion, face showing pleasure expressions, shoulders and torso prominent, intimate framing',
         'back': 'From behind over subject, back of head, shoulders, back muscles visible, receiving position clear',
         'side': 'Bodies intertwined side view, torso stacked, intimate connection visible, side profile of pleasure on faces',
-        'pov_first_person': 'Looking down at torso and face, subject's eyes meeting camera, chest bouncing toward view, intimate close framing'
+        'pov_first_person': 'Looking down at torso and face, subject\'s eyes meeting camera, chest bouncing toward view, intimate close framing'
       },
       closeup: {
         'front': 'Face extreme closeup, eyes rolled back, mouth open in ecstasy, sweat visible, facial expressions of deep pleasure, intimate connection',
         'back': 'Closeup of back of head, neck showing tension, hair flowing, shoulders tensing',
         'side': 'Face side profile in closeup, mouth open, expressions of pleasure, profile of pleasure clear',
-        'pov_first_person': 'Subject's face extreme closeup looking directly at camera, eyes intense, mouth open, breathing heavy, immersive connection'
+        'pov_first_person': 'Subject\'s face extreme closeup looking directly at camera, eyes intense, mouth open, breathing heavy, immersive connection'
       }
     },
     cowgirl: {
@@ -637,13 +637,13 @@ function buildSexualPositionPrompt(
     face_sitting: {
       full_body: {
         'front': 'Sitting on face, both bodies visible in full frame, dominant pleasure, receiver beneath, sitter above and prominent',
-        'back': 'From behind, sitter's back visible, receiver beneath, dominant rear view',
+        'back': 'From behind, sitter\'s back visible, receiver beneath, dominant rear view',
         'side': 'Side profile face sitting, body positioning visible in profile',
         'pov_first_person': 'Looking up at sitter, face-level perspective from receiver position'
       },
       medium: {
         'front': 'Seated on face, posterior prominent, pleasure and satisfaction visible, dominant positioning, torso visible',
-        'back': 'Back and rear prominent, sitter's body dominant, positioning clear',
+        'back': 'Back and rear prominent, sitter\'s body dominant, positioning clear',
         'side': 'Side profile seated, body positioning evident',
         'pov_first_person': 'Face-level perspective of sitter, close intimate view'
       },
