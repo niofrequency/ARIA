@@ -362,8 +362,15 @@ export const generateAriaResponse = async (
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(`Grok API Error: ${errorData.error || response.statusText}`);
+      // ✅ SAFELY PARSE JSON ERRORS OR PLAIN TEXT
+      const errorText = await response.text();
+      let errorData;
+      try {
+        errorData = JSON.parse(errorText);
+      } catch (e) {
+        errorData = { error: errorText.substring(0, 200) }; // Fallback for HTML/Text errors
+      }
+      throw new Error(`Grok API Error (${response.status}): ${errorData.error || response.statusText}`);
     }
 
     const data = await response.json();
