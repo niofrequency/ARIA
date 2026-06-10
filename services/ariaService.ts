@@ -7,7 +7,9 @@ import { retrieveMemories } from "./memoryService";
  * Converts the visual tag into a structured JSON state for the AI's memory.
  */
 export const buildVisualAwarenessJson = (visualDescription: string) => {
-  const parts = visualDescription.split(',').map(p => p.trim());
+  // Added a quick safety fallback in case visualDescription is undefined
+  const safeDescription = visualDescription || "current moment";
+  const parts = safeDescription.split(',').map(p => p.trim());
   
   const visualState = {
     scene_type: parts.includes('selfie') ? 'candid_selfie' : 'environmental_shot',
